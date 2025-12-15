@@ -199,7 +199,7 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
 
       // Implementasi fungsi upload SK di sini
       Toast.success("Aksi upload SK sedang diproses...");
-      // loadData(currentPage, sortBy, search, sortStatus); // Muat ulang data setelah aksi
+      
     },
     []
   );
