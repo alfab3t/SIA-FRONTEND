@@ -2,17 +2,13 @@
 
 import Icon from "./Icon";
 import Badge from "./Badge";
-import DOMPurify from "isomorphic-dompurify";
+import DOMPurify from "dompurify";
 import PropTypes from "prop-types";
 import { useCallback } from "react";
 
 export default function TableRow({
   row,
   columns,
-  enableCheckbox,
-  isSelected,
-  isRowSelectable,
-  onSelectRow,
   onToggle,
   onCancel,
   onDelete,
@@ -24,8 +20,7 @@ export default function TableRow({
   onUpload,
   onFinal,
   onPrint,
-  config,
-  rowClassName,
+  onAjukan,   // <=== TAMBAHAN
 }) {
   const renderAction = useCallback(
     (actions, id, status) =>
@@ -68,6 +63,7 @@ export default function TableRow({
                 onClick={() => onDetail(id)}
               />
             );
+
           case "Cancel":
             return (
               <Icon
@@ -90,6 +86,7 @@ export default function TableRow({
                 onClick={() => onEdit(id)}
               />
             );
+
           case "Delete":
             return (
               <Icon
@@ -100,6 +97,7 @@ export default function TableRow({
                 onClick={() => onDelete(id)}
               />
             );
+
           case "Approve":
             return (
               <Icon
@@ -111,6 +109,7 @@ export default function TableRow({
                 onClick={() => onApprove(id)}
               />
             );
+
           case "Reject":
             return (
               <Icon
@@ -122,6 +121,7 @@ export default function TableRow({
                 onClick={() => onReject(id)}
               />
             );
+
           case "Print":
             return (
               <Icon
@@ -132,16 +132,18 @@ export default function TableRow({
                 onClick={() => onPrint(id)}
               />
             );
+
           case "Sent":
             return (
               <Icon
                 key={`${id}-${action}`}
-                name="send"
+                name="paper-plane"
                 title="Kirim"
                 cssClass="text-primary btn px-1 py-0"
                 onClick={() => onSent(id)}
               />
             );
+
           case "Upload":
             return (
               <Icon
@@ -153,6 +155,7 @@ export default function TableRow({
                 onClick={() => onUpload(id)}
               />
             );
+
           case "Final":
             return (
               <Icon
@@ -164,6 +167,24 @@ export default function TableRow({
                 onClick={() => onFinal(id)}
               />
             );
+
+          // =====================================================
+          // 💥 INI YANG DITAMBAHKAN — Tombol AJUKAN ✈️
+          // =====================================================
+          case "Ajukan":
+            return (
+              <Icon
+                key={`${id}-${action}`}
+                name="send"
+                type="Bold"
+                cssClass="btn px-1 py-0 text-primary"
+                title="Ajukan"
+                onClick={() => onAjukan?.(id)}
+              />
+            );
+
+
+
           default: {
             try {
               if (typeof action === "object") {
@@ -199,60 +220,34 @@ export default function TableRow({
       onSent,
       onToggle,
       onUpload,
+      onAjukan, // <=== TAMBAHAN
     ]
   );
 
-  const canSelect = isRowSelectable ? isRowSelectable(row) : true;
-  const customRowClass = rowClassName ? rowClassName(row) : "";
-
   return (
-    <tr
-      className={`align-middle ${
-        isSelected ? "table-active" : ""
-      } ${customRowClass}`}
-    >
+    <tr className="align-middle">
       {columns.map((col, index) => {
         let cell;
-        const isWrap = config?.isWrap?.[col] || false;
 
-        if (enableCheckbox && col === "Check") {
-          if (canSelect) {
-            cell = (
-              <input
-                type="checkbox"
-                className="form-check-input"
-                checked={isSelected}
-                onChange={() => onSelectRow(row.id)}
-                style={{ cursor: "pointer" }}
-              />
-            );
-          } else {
-            cell = <span className="text-muted small"></span>;
-          }
-        } else if (col === "Status") {
+        if (col === "Status") {
           cell = <Badge status={row[col]} />;
         } else if (col === "Aksi") {
           cell = renderAction(row[col], row.id, row.Status);
-        } else if (typeof row[col] === "string") {
+        } else {
           cell = (
             <div
-              style={{ whiteSpace: isWrap ? "normal" : "nowrap" }}
               dangerouslySetInnerHTML={{
                 __html: DOMPurify.sanitize(row[col]),
               }}
             ></div>
           );
-        } else {
-          cell = row[col];
         }
 
         return (
           <td
             key={col + "-" + index}
             className="py-2 border-bottom"
-            style={{
-              textAlign: row.Alignment ? row.Alignment[index] : "center",
-            }}
+            style={{ textAlign: row.Alignment[index] || "center" }}
           >
             {cell}
           </td>
@@ -265,10 +260,6 @@ export default function TableRow({
 TableRow.propTypes = {
   row: PropTypes.object.isRequired,
   columns: PropTypes.arrayOf(PropTypes.string).isRequired,
-  enableCheckbox: PropTypes.bool,
-  isSelected: PropTypes.bool,
-  isRowSelectable: PropTypes.func,
-  onSelectRow: PropTypes.func,
   onToggle: PropTypes.func,
   onCancel: PropTypes.func,
   onDelete: PropTypes.func,
@@ -280,6 +271,5 @@ TableRow.propTypes = {
   onUpload: PropTypes.func,
   onFinal: PropTypes.func,
   onPrint: PropTypes.func,
-  config: PropTypes.object,
-  rowClassName: PropTypes.func,
+  onAjukan: PropTypes.func, // <=== TAMBAHAN
 };
