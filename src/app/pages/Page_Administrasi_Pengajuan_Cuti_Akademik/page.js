@@ -66,9 +66,9 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
   // Map roles based on ASP.NET code structure
   const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
-  const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI";
+  const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI";
   const isWadir1 = fixedRole === "ROL01" || fixedRole === "WADIR1";
-  const isFinance = fixedRole === "ROL08" || fixedRole === "FINANCE";
+  const isFinance = fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE";
   const isDAAK = fixedRole === "ROL21" || fixedRole === "DAAK";
   
   // Add support for generic ADMIN role and KARYAWAN (staff) role
@@ -134,10 +134,18 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           mhsId = userData?.mhsId || userData?.username || "";
           statusFilter = ""; // Will filter out approved in frontend
         } else if (isProdi) {
-          // Prodi sees only items waiting for their approval
-          statusFilter = "Belum Disetujui Prodi";
-          userId = userData?.username || "";
-          mhsId = "%";
+          // Check if it's NDA-PRODI (should see all data like admin) or regular PRODI (only their approval items)
+          if (fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI") {
+            // NDA-PRODI sees ALL pending data like admin
+            statusFilter = ""; // Will filter in frontend to exclude "Disetujui"
+            mhsId = "%";
+            userId = "";
+          } else {
+            // Regular Prodi sees only items waiting for their approval
+            statusFilter = "Belum Disetujui Prodi";
+            userId = userData?.username || "";
+            mhsId = "%";
+          }
         } else if (isWadir1) {
           // Wadir1 sees only items waiting for their approval
           statusFilter = "Belum Disetujui Wadir 1";
