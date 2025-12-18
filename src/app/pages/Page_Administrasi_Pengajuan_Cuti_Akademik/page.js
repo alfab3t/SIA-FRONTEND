@@ -640,38 +640,85 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     setLoading(true);
 
     try {
-      const payload = {
-        DraftId: id,
-        ModifiedBy: userData?.mhsId || userData?.userid || "",
-      };
-
-      // Use the generate-id endpoint from your controller: PUT /api/CutiAkademik/generate-id
-      const url = `${API_LINK}CutiAkademik/generate-id`;
-
-      const res = await fetch(url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const raw = await res.text();
-      let result;
-
-      try {
-        result = JSON.parse(raw);
-      } catch {
-        Toast.error("Response server tidak valid:\n\n" + raw);
+      // Pastikan ModifiedBy terisi dengan benar
+      const modifiedBy = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
+      
+      if (!modifiedBy) {
+        Toast.error("Data user tidak lengkap. Silakan login ulang.");
         return;
       }
 
+      const payload = {
+        DraftId: id,
+        ModifiedBy: modifiedBy,
+      };
+
+      console.log("=== AJUKAN CUTI AKADEMIK ===");
+      console.log("Payload:", payload);
+      console.log("UserData:", userData);
+
+      // Endpoint untuk mahasiswa generate ID
+      const url = `${API_LINK}CutiAkademik/generate-id`;
+      console.log("URL:", url);
+
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("Response status:", res.status);
+      console.log("Response headers:", Object.fromEntries(res.headers.entries()));
+
+      const raw = await res.text();
+      console.log("Raw response:", raw);
+      // Cek apakah response berhasil
+      if (!res.ok) {
+        console.error("HTTP Error:", res.status, res.statusText);
+        
+        // Coba parse sebagai JSON untuk error message
+        try {
+          const errorData = JSON.parse(raw);
+          const errorMsg = errorData.message || errorData.error || `HTTP ${res.status}: ${res.statusText}`;
+          Toast.error(`Gagal mengajukan: ${errorMsg}`);
+        } catch {
+          // Jika bukan JSON, tampilkan raw response
+          if (raw.includes("PRIMARY KEY constraint")) {
+            Toast.error("Error: ID sudah ada di database. Silakan coba lagi atau hubungi admin.");
+          } else if (raw.includes("SqlException")) {
+            Toast.error("Error database. Silakan coba lagi atau hubungi admin.");
+          } else {
+            Toast.error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+        }
+        return;
+      }
+
+      // Parse response JSON
+      let result;
+      try {
+        result = JSON.parse(raw);
+        console.log("Parsed result:", result);
+      } catch (parseError) {
+        console.error("JSON Parse error:", parseError);
+        Toast.error("Response server tidak valid. Periksa console untuk detail.");
+        return;
+      }
+
+      // Cek hasil
       if (result?.finalId) {
-        Toast.success("Pengajuan berhasil diajukan.");
+        Toast.success(`Pengajuan berhasil diajukan dengan ID: ${result.finalId}`);
         loadData(1);
       } else {
-        Toast.error(result?.message || "Gagal mengajukan.");
+        const errorMsg = result?.message || result?.error || "Gagal mengajukan pengajuan.";
+        Toast.error(errorMsg);
       }
     } catch (err) {
-      Toast.error(err.message);
+      console.error("Ajukan catch error:", err);
+      Toast.error(`Gagal mengajukan: ${err.message}`);
     } finally {
       setLoading(false);
     }
