@@ -819,13 +819,15 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
   };
 
-  // Handle Approve/Reject actions - These need to be implemented in the controller
+  // Handle Approve - Tanpa textbox, otomatis terisi
   const handleApprove = async (itemId) => {
     const confirm = await SweetAlert({
-      title: "Setujui Pengajuan",
-      text: "Yakin ingin menyetujui pengajuan ini?",
+      title: "Setujui Pengajuan Cuti Akademik",
+      text: "Yakin ingin menyetujui pengajuan cuti akademik ini?",
       icon: "question",
+      showCancelButton: true,
       confirmText: "Ya, Setujui!",
+      cancelText: "Batal",
       confirmButtonColor: "#28a745",
     });
 
@@ -834,52 +836,154 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     setLoading(true);
 
     try {
-      console.log("Approve ID:", itemId);
-      // TODO: Add approve endpoint to controller
-      // For now, show message that feature needs to be implemented
-      Toast.info("Fitur approve belum diimplementasi di controller. Silakan tambahkan endpoint approve.");
+      console.log("=== APPROVE PRODI ===");
+      console.log("ID:", itemId);
+
+      // Menimbang otomatis terisi (tidak perlu input dari user)
+      const menimbang = "Pengajuan cuti akademik telah memenuhi persyaratan dan disetujui oleh program studi.";
+      const approvedBy = userData?.nama || userData?.username || userData?.userid || "";
+
+      console.log("Menimbang:", menimbang);
+      console.log("ApprovedBy:", approvedBy);
+
+      // Sesuai dengan controller: [HttpPut("approve/prodi")]
+      const url = `${API_LINK}CutiAkademik/approve/prodi`;
       
-      // When implemented, use:
-      // const url = `${API_LINK}CutiAkademik/approve`;
-      // const payload = { id: itemId, username: userData?.username || "", role: fixedRole };
-      // const res = await fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const payload = {
+        id: itemId,
+        menimbang: menimbang,
+        approvedBy: approvedBy
+      };
+
+      console.log("Approve payload:", payload);
+
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      console.log("Approve response status:", res.status);
+
+      const raw = await res.text();
+      console.log("Approve raw response:", raw);
+
+      if (!res.ok) {
+        // Handle error response
+        try {
+          const errorData = JSON.parse(raw);
+          const errorMsg = errorData.message || errorData.error || `HTTP ${res.status}`;
+          Toast.error(`Gagal menyetujui: ${errorMsg}`);
+        } catch {
+          Toast.error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        return;
+      }
+
+      // Parse success response
+      let result;
+      try {
+        result = JSON.parse(raw);
+        console.log("Approve result:", result);
+      } catch {
+        // Jika tidak bisa parse JSON, anggap sukses jika status 200
+        result = { message: "Pengajuan berhasil disetujui" };
+      }
+
+      // Tampilkan notifikasi sukses
+      Toast.success("Pengajuan cuti akademik berhasil disetujui!");
+      loadData(1); // Reload data
       
     } catch (err) {
-      Toast.error(err.message);
+      console.error("Approve error:", err);
+      Toast.error(`Gagal menyetujui: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleReject = async (itemId) => {
-    const { value: reason } = await SweetAlert({
-      title: "Tolak Pengajuan",
-      text: "Masukkan alasan penolakan:",
-      input: "textarea",
-      inputPlaceholder: "Alasan penolakan...",
+    const confirm = await SweetAlert({
+      title: "Tolak Pengajuan Cuti Akademik",
+      text: "Yakin ingin menolak pengajuan cuti akademik ini?",
+      icon: "warning",
       showCancelButton: true,
-      confirmText: "Tolak",
+      confirmText: "Ya, Tolak!",
       cancelText: "Batal",
       confirmButtonColor: "#dc3545",
     });
 
-    if (!reason) return;
+    if (!confirm) return;
 
     setLoading(true);
 
     try {
-      console.log("Reject ID:", itemId, "Reason:", reason);
-      // TODO: Add reject endpoint to controller
-      // For now, show message that feature needs to be implemented
-      Toast.info("Fitur reject belum diimplementasi di controller. Silakan tambahkan endpoint reject.");
+      console.log("=== REJECT PRODI ===");
+      console.log("ID:", itemId);
+
+      // Keterangan otomatis terisi (tidak perlu input dari user)
+      const keterangan = "Pengajuan cuti akademik tidak memenuhi persyaratan yang ditetapkan oleh program studi.";
+
+      console.log("Keterangan:", keterangan);
+      console.log("Role:", fixedRole);
+
+      // Sesuai dengan controller: [HttpPut("reject")]
+      const url = `${API_LINK}CutiAkademik/reject`;
       
-      // When implemented, use:
-      // const url = `${API_LINK}CutiAkademik/reject`;
-      // const payload = { id: itemId, username: userData?.username || "", role: fixedRole, reason: reason };
-      // const res = await fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const payload = {
+        id: itemId,
+        role: "prodi", // Role untuk prodi
+        keterangan: keterangan
+      };
+
+      console.log("Reject payload:", payload);
+
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      console.log("Reject response status:", res.status);
+
+      const raw = await res.text();
+      console.log("Reject raw response:", raw);
+
+      if (!res.ok) {
+        // Handle error response
+        try {
+          const errorData = JSON.parse(raw);
+          const errorMsg = errorData.message || errorData.error || `HTTP ${res.status}`;
+          Toast.error(`Gagal menolak: ${errorMsg}`);
+        } catch {
+          Toast.error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        return;
+      }
+
+      // Parse success response
+      let result;
+      try {
+        result = JSON.parse(raw);
+        console.log("Reject result:", result);
+      } catch {
+        // Jika tidak bisa parse JSON, anggap sukses jika status 200
+        result = { message: "Pengajuan berhasil ditolak" };
+      }
+
+      // Tampilkan notifikasi sukses
+      Toast.success("Pengajuan cuti akademik berhasil ditolak!");
+      loadData(1); // Reload data
       
     } catch (err) {
-      Toast.error(err.message);
+      console.error("Reject error:", err);
+      Toast.error(`Gagal menolak: ${err.message}`);
     } finally {
       setLoading(false);
     }
