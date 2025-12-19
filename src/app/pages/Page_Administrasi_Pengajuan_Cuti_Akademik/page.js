@@ -17,7 +17,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const ssoData = useMemo(() => getSSOData(), []);
   const userData = useMemo(() => getUserData(), []);
   
-  // ========== PERMISSION & STATE MANAGEMENT ==========
+  
   const [permission, setPermission] = useState(null);
 
   useEffect(() => {
@@ -55,29 +55,25 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const sortRef = useRef();
   const statusRef = useRef();
 
-  // =========================
-  // ROLE HANDLING - Based on ASP.NET roles
-  // =========================
+
   let fixedRole = (userData?.role || "").toUpperCase();
   
   if (permission?.roleName) {
     fixedRole = permission.roleName.toUpperCase();
   }
 
-  // Map roles based on ASP.NET code structure
+  
   const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
   const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI";
   const isWadir1 = fixedRole === "ROL01" || fixedRole === "WADIR1";
   const isFinance = fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE";
   const isDAAK = fixedRole === "ROL21" || fixedRole === "DAAK";
   
-  // Add support for generic ADMIN role and KARYAWAN (staff) role
+  
   const isAdmin = fixedRole === "ADMIN" || fixedRole === "ADMIN SIA" || fixedRole === "KARYAWAN" ||
                   isWadir1 || isFinance || isDAAK;
 
-  // =========================
-  // FILTER OPTIONS - Based on ASP.NET structure
-  // =========================
+
   const dataFilterSort = [
     { Value: "tanggal_desc", Text: "Tanggal Pengajuan [↓]" },
     { Value: "tanggal_asc", Text: "Tanggal Pengajuan [↑]" },
@@ -105,9 +101,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const [searchRiwayat, setSearchRiwayat] = useState("");
   const [sortBy, setSortBy] = useState(dataFilterSort[0].Value);
   const [sortStatus, setSortStatus] = useState(dataFilterStatus[0].Value);
-  // ======================================================
-  // LOAD DATA PENGAJUAN - Based on Controller GetAll method
-  // ======================================================
+  
   const loadData = useCallback(
     async (page = 1) => {
       try {
@@ -123,45 +117,45 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         console.log("Is DAAK:", isDAAK);
         console.log("Is Admin:", isAdmin);
 
-        // Determine parameters based on role and your backend API
-        // PENGAJUAN section should only show PENDING items (not approved/completed)
-        let mhsId = "%"; // Default to % for SQL LIKE queries
+        
+        
+        let mhsId = "%"; 
         let statusFilter = "";
         let userId = "";
         
         if (isMahasiswa) {
-          // For mahasiswa, show their own PENDING data only
+          
           mhsId = userData?.mhsId || userData?.username || "";
-          statusFilter = ""; // Will filter out approved in frontend
+          statusFilter = ""; 
         } else if (isProdi) {
-          // Check if it's NDA-PRODI (should see all data like admin) or regular PRODI (only their approval items)
+          
           if (fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI") {
-            // NDA-PRODI sees ALL pending data like admin
-            statusFilter = ""; // Will filter in frontend to exclude "Disetujui"
+            
+            statusFilter = ""; 
             mhsId = "%";
             userId = "";
           } else {
-            // Regular Prodi sees only items waiting for their approval
+            
             statusFilter = "Belum Disetujui Prodi";
             userId = userData?.username || "";
             mhsId = "%";
           }
         } else if (isWadir1) {
-          // Wadir1 sees only items waiting for their approval
+          
           statusFilter = "Belum Disetujui Wadir 1";
           mhsId = "%";
         } else if (isFinance) {
-          // Finance sees only items waiting for their approval
+          
           statusFilter = "Belum Disetujui Finance";
           mhsId = "%";
         } else if (isDAAK) {
-          // DAAK sees items waiting for SK upload
+          
           statusFilter = "Menunggu Upload SK";
           mhsId = "%";
         } else if (isAdmin) {
-          // Admin sees ALL PENDING items (not approved ones)
-          // This will show items that need action, not completed ones
-          statusFilter = ""; // Will filter in frontend to exclude "Disetujui"
+          
+          
+          statusFilter = ""; 
           mhsId = "%";
           userId = "";
         }
@@ -169,18 +163,18 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         // Map frontend role to backend role codes
         let backendRole = fixedRole;
         if (fixedRole === "ADMIN SIA" || fixedRole === "ADMIN") {
-          backendRole = "ROL21"; // Use ROL21 as it works in Swagger
+          backendRole = "ROL21"; // 
         }
 
         console.log("API Parameters:", { mhsId, statusFilter, userId, role: backendRole, search });
 
-        // Build API URL with proper parameters matching your controller
+        
         const params = new URLSearchParams();
         
-        // Always include mhsId (even if empty, some stored procedures might need it)
+        
         params.append('mhsId', mhsId || '%');
         
-        // Only add other parameters if they have values
+        
         if (statusFilter) params.append('status', statusFilter);
         if (userId) params.append('userId', userId);
         if (backendRole) params.append('role', backendRole);
@@ -218,22 +212,22 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
         console.log("Parsed API Response Data:", data);
 
-        // Handle different response formats
+        
         let actualData = data;
         if (data && typeof data === 'object') {
-          // If response has a data property, use that
+          
           if (data.data && Array.isArray(data.data)) {
             actualData = data.data;
           }
-          // If response has items property, use that
+          
           else if (data.items && Array.isArray(data.items)) {
             actualData = data.items;
           }
-          // If response is wrapped in result property
+          
           else if (data.result && Array.isArray(data.result)) {
             actualData = data.result;
           }
-          // If data itself is not an array but has array properties
+          
           else if (!Array.isArray(data)) {
             console.log("Response is object but not array, checking properties...");
             const arrayProps = Object.keys(data).filter(key => Array.isArray(data[key]));
@@ -255,41 +249,41 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
         console.log("Processing array data:", actualData);
 
-        // FILTER: For PENGAJUAN section with mahasiswa-specific logic
+        
         const pendingData = actualData.filter(item => {
           const currentStatus = item.status || item.cak_status || "";
           
           if (isMahasiswa) {
-            // MAHASISWA: Show ONLY their own draft entries
+            
             if (currentStatus === "Draft") {
-              return true; // Show only draft entries for mahasiswa
+              return true; 
             }
-            return false; // Hide all non-draft entries for mahasiswa
+            return false; 
           } else {
-            // ADMIN/STAFF: Original logic - exclude approved items
-            // Approved items should only appear in RIWAYAT section
+            
+            
             if (currentStatus === "Disetujui") {
               return false;
             }
-            // Include all pending statuses in pengajuan list
+            
             return true;
           }
         });
 
         console.log("Filtered pending data:", pendingData);
 
-        // Apply pagination to pending data
+        
         const totalPendingItems = pendingData.length;
         const startIndex = (page - 1) * pageSize;
         const endIndex = startIndex + pageSize;
         const paginatedPendingData = pendingData.slice(startIndex, endIndex);
 
         const formattedData = paginatedPendingData.map((item, index) => {
-          // Check if it's draft based on ID format and status
+          
           const isDraft = item.status === "Draft" || item.id === "DRAFT" || !item.id?.includes("PMA");
           const isApproved = item.status === "Disetujui";
 
-          // Determine available actions based on role and status
+          
           let actions = ["Detail"];
           
           const currentStatus = item.status || item.cak_status || "";
@@ -297,91 +291,95 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           
           if (isMahasiswa) {
             if (isDraft) {
-              actions = ["Detail", "Edit", "Delete", "Ajukan", "Upload"];
+              actions = ["Detail", "Edit", "Delete", "Ajukan"];
             } else {
-              actions = ["Detail", "Upload"]; // Mahasiswa can view and upload SK
+              actions = ["Detail"]; // Mahasiswa can only view submitted applications
             }
           } else if (isProdi) {
             if (currentStatus === "Belum Disetujui Prodi") {
-              actions = ["Detail", "Approve", "Reject", "Upload"];
+              actions = ["Detail", "Approve", "Reject"];
             } else {
-              actions = ["Detail", "Upload"];
+              actions = ["Detail"];
             }
           } else if (isWadir1) {
             if (currentStatus === "Belum Disetujui Wadir 1") {
-              actions = ["Detail", "Approve", "Reject", "Upload"];
+              actions = ["Detail", "Approve", "Reject"];
             } else {
-              actions = ["Detail", "Upload"];
+              actions = ["Detail"];
             }
           } else if (isFinance) {
             if (currentStatus === "Belum Disetujui Finance") {
-              actions = ["Detail", "Approve", "Reject", "Upload"];
+              actions = ["Detail", "Approve", "Reject"];
             } else {
-              actions = ["Detail", "Upload"];
+              actions = ["Detail"];
             }
           } else if (isDAAK || isAdmin) {
-            // DAAK/Admin has Detail and Upload actions for all items
+            // ONLY DAAK/Admin can upload files (Unggah Berkas)
             actions = ["Detail", "Upload"];
           }
 
-          // Format approval status display based on API response format
+          
           const formatApprovalStatus = (approved, currentStatus, approvalType) => {
             console.log(`${approvalType} approval value:`, approved, "Status:", currentStatus);
             
-            // FIRST: Check if status indicates rejection for this approval type
-            if (currentStatus && currentStatus.includes("Ditolak")) {
-              if (approvalType === "Prodi" && currentStatus.includes("Prodi")) {
-                return "❌"; // Red X - rejected by Prodi
-              }
-              if (approvalType === "Wadir" && (currentStatus.includes("Wadir") || currentStatus.includes("Dir"))) {
-                return "❌"; // Red X - rejected by Wadir
+            // FIRST: Check if status indicates rejection for this approval type (case-insensitive)
+            if (currentStatus) {
+              const statusLower = currentStatus.toLowerCase();
+              if (statusLower.includes("ditolak")) {
+                if (approvalType === "Prodi" && statusLower.includes("prodi")) {
+                  return "❌"; // Red X - rejected by Prodi
+                }
+                if (approvalType === "Wadir" && (statusLower.includes("wadir") || statusLower.includes("dir"))) {
+                  return "❌"; // Red X - rejected by Wadir
+                }
               }
             }
             
             // SECOND: If approval field contains a username/value AND not rejected, it means approved
             if (approved && approved !== "" && approved !== null && approved !== undefined) {
+              const statusLower = currentStatus ? currentStatus.toLowerCase() : "";
               // Only show approved if the overall status is "Disetujui" or if this specific approval passed
               if (currentStatus === "Disetujui" || 
-                  (approvalType === "Prodi" && !currentStatus.includes("Ditolak Prodi")) ||
-                  (approvalType === "Wadir" && !currentStatus.includes("Ditolak Wadir"))) {
+                  (approvalType === "Prodi" && !statusLower.includes("ditolak prodi")) ||
+                  (approvalType === "Wadir" && !statusLower.includes("ditolak wadir"))) {
                 return "✅"; // Green checkmark - approved
               }
             }
             
             // THIRD: For empty/null values or pending status, show dash
-            return "-"; // Pending/not yet processed
+            return "-"; // Pending/not yet processed 
           };
 
-          // Format SK Cuti Akademik column - always show print icon
+          
           const formatSKColumn = (skNo) => {
-            return "🖨️ Cetak SK"; // Always show print icon for SK
+            return "🖨️ Cetak SK"; 
           };
 
-          // Debug: Log the item structure to understand the data format
+          
           if (index === 0) {
             console.log("Sample item structure:", item);
             console.log("Available keys:", Object.keys(item));
           }
 
-          // Get No SK value - based on your API response structure
+          
           const noSK = item.suratNo || "";
           
-          // Get approval values - based on your API response structure
+          
           const prodiApproval = item.approveProdi || item.approve_prodi || item.cak_approval_prodi;
           const wadirApproval = item.approveDir1 || item.approve_dir1 || item.cak_approval_dir1;
 
           return {
-            No: startIndex + index + 1, // Correct numbering across pages
-            id: item.cak_id || item.id || item.idDisplay, // Use cak_id as primary identifier
-            "No Pengajuan": item.id || item.idDisplay || item.cak_id || "-", // Display the pengajuan number
+            No: startIndex + index + 1, 
+            id: item.cak_id || item.id || item.idDisplay, 
+            "No Pengajuan": item.id || item.idDisplay || item.cak_id || "-", 
             "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
-            "No SK": noSK || "-", // Show the actual SK number, or "-" if empty
+            "No SK": noSK || "-", 
             "Disetujui Prodi": formatApprovalStatus(prodiApproval, currentStatus, "Prodi"),
             "Disetujui Wadir 1": formatApprovalStatus(wadirApproval, currentStatus, "Wadir"),
             Status: currentStatus || "-",
             "SK Cuti Akademik": formatSKColumn(noSK),
             Aksi: actions,
-            Alignment: Array(9).fill("center"), // Back to original 9 columns
+            Alignment: Array(9).fill("center"), 
           };
         });
 
@@ -389,13 +387,13 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         console.log(`Showing ${formattedData.length} items of ${totalPendingItems} total (page ${page})`);
 
         setDataCutiAkademik(formattedData);
-        setTotalData(totalPendingItems); // Use total pending items for pagination
+        setTotalData(totalPendingItems); 
         setCurrentPage(page);
       } catch (err) {
         console.error("Error loading data:", err);
         Toast.error(`Gagal memuat data pengajuan: ${err.message}`);
         
-        // Set empty data on error
+        
         setDataCutiAkademik([]);
         setTotalData(0);
       } finally {
@@ -404,9 +402,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     },
     [fixedRole, isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData, search]
   );
-  // ======================================================
-  // LOAD DATA RIWAYAT - Based on Controller GetRiwayat method
-  // ======================================================
+
   const loadDataRiwayat = useCallback(
     async (page = 1) => {
       try {
@@ -416,29 +412,29 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         console.log("=== DEBUG LOAD RIWAYAT ===");
         console.log("Search Riwayat:", searchRiwayat);
 
-        // RIWAYAT section should show completed/approved items
-        // The riwayat endpoint might already filter for completed items
-        let statusForRiwayat = ""; // Let the riwayat endpoint handle filtering
         
-        // Different roles might see different riwayat data based on their access
+        
+        let statusForRiwayat = ""; 
+        
+        
         if (isProdi) {
-          // Prodi might see riwayat for their program
+          
           statusForRiwayat = "";
         } else if (isWadir1 || isFinance || isDAAK || isAdmin) {
-          // Admin roles see all riwayat
+          
           statusForRiwayat = "";
         }
 
         const params = new URLSearchParams();
-        // For riwayat, let the backend determine what data to show
-        // Don't filter by userId for admin roles
+        
+        
         if (!isAdmin && userData?.username) {
           params.append('userId', userData.username);
         }
         if (statusForRiwayat) params.append('status', statusForRiwayat);
         if (searchRiwayat) params.append('search', searchRiwayat);
 
-        // Use the riwayat endpoint - it should return completed/approved items
+        
         const url = `${API_LINK}CutiAkademik/riwayat?${params}`;
         console.log("Riwayat API URL:", url);
 
@@ -471,7 +467,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
         console.log("Riwayat Parsed API Response:", data);
 
-        // Handle different response formats
+        
         let actualData = data;
         if (data && typeof data === 'object') {
           if (data.data && Array.isArray(data.data)) {
@@ -497,13 +493,13 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
         console.log("Processing riwayat array data:", actualData);
 
-        // FILTER: For RIWAYAT section, only show COMPLETED items
-        // Exclude: Draft, Belum Disetujui (any), Menunggu Upload SK
+        
+        
         const completedData = actualData.filter(item => {
           const currentStatus = item.status || item.cak_status || "";
           
-          // Only include items that are fully completed
-          // Exclude all pending statuses
+          
+          
           const pendingStatuses = [
             "Draft",
             "Belum Disetujui Prodi", 
@@ -512,26 +508,26 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             "Menunggu Upload SK"
           ];
           
-          // Only show if status is NOT in pending list
+          
           return !pendingStatuses.includes(currentStatus) && currentStatus !== "";
         });
 
         console.log("Filtered completed data for riwayat:", completedData);
         console.log("Sample item structure:", completedData[0]);
 
-        // Apply pagination to completed data
+        
         const totalItems = completedData.length;
         const startIndex = (page - 1) * pageSize;
         const endIndex = startIndex + pageSize;
         const paginatedData = completedData.slice(startIndex, endIndex);
 
-        // Fetch student details for each item to get nama mahasiswa and prodi
+        
         const formattedDataPromises = paginatedData.map(async (item, index) => {
           let namaMahasiswa = "-";
           let prodi = "-";
           
-          // ALWAYS fetch detail to get nama mahasiswa and prodi
-          // Since the riwayat API doesn't include this information
+          
+          
           if (item.mhsId || item.id) {
             try {
               const detailUrl = `${API_LINK}CutiAkademik/detail?id=${item.id || item.cak_id}`;
@@ -549,9 +545,9 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
                 const detailData = await detailResponse.json();
                 console.log("Detail data for", item.id, ":", detailData);
                 
-                // Extract nama mahasiswa from detail response
-                // Based on actual API response structure
-                namaMahasiswa = detailData.mahasiswa ||           // Primary field from API
+                
+                
+                namaMahasiswa = detailData.mahasiswa ||           
                                detailData.mhs_nama || 
                                detailData.namaMahasiswa || 
                                detailData.nama_mahasiswa || 
@@ -559,11 +555,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
                                detailData.nama ||
                                detailData.name || "-";
                 
-                // Extract prodi from detail response
-                // Based on actual API response structure
-                prodi = detailData.konsentrasi ||                 // Primary field from API
-                       detailData.prodiNama ||                    // Secondary field from API
-                       detailData.konsentrasiSingkatan ||         // Alternative field
+                
+               
+                prodi = detailData.konsentrasi ||                 
+                       detailData.prodiNama ||                    
+                       detailData.konsentrasiSingkatan ||         
                        detailData.kon_singkatan || 
                        detailData.prodi || 
                        detailData.programStudi || 
@@ -582,7 +578,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           }
 
           return {
-            No: startIndex + index + 1, // Correct numbering across pages
+            No: startIndex + index + 1, 
             id: item.cak_id || item.id,
             "No Cuti Akademik": item.id || item.cak_id || "-",
             "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
@@ -595,26 +591,25 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           };
         });
 
-        // Wait for all detail requests to complete
+        
         console.log("Waiting for all detail requests to complete...");
         const formattedData = await Promise.all(formattedDataPromises);
 
         console.log("Formatted riwayat data with student details:", formattedData);
         console.log(`Showing ${formattedData.length} items of ${totalItems} total (page ${page})`);
         
-        // Log sample of nama mahasiswa to verify
         if (formattedData.length > 0) {
           console.log("Sample nama mahasiswa:", formattedData[0]["Nama Mahasiswa"]);
         }
 
         setDataRiwayat(formattedData);
-        setTotalDataRiwayat(totalItems); // Use total items for pagination
+        setTotalDataRiwayat(totalItems); 
         setCurrentPageRiwayat(page);
       } catch (err) {
         console.error("Error loading riwayat:", err);
         Toast.error(`Gagal memuat data riwayat: ${err.message}`);
         
-        // Set empty data on error
+        
         setDataRiwayat([]);
         setTotalDataRiwayat(0);
       } finally {
@@ -623,9 +618,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     },
     [userData, searchRiwayat, isProdi, isWadir1, isFinance, isDAAK, isAdmin]
   );
-  // ======================================================
-  // AJUKAN CUTI AKADEMIK
-  // ======================================================
+  
   const handleAjukan = async (id) => {
     const confirm = await SweetAlert({
       title: "Ajukan Pengajuan",
@@ -640,7 +633,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     setLoading(true);
 
     try {
-      // Pastikan ModifiedBy terisi dengan benar
+      
       const modifiedBy = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
       
       if (!modifiedBy) {
@@ -657,7 +650,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       console.log("Payload:", payload);
       console.log("UserData:", userData);
 
-      // Endpoint untuk mahasiswa generate ID
+      
       const url = `${API_LINK}CutiAkademik/generate-id`;
       console.log("URL:", url);
 
@@ -675,17 +668,17 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
       const raw = await res.text();
       console.log("Raw response:", raw);
-      // Cek apakah response berhasil
+      
       if (!res.ok) {
         console.error("HTTP Error:", res.status, res.statusText);
         
-        // Coba parse sebagai JSON untuk error message
+        
         try {
           const errorData = JSON.parse(raw);
           const errorMsg = errorData.message || errorData.error || `HTTP ${res.status}: ${res.statusText}`;
           Toast.error(`Gagal mengajukan: ${errorMsg}`);
         } catch {
-          // Jika bukan JSON, tampilkan raw response
+          
           if (raw.includes("PRIMARY KEY constraint")) {
             Toast.error("Error: ID sudah ada di database. Silakan coba lagi atau hubungi admin.");
           } else if (raw.includes("SqlException")) {
@@ -697,7 +690,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         return;
       }
 
-      // Parse response JSON
       let result;
       try {
         result = JSON.parse(raw);
@@ -708,7 +700,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         return;
       }
 
-      // Cek hasil
+      
       if (result?.finalId) {
         Toast.success(`Pengajuan berhasil diajukan dengan ID: ${result.finalId}`);
         loadData(1);
@@ -724,14 +716,12 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
   };
 
-  // ======================================================
-  // HANDLERS
-  // ======================================================
+  
   const handleSearch = useCallback(
     (query) => {
       console.log("Search query:", query);
       setSearch(query);
-      setCurrentPage(1); // Reset to first page when searching
+      setCurrentPage(1); 
       loadData(1);
     },
     [loadData]
@@ -740,7 +730,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const handleSearchRiwayat = useCallback(
     (query) => {
       setSearchRiwayat(query);
-      setCurrentPageRiwayat(1); // Reset to first page when searching
+      setCurrentPageRiwayat(1); 
       loadDataRiwayat(1);
     },
     [loadDataRiwayat]
@@ -793,7 +783,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     setLoading(true);
 
     try {
-      // Use DELETE endpoint from your controller: DELETE /api/CutiAkademik/{id}
+      
       const url = `${API_LINK}CutiAkademik/${id}`;
 
       const res = await fetch(url, { method: "DELETE" });
@@ -804,7 +794,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
       const data = await res.json();
 
-      // Check for success based on your controller response
+      
       if (data.message && data.message.includes("berhasil")) {
         Toast.success(data.message);
         loadData(1);
@@ -819,7 +809,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
   };
 
-  // Handle Approve - Tanpa textbox, otomatis terisi
+  
   const handleApprove = async (itemId) => {
     const confirm = await SweetAlert({
       title: "Setujui Pengajuan Cuti Akademik",
@@ -839,14 +829,14 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       console.log("=== APPROVE PRODI ===");
       console.log("ID:", itemId);
 
-      // Menimbang otomatis terisi (tidak perlu input dari user)
+      
       const menimbang = "Pengajuan cuti akademik telah memenuhi persyaratan dan disetujui oleh program studi.";
       const approvedBy = userData?.nama || userData?.username || userData?.userid || "";
 
       console.log("Menimbang:", menimbang);
       console.log("ApprovedBy:", approvedBy);
 
-      // Sesuai dengan controller: [HttpPut("approve/prodi")]
+      
       const url = `${API_LINK}CutiAkademik/approve/prodi`;
       
       const payload = {
@@ -872,7 +862,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       console.log("Approve raw response:", raw);
 
       if (!res.ok) {
-        // Handle error response
+        
         try {
           const errorData = JSON.parse(raw);
           const errorMsg = errorData.message || errorData.error || `HTTP ${res.status}`;
@@ -883,19 +873,19 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         return;
       }
 
-      // Parse success response
+      
       let result;
       try {
         result = JSON.parse(raw);
         console.log("Approve result:", result);
       } catch {
-        // Jika tidak bisa parse JSON, anggap sukses jika status 200
+        
         result = { message: "Pengajuan berhasil disetujui" };
       }
 
-      // Tampilkan notifikasi sukses
+      
       Toast.success("Pengajuan cuti akademik berhasil disetujui!");
-      loadData(1); // Reload data
+      loadData(1); 
       
     } catch (err) {
       console.error("Approve error:", err);
@@ -921,25 +911,41 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     setLoading(true);
 
     try {
-      console.log("=== REJECT PRODI ===");
-      console.log("ID:", itemId);
+      console.log("=== REJECT CUTI AKADEMIK ===");
+      console.log("Item ID:", itemId);
+      console.log("User Role:", fixedRole);
 
-      // Keterangan otomatis terisi (tidak perlu input dari user)
-      const keterangan = "Pengajuan cuti akademik tidak memenuhi persyaratan yang ditetapkan oleh program studi.";
-
-      console.log("Keterangan:", keterangan);
-      console.log("Role:", fixedRole);
-
-      // Sesuai dengan controller: [HttpPut("reject")]
-      const url = `${API_LINK}CutiAkademik/reject`;
+      // Auto-generate rejection reason based on role
+      let autoReason = "";
+      let backendRole = "";
       
+      if (isProdi) {
+        autoReason = "Ditolak oleh Program Studi";
+        backendRole = "prodi";
+      } else if (isWadir1) {
+        autoReason = "Ditolak oleh Wakil Direktur 1";
+        backendRole = "wadir1";
+      } else if (isFinance) {
+        autoReason = "Ditolak oleh Bagian Keuangan";
+        backendRole = "finance";
+      } else {
+        autoReason = "Pengajuan ditolak";
+        backendRole = "prodi"; // default
+      }
+
+      console.log("Auto Reason:", autoReason);
+      console.log("Backend Role:", backendRole);
+
       const payload = {
         id: itemId,
-        role: "prodi", // Role untuk prodi
-        keterangan: keterangan
+        role: backendRole,
+        keterangan: autoReason
       };
 
       console.log("Reject payload:", payload);
+
+      const url = `${API_LINK}CutiAkademik/reject`;
+      console.log("API URL:", url);
 
       const res = await fetch(url, {
         method: "PUT",
@@ -952,34 +958,41 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
       console.log("Reject response status:", res.status);
 
-      const raw = await res.text();
-      console.log("Reject raw response:", raw);
-
       if (!res.ok) {
-        // Handle error response
+        const errorText = await res.text();
+        console.error("API Error Response:", errorText);
+        
         try {
-          const errorData = JSON.parse(raw);
-          const errorMsg = errorData.message || errorData.error || `HTTP ${res.status}`;
-          Toast.error(`Gagal menolak: ${errorMsg}`);
-        } catch {
-          Toast.error(`HTTP ${res.status}: ${res.statusText}`);
+          const errorData = JSON.parse(errorText);
+          const errorMsg = errorData.message || errorData.error || errorData.details || `HTTP ${res.status}: ${res.statusText}`;
+          Toast.error(`Gagal menolak pengajuan: ${errorMsg}`);
+        } catch (parseError) {
+          Toast.error(`Gagal menolak pengajuan: HTTP ${res.status}\n\n${errorText}`);
         }
         return;
       }
 
-      // Parse success response
+      // Read response as text first, then parse as JSON
+      const raw = await res.text();
+      console.log("Reject raw response:", raw);
+
       let result;
       try {
         result = JSON.parse(raw);
-        console.log("Reject result:", result);
-      } catch {
-        // Jika tidak bisa parse JSON, anggap sukses jika status 200
-        result = { message: "Pengajuan berhasil ditolak" };
+        console.log("Reject Result:", result);
+      } catch (parseError) {
+        console.error("JSON Parse Error:", parseError);
+        Toast.error("Response server tidak valid:\n\n" + raw);
+        return;
       }
 
-      // Tampilkan notifikasi sukses
-      Toast.success("Pengajuan cuti akademik berhasil ditolak!");
-      loadData(1); // Reload data
+      if (result?.message && result.message.includes("berhasil")) {
+        Toast.success(result.message);
+        loadData(1); // Reload data
+        if (showRiwayat) loadDataRiwayat(1); // Reload riwayat if visible
+      } else {
+        throw new Error(result?.message || "Gagal menolak pengajuan");
+      } 
       
     } catch (err) {
       console.error("Reject error:", err);
@@ -998,13 +1011,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   };
 
   const handlePrint = (id) => {
-    // Use the file endpoint from your controller: GET /api/CutiAkademik/file/{filename}
+    
     window.open(`${API_LINK}CutiAkademik/file/${id}`, "_blank");
   };
 
-  // ======================================================
-  // FIRST LOAD - Based on ASP.NET Page_Load logic
-  // ======================================================
+  
   useEffect(() => {
     if (!ssoData) {
       Toast.error("Sesi habis. Silakan login kembali.");
@@ -1016,10 +1027,10 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
 
 
-    // Load data based on role (similar to ASP.NET loadData() method)
+    
     loadData(1);
     
-    // Show riwayat panel for admin roles (based on ASP.NET panelRiwayat.Visible logic)
+    
     if (isProdi || isWadir1 || isFinance || isDAAK || isAdmin) {
       setShowRiwayat(true);
       loadDataRiwayat(1);
@@ -1062,7 +1073,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
 
 
-      {/* Panel Data Pengajuan - Based on ASP.NET panelData */}
+      
       <div className="mb-4">
         <h5>Daftar Pengajuan Cuti Akademik</h5>
         
@@ -1125,7 +1136,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         )}
       </div>
 
-      {/* Panel Riwayat - Based on ASP.NET panelRiwayat */}
+      
       {showRiwayat && (
         <div className="mt-5">
           <h5>Daftar Riwayat Cuti Akademik</h5>
@@ -1176,4 +1187,3 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     </MainContent>
   );
 }
-//s
