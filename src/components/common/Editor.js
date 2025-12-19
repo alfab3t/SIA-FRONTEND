@@ -44,7 +44,7 @@ const CKEditor = dynamic(
   { ssr: false }
 );
 
-const Editor = ({ label, name, value, onChange, error }) => {
+const Editor = ({ label, name, value, onChange, error, placeholder }) => {
   const handleEditorChange = useCallback(
     (event, editor) => {
       try {
@@ -65,6 +65,7 @@ const Editor = ({ label, name, value, onChange, error }) => {
         data={value}
         onChange={handleEditorChange}
         config={{
+          placeholder: placeholder || "Mulai mengetik...",
           plugins: [
             Alignment,
             Essentials,
@@ -156,4 +157,5 @@ Editor.propTypes = {
   value: PropTypes.string.isRequired,
   onChange: PropTypes.func.isRequired,
   error: PropTypes.string,
+  placeholder: PropTypes.string,
 };

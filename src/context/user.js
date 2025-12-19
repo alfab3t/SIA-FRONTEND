@@ -28,5 +28,30 @@ function getDecryptedCookie(name) {
   }
 }
 
-export const getUserData = () => getDecryptedCookie(COOKIE_USER_DATA);
+export const getUserData = () => {
+  const data = getDecryptedCookie(COOKIE_USER_DATA);
+  if (!data) return null;
+
+  return {
+    ...data,
+
+    // 🔑 NORMALISASI USERNAME
+    username:
+      data.username ||
+      data.kry_username ||
+      data.user_id ||
+      data.nip ||
+      data.mhs_id ||
+      data.nama ||          // ⬅️ INI KUNCI UNTUK NDA-PRODI
+      "",
+
+    displayName:
+      data.displayName ||
+      data.fullName ||
+      data.nama ||
+      ""
+  };
+};
+
+
 export const getSSOData = () => getDecryptedCookie(COOKIE_SSO_DATA);

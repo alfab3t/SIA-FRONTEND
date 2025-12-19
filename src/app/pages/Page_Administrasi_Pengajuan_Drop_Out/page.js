@@ -26,6 +26,8 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
   const sortRef = useRef();
   const statusRef = useRef();
 
+  /* ================= FILTER ================= */
+
   const dataFilterSort = [
     { Value: "a.dro_created_date desc", Text: "Tanggal Pengajuan [↓]" },
     { Value: "a.dro_created_date asc", Text: "Tanggal Pengajuan [↑]" },
@@ -35,6 +37,9 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
 
   const dataFilterStatus = [
     { Value: "", Text: "Semua Status" },
+    { Value: "Draft", Text: "Draft" },
+    { Value: "Belum Disetujui Wadir 1", Text: "Menunggu Wadir 1" },
+    { Value: "Belum Disetujui Direktur", Text: "Menunggu Direktur" },
     { Value: "Disetujui", Text: "Disetujui" },
     { Value: "Ditolak", Text: "Ditolak" }
   ];
@@ -44,55 +49,73 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
   const [pageSize] = useState(10);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState(dataFilterSort[0].Value);
-  const [sortStatus, setSortStatus] = useState(dataFilterStatus[0].Value);
+  const [sortStatus, setSortStatus] = useState("");
 
-  /** ======================================================
-   *  LOAD DATA – GET DropOut/riwayat sesuai parameter swagger
-   * ====================================================== */
+  /* ================= ROLE CHECK (INI KUNCI UTAMA) ================= */
+
+  const canCreate = useMemo(() => {
+    if (!isClient || !userData?.role) return false;
+
+    const role = userData.role.toUpperCase();
+
+    return (
+      role.includes("MAHASISWA") ||
+      role.includes("PRODI")
+    );
+  }, [isClient, userData]);
+
+  /* ================= LOAD DATA ================= */
+
   const loadData = useCallback(
-    async (page = 1, sort = "a.dro_created_date desc", keyword = "", status = "") => {
+    async (page = 1, sort = sortBy, keyword = "", status = "") => {
       try {
         setLoading(true);
 
-        // pastikan struktur cookie benar
-        const username = userData?.username || userData?.userName || "";
+        const username = userData?.username || "";
         const role = userData?.role || "";
-        const displayName = userData?.fullName || userData?.displayName || "";
+        const displayName =
+          userData?.displayName ||
+          userData?.fullName ||
+          "";
 
         if (!username) {
-          console.warn("⚠ User belum terisi — username kosong.");
           setDataDropOut([]);
           return;
         }
 
         const params = {
-          username: username,
-          keyword: keyword,
+          username,
+          keyword,
           sortBy: sort,
           konsentrasi: "",
-          role: role,
-          displayName: displayName
+          role,
+          displayName
         };
 
-        const response = await fetchData(API_LINK + "DropOut/riwayat", params, "GET");
+        const response = await fetchData(
+          API_LINK + "DropOut/riwayat",
+          params,
+          "GET"
+        );
 
-        let dataList = Array.isArray(response) ? response : response?.data || [];
+        const list = Array.isArray(response)
+          ? response
+          : response?.data || [];
 
-        const mappedData = dataList.map((item, index) => ({
+        const mapped = list.map((item, index) => ({
           No: (page - 1) * pageSize + index + 1,
-          id: item.dro_id ?? item.id,
+          id: item.dro_id,
           "No. Pengajuan DO": item.dro_id ?? "-",
           "Tanggal Pengajuan": DateFormatter.formatDate(item.dro_created_date),
-          "Dibuat Oleh": item.dro_created_by ?? "-",
           "Nama Mahasiswa": item.mhs_nama ?? "-",
           Prodi: item.kon_nama ?? "-",
-          "No. SK DO": item.srt_no ?? "-",
           Status: item.dro_status ?? "-",
-          Aksi: ["Detail", ...(item.srt_no ? ["Download"] : [])]
+          "No. SK DO": item.srt_no ?? "-",
+          Aksi: ["Detail"]
         }));
 
-        setDataDropOut(mappedData);
-        setTotalData(mappedData.length);
+        setDataDropOut(mapped);
+        setTotalData(mapped.length);
         setCurrentPage(page);
       } catch (err) {
         Toast.error(err.message);
@@ -101,85 +124,69 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
         setLoading(false);
       }
     },
-    [pageSize, userData]
+    [pageSize, sortBy, userData]
   );
 
-  /** ========================== HANDLERS ========================== */
+  /* ================= HANDLER ================= */
 
-  const handleSearch = useCallback(
-    (query) => {
-      setSearch(query);
-      loadData(1, sortBy, query, sortStatus);
-    },
-    [sortBy, sortStatus, loadData]
-  );
+  const handleSearch = (q) => {
+    setSearch(q);
+    loadData(1, sortBy, q, sortStatus);
+  };
 
-  const handleFilterApply = useCallback(() => {
-    const newSort = sortRef.current.value;
-    const newStatus = statusRef.current.value;
+  const handleFilterApply = () => {
+    const s = sortRef.current.value;
+    const st = statusRef.current.value;
 
-    setSortBy(newSort);
-    setSortStatus(newStatus);
-    loadData(1, newSort, search, newStatus);
-  }, [search, loadData]);
+    setSortBy(s);
+    setSortStatus(st);
+    loadData(1, s, search, st);
+  };
 
-  const handleNavigation = useCallback(
-    (page) => loadData(page, sortBy, search, sortStatus),
-    [sortBy, search, sortStatus, loadData]
-  );
+  const handleDetail = (id) => {
+    router.push(`/pages/administrasi/drop-out/detail/${encryptIdUrl(id)}`);
+  };
 
-  const handleDetail = useCallback(
-    (id) =>
-      router.push(`/pages/administrasi/drop-out/detail/${encryptIdUrl(id)}`),
-    [router]
-  );
-
-  const handleDownload = useCallback(() => {
-    Toast.info("Fitur download SK belum diaktifkan.");
-  }, []);
-
-  /** ====================== INITIAL LOAD ======================= */
+  /* ================= INIT ================= */
 
   useEffect(() => {
     setIsClient(true);
 
     if (!ssoData) {
       Toast.error("Sesi anda habis. Silakan login kembali.");
-      router.push("./auth/login");
+      router.push("/auth/login");
       return;
     }
 
-    loadData(1, sortBy, search, sortStatus);
-  }, [ssoData, router, loadData, sortBy, search, sortStatus]);
+    loadData();
+  }, [ssoData, loadData, router]);
 
-  /** ======================== RENDER ============================ */
+  /* ================= FILTER UI ================= */
 
   const filterContent = (
     <>
       <DropDown
         ref={sortRef}
         arrData={dataFilterSort}
-        type="pilih"
         label="Urutkan"
-        forInput="sortBy"
         defaultValue={sortBy}
       />
       <DropDown
         ref={statusRef}
         arrData={dataFilterStatus}
-        type="pilih"
         label="Status"
-        forInput="sortStatus"
         defaultValue={sortStatus}
       />
     </>
   );
 
+  /* ================= RENDER ================= */
+
   return (
     <MainContent
       layout="Admin"
       loading={loading}
-      title="Riwayat Pengajuan Drop Out"
+      title="Pengajuan Drop Out"
       breadcrumb={[
         { label: "Sistem Informasi Akademik" },
         { label: "Administrasi Akademik" },
@@ -188,33 +195,31 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     >
       <Formsearch
         onSearch={handleSearch}
-        onAdd={() => router.push("/pages/administrasi/drop-out/add")}
+        onAdd={() =>
+          router.push("/pages/Page_Administrasi_Pengajuan_Drop_Out/add")
+        }
         onFilter={handleFilterApply}
-        showAddButton={isClient && userData?.permission?.includes("dropout.create")}
-        showExportButton={false}
-        searchPlaceholder="Cari No. Pengajuan DO / Nama Mahasiswa"
-        addButtonText="Tambah Baru"
+        showAddButton={canCreate}
+        addButtonText="Tambah Pengajuan"
+        searchPlaceholder="Cari No. Pengajuan / Nama Mahasiswa"
         filterContent={filterContent}
       />
 
-      <div className="row align-items-center g-3">
-        <div className="col-12">
-          <Table
-            data={dataDropOut}
-            onDetail={handleDetail}
-            onToggle={handleDownload}
-          />
+      <Table
+        data={dataDropOut}
+        onDetail={handleDetail}
+      />
 
-          {totalData > 0 && (
-            <Paging
-              pageSize={pageSize}
-              pageCurrent={currentPage}
-              totalData={totalData}
-              navigation={handleNavigation}
-            />
-          )}
-        </div>
-      </div>
+      {totalData > 0 && (
+        <Paging
+          pageSize={pageSize}
+          pageCurrent={currentPage}
+          totalData={totalData}
+          navigation={(p) =>
+            loadData(p, sortBy, search, sortStatus)
+          }
+        />
+      )}
     </MainContent>
   );
 }
