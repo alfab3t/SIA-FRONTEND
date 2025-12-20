@@ -66,12 +66,15 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
   const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI";
   const isWadir1 = fixedRole === "ROL01" || fixedRole === "WADIR1";
-  const isFinance = fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE";
+  const isFinance = fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE" || 
+                    (userData?.nama && userData.nama.toLowerCase().includes('finance'));
   const isDAAK = fixedRole === "ROL21" || fixedRole === "DAAK";
   
   
-  const isAdmin = fixedRole === "ADMIN" || fixedRole === "ADMIN SIA" || fixedRole === "KARYAWAN" ||
-                  isWadir1 || isFinance || isDAAK;
+  // Admin should NOT include Finance, Wadir1, or Prodi users who have specific workflows
+  const isAdmin = (fixedRole === "ADMIN" || fixedRole === "ADMIN SIA" || 
+                  (fixedRole === "KARYAWAN" && !isFinance && !isWadir1 && !isProdi) ||
+                  isDAAK);
 
 
   const dataFilterSort = [
@@ -110,6 +113,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         console.log("=== DEBUG LOAD DATA ===");
         console.log("User Data:", userData);
         console.log("Fixed Role:", fixedRole);
+        console.log("User Nama:", userData?.nama);
         console.log("Is Mahasiswa:", isMahasiswa);
         console.log("Is Prodi:", isProdi);
         console.log("Is Wadir1:", isWadir1);
@@ -167,6 +171,13 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         }
 
         console.log("API Parameters:", { mhsId, statusFilter, userId, role: backendRole, search });
+        console.log("Workflow Path:", 
+          isMahasiswa ? "MAHASISWA" : 
+          isProdi ? "PRODI" : 
+          isWadir1 ? "WADIR1" : 
+          isFinance ? "FINANCE" : 
+          isDAAK ? "DAAK" : 
+          isAdmin ? "ADMIN" : "UNKNOWN");
 
         
         const params = new URLSearchParams();
@@ -314,8 +325,46 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               actions = ["Detail"];
             }
           } else if (isDAAK || isAdmin) {
-            // ONLY DAAK/Admin can upload files (Unggah Berkas)
-            actions = ["Detail", "Upload"];
+            // Check if all three approvals are complete
+            const isAllApprovalsComplete = currentStatus && 
+              !currentStatus.includes("Belum Disetujui Prodi") && 
+              !currentStatus.includes("Belum Disetujui Wadir 1") && 
+              !currentStatus.includes("Belum Disetujui Finance") &&
+              !currentStatus.includes("Draft") &&
+              !currentStatus.includes("Ditolak");
+              
+            // Additional check for specific approved statuses
+            const isReadyForSK = currentStatus === "Menunggu Upload SK" || 
+                               currentStatus === "Disetujui" ||
+                               isAllApprovalsComplete;
+            
+            // Debug admin actions logic
+            if (index === 0) {
+              console.log("=== ADMIN ACTIONS DEBUG ===");
+              console.log("Current Status:", currentStatus);
+              console.log("All Approvals Complete:", isAllApprovalsComplete);
+              console.log("Ready for SK:", isReadyForSK);
+              console.log("Has Uploaded SK:", hasUploadedSK);
+            }
+            
+            if (isReadyForSK) {
+              // All approvals complete - admin can manage SK
+              if (hasUploadedSK) {
+                // SK already uploaded, show download option
+                actions = ["Detail", "DownloadSK"];
+              } else {
+                // No SK yet, show upload option
+                actions = ["Detail", "Upload"];
+              }
+            } else {
+              // Approvals still pending - admin can only view
+              actions = ["Detail"];
+            }
+            
+            // Debug final actions
+            if (index === 0) {
+              console.log("Final Admin Actions:", actions);
+            }
           }
 
           
@@ -351,8 +400,19 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           };
 
           
-          const formatSKColumn = (skNo) => {
-            return "🖨️ Cetak SK"; 
+          const formatSKColumn = (skNo, itemId) => {
+            if (skNo && skNo !== "" && skNo !== "-") {
+              return {
+                text: "🖨️ Cetak SK", // Blue printer icon when SK exists
+                clickable: true,
+                onClick: () => handleDownloadSK(itemId)
+              };
+            } else {
+              return {
+                text: "🖨️ Tidak Ada SK", // Gray printer icon when SK not available
+                clickable: false
+              };
+            }
           };
 
           
@@ -362,7 +422,16 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           }
 
           
-          const noSK = item.suratNo || "";
+          const noSK = item.srt_no || item.suratNo || item.cak_srt_no || "";
+          
+          // Debug SK number reading
+          if (index === 0) {
+            console.log("=== SK DEBUG ===");
+            console.log("item.srt_no:", item.srt_no);
+            console.log("item.suratNo:", item.suratNo);
+            console.log("item.cak_srt_no:", item.cak_srt_no);
+            console.log("Final noSK:", noSK);
+          }
           
           
           const prodiApproval = item.approveProdi || item.approve_prodi || item.cak_approval_prodi;
@@ -377,7 +446,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             "Disetujui Prodi": formatApprovalStatus(prodiApproval, currentStatus, "Prodi"),
             "Disetujui Wadir 1": formatApprovalStatus(wadirApproval, currentStatus, "Wadir"),
             Status: currentStatus || "-",
-            "SK Cuti Akademik": formatSKColumn(noSK),
+            "SK Cuti Akademik": formatSKColumn(noSK, item.cak_id || item.id),
             Aksi: actions,
             Alignment: Array(9).fill("center"), 
           };
@@ -586,7 +655,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             NIM: item.mhsId || item.mhs_id || "-",
             "Nama Mahasiswa": namaMahasiswa,
             Prodi: prodi,
-            Aksi: ["Detail", "Print"],
+            Aksi: ["Detail"],
             Alignment: Array(8).fill("center"),
           };
         });
@@ -1015,6 +1084,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     window.open(`${API_LINK}CutiAkademik/file/${id}`, "_blank");
   };
 
+  const handleDownloadSK = (id) => {
+    // Download SK file using the file endpoint
+    window.open(`${API_LINK}CutiAkademik/file/${id}`, "_blank");
+  };
+
   
   useEffect(() => {
     if (!ssoData) {
@@ -1109,6 +1183,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               onReject={handleReject}
               onUpload={handleUpload}
               onPrint={handlePrint}
+              onDownloadSK={handleDownloadSK}
             />
 
             {totalData > 0 && (
