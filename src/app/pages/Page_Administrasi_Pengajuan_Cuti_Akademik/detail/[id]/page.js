@@ -8,6 +8,7 @@ import { useRouter, useParams } from "next/navigation";
 import { API_LINK } from "@/lib/constant";
 import { decryptIdUrl } from "@/lib/encryptor";
 import { getUserData } from "@/context/user";
+import { formatDate } from "@/lib/dateFormater";
 
 export default function DetailCutiAkademikPage() {
   const router = useRouter();
@@ -24,6 +25,38 @@ export default function DetailCutiAkademikPage() {
       return "";
     }
   }, [params]);
+
+  // ============================
+  // HELPER FUNCTIONS
+  // ============================
+  const getStatusBadge = (status) => {
+    const statusMap = {
+      'Menunggu Persetujuan': { class: 'warning', text: 'Menunggu Persetujuan' },
+      'Disetujui Prodi': { class: 'info', text: 'Disetujui Prodi' },
+      'Disetujui': { class: 'success', text: 'Disetujui' },
+      'Ditolak': { class: 'danger', text: 'Ditolak' },
+      'Dalam Proses': { class: 'primary', text: 'Dalam Proses' }
+    };
+    
+    const statusInfo = statusMap[status] || { class: 'secondary', text: status || 'Tidak Diketahui' };
+    return (
+      <span className={`badge bg-${statusInfo.class}`}>
+        {statusInfo.text}
+      </span>
+    );
+  };
+
+  const canViewApprovalStatus = () => {
+    const userRole = userData?.role?.toLowerCase();
+    return ['nda+prodi', 'user_finance', 'admin'].includes(userRole);
+  };
+
+  const formatTanggalPengajuan = (tanggal) => {
+    if (!tanggal) {
+      return formatDate(new Date());
+    }
+    return tanggal;
+  };
 
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
@@ -143,7 +176,7 @@ export default function DetailCutiAkademikPage() {
 
           <div className="col-lg-6 mb-3">
             <label className="form-label fw-semibold">Tanggal Pengajuan</label>
-            <p>{detail?.tglPengajuan || "-"}</p>
+            <p>{formatTanggalPengajuan(detail?.tglPengajuan)}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
@@ -158,9 +191,101 @@ export default function DetailCutiAkademikPage() {
 
           <div className="col-lg-6 mb-3">
             <label className="form-label fw-semibold">Status</label>
-            <p>{detail?.status || "-"}</p>
+            <div>{getStatusBadge(detail?.status)}</div>
           </div>
+
+          {/* Tambahan field persetujuan di bagian status utama */}
+          {detail?.approvalProdi && (
+            <div className="col-lg-6 mb-3">
+              <label className="form-label fw-semibold">Persetujuan Prodi Oleh</label>
+              <p>{detail.approvalProdi}</p>
+            </div>
+          )}
+
+          {detail?.approvalDir1 && (
+            <div className="col-lg-6 mb-3">
+              <label className="form-label fw-semibold">Persetujuan Wadir1 Oleh</label>
+              <p>{detail.approvalDir1}</p>
+            </div>
+          )}
         </div>
+
+        {/* Status Persetujuan - Hanya untuk role tertentu */}
+        {canViewApprovalStatus() && (
+          <>
+            <br />
+            <h5 className="fw-bold">Status Persetujuan</h5>
+            <hr />
+            <div className="row">
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Status Approval Prodi</label>
+                <div>
+                  {detail?.approvalProdi && detail?.appProdiDate ? (
+                    <span className="badge bg-success">Disetujui</span>
+                  ) : (
+                    <span className="badge bg-warning">Menunggu Persetujuan</span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Persetujuan Prodi Oleh</label>
+                <p>{detail?.approvalProdi || "Belum disetujui"}</p>
+              </div>
+              
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Tanggal Persetujuan Prodi</label>
+                <p>{detail?.appProdiDate || "Belum disetujui"}</p>
+              </div>
+              
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Status Approval Wakil Direktur</label>
+                <div>
+                  {detail?.approvalDir1 && detail?.appDir1Date ? (
+                    <span className="badge bg-success">Disetujui</span>
+                  ) : (
+                    <span className="badge bg-warning">Menunggu Persetujuan</span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Persetujuan Wakil Direktur Oleh</label>
+                <p>{detail?.approvalDir1 || "Belum disetujui"}</p>
+              </div>
+              
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Tanggal Persetujuan Wakil Direktur</label>
+                <p>{detail?.appDir1Date || "Belum disetujui"}</p>
+              </div>
+              
+              {detail?.menimbang && (
+                <div className="col-lg-12 mb-3">
+                  <label className="form-label fw-semibold">Pertimbangan</label>
+                  <div className="text-muted" dangerouslySetInnerHTML={{ __html: detail.menimbang }} />
+                </div>
+              )}
+              
+              {detail?.sk && (
+                <div className="col-lg-12 mb-3">
+                  <label className="form-label fw-semibold">Surat Keputusan</label>
+                  <div>
+                    <Button
+                      classType="success"
+                      label="📄 Download SK Cuti Akademik"
+                      onClick={() => handleDownload(detail.sk)}
+                    />
+                    {detail?.srtNo && (
+                      <p className="mt-2 mb-0 text-muted">
+                        <small>Nomor: {detail.srtNo}</small>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         <br />
 
