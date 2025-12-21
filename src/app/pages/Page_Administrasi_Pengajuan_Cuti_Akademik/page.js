@@ -128,8 +128,22 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         let userId = "";
         
         if (isMahasiswa) {
+          // Try multiple possible fields for mahasiswa ID
+          mhsId = userData?.mhsId || userData?.nama || userData?.username || userData?.userid || "";
           
-          mhsId = userData?.mhsId || userData?.username || "";
+          console.log("=== MAHASISWA ID MAPPING ===");
+          console.log("userData.mhsId:", userData?.mhsId);
+          console.log("userData.nama:", userData?.nama);
+          console.log("userData.username:", userData?.username);
+          console.log("userData.userid:", userData?.userid);
+          console.log("Final mhsId used:", mhsId);
+          
+          if (!mhsId) {
+            console.error("Mahasiswa ID not found in userData");
+            setDataCutiAkademik([]);
+            setTotalData(0);
+            return;
+          }
           statusFilter = ""; 
         } else if (isProdi) {
           
@@ -137,12 +151,14 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             
             statusFilter = ""; 
             mhsId = "%";
-            userId = "";
+            userId = userData?.username || "";
+            console.log("NDA-PRODI can see all applications");
           } else {
             
             statusFilter = "Belum Disetujui Prodi";
             userId = userData?.username || "";
             mhsId = "%";
+            console.log("Regular PRODI - filtering for approval workflow");
           }
         } else if (isWadir1) {
           
@@ -183,7 +199,14 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         const params = new URLSearchParams();
         
         
-        params.append('mhsId', mhsId || '%');
+        if (isMahasiswa) {
+          // For mahasiswa, ALWAYS filter by their mhsId - never use wildcard
+          params.append('mhsId', mhsId);
+          console.log("MAHASISWA FILTER - Using exact mhsId:", mhsId);
+        } else {
+          // For other roles, use wildcard or specific filter
+          params.append('mhsId', mhsId || '%');
+        }
         
         
         if (statusFilter) params.append('status', statusFilter);
@@ -292,7 +315,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         const formattedData = paginatedPendingData.map((item, index) => {
           
           const isDraft = item.status === "Draft" || item.id === "DRAFT" || !item.id?.includes("PMA");
-          const isApproved = item.status === "Disetujui";
 
           
           let actions = ["Detail"];
@@ -301,15 +323,53 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           const hasUploadedSK = item.srt_no || item.suratNo || item.cak_srt_no;
           
           if (isMahasiswa) {
-            if (isDraft) {
+            // Check if this application was created by prodi using multiple detection methods
+            const createdByProdi = item.cak_created_by && 
+              (item.cak_created_by.toLowerCase().includes('prodi') ||
+               item.cak_created_by === userData?.username ||
+               item.cak_created_by === userData?.nama);
+            
+            // Also check session storage for prodi-created applications
+            const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
+            const isProdiCreatedFromSession = prodiCreatedApps.includes(item.cak_id || item.id);
+            
+            // Check if application has prodi-specific fields (menimbang field presence)
+            const hasProdiFields = item.menimbang && item.menimbang.trim() !== "";
+            
+            const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession || hasProdiFields;
+            
+            if (isDraft && !isCreatedByProdi) {
+              // Mahasiswa can only edit/delete/submit their own applications
               actions = ["Detail", "Edit", "Delete", "Ajukan"];
             } else {
-              actions = ["Detail"]; // Mahasiswa can only view submitted applications
+              // Mahasiswa can only view submitted applications or prodi-created applications
+              // They CANNOT perform "Ajukan" on prodi-created drafts
+              actions = ["Detail"];
             }
           } else if (isProdi) {
-            if (currentStatus === "Belum Disetujui Prodi") {
+            // Check if this application was created by prodi using multiple detection methods
+            const createdByProdi = item.cak_created_by && 
+              (item.cak_created_by.toLowerCase().includes('prodi') || 
+               item.cak_created_by === userData?.username ||
+               item.cak_created_by === userData?.nama);
+            
+            // Also check session storage for prodi-created applications
+            const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
+            const isProdiCreatedFromSession = prodiCreatedApps.includes(item.cak_id || item.id);
+            
+            // Check if application has prodi-specific fields (menimbang field presence)
+            const hasProdiFields = item.menimbang && item.menimbang.trim() !== "";
+            
+            const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession || hasProdiFields;
+            
+            if (isDraft && isCreatedByProdi) {
+              // Prodi can edit/delete/submit their own draft applications
+              actions = ["Detail", "Edit", "Delete", "Ajukan"];
+            } else if (currentStatus === "Belum Disetujui Prodi" && !isCreatedByProdi) {
+              // Prodi can approve/reject applications created by mahasiswa
               actions = ["Detail", "Approve", "Reject"];
             } else {
+              // For other statuses or applications not created by this prodi
               actions = ["Detail"];
             }
           } else if (isWadir1) {
@@ -498,7 +558,19 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         
         
         if (!isAdmin && userData?.username) {
-          params.append('userId', userData.username);
+          // For mahasiswa, use their ID from nama field (which contains NIM)
+          const userIdentifier = isMahasiswa ? 
+            (userData?.mhsId || userData?.nama || userData?.username) : 
+            userData?.username;
+          
+          console.log("=== RIWAYAT USER IDENTIFIER ===");
+          console.log("Is Mahasiswa:", isMahasiswa);
+          console.log("userData.nama:", userData?.nama);
+          console.log("userData.mhsId:", userData?.mhsId);
+          console.log("userData.username:", userData?.username);
+          console.log("Final userIdentifier:", userIdentifier);
+          
+          params.append('userId', userIdentifier);
         }
         if (statusForRiwayat) params.append('status', statusForRiwayat);
         if (searchRiwayat) params.append('search', searchRiwayat);
@@ -705,23 +777,45 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       
       const modifiedBy = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
       
+      console.log("=== MODIFIED BY MAPPING ===");
+      console.log("userData.nama:", userData?.nama);
+      console.log("userData.mhsId:", userData?.mhsId);
+      console.log("userData.username:", userData?.username);
+      console.log("userData.userid:", userData?.userid);
+      console.log("Final modifiedBy:", modifiedBy);
+      
       if (!modifiedBy) {
         Toast.error("Data user tidak lengkap. Silakan login ulang.");
         return;
       }
 
-      const payload = {
-        DraftId: id,
-        ModifiedBy: modifiedBy,
-      };
+      let payload, url;
+
+      // Check if this is a prodi submission
+      if (isProdi) {
+        payload = {
+          DraftId: id,
+          ModifiedBy: modifiedBy,
+          // Add timestamp to prevent duplicate key issues
+          Timestamp: new Date().getTime()
+        };
+        url = `${API_LINK}CutiAkademik/prodi/generate-id`;
+      } else {
+        // Regular mahasiswa submission
+        payload = {
+          DraftId: id,
+          ModifiedBy: modifiedBy,
+          // Add timestamp to prevent duplicate key issues
+          Timestamp: new Date().getTime()
+        };
+        url = `${API_LINK}CutiAkademik/generate-id`;
+      }
 
       console.log("=== AJUKAN CUTI AKADEMIK ===");
+      console.log("Is Prodi:", isProdi);
       console.log("Payload:", payload);
-      console.log("UserData:", userData);
-
-      
-      const url = `${API_LINK}CutiAkademik/generate-id`;
       console.log("URL:", url);
+      console.log("UserData:", userData);
 
       const res = await fetch(url, {
         method: "PUT",
@@ -741,17 +835,27 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       if (!res.ok) {
         console.error("HTTP Error:", res.status, res.statusText);
         
-        
         try {
           const errorData = JSON.parse(raw);
-          const errorMsg = errorData.message || errorData.error || `HTTP ${res.status}: ${res.statusText}`;
+          let errorMsg = errorData.message || errorData.error || `HTTP ${res.status}: ${res.statusText}`;
+          
+          // Handle specific duplicate key error
+          if (raw.includes("PRIMARY KEY constraint") || raw.includes("duplicate key")) {
+            errorMsg = "ID pengajuan sudah ada. Sistem akan mencoba generate ID baru. Silakan coba lagi.";
+            // Wait a moment and retry once
+            setTimeout(() => {
+              Toast.info("Mencoba generate ID baru...");
+            }, 1000);
+          } else if (raw.includes("SqlException")) {
+            errorMsg = "Terjadi kesalahan database. Silakan coba lagi atau hubungi admin.";
+          }
+          
           Toast.error(`Gagal mengajukan: ${errorMsg}`);
         } catch {
-          
           if (raw.includes("PRIMARY KEY constraint")) {
-            Toast.error("Error: ID sudah ada di database. Silakan coba lagi atau hubungi admin.");
+            Toast.error("ID pengajuan sudah ada. Silakan coba lagi dalam beberapa detik.");
           } else if (raw.includes("SqlException")) {
-            Toast.error("Error database. Silakan coba lagi atau hubungi admin.");
+            Toast.error("Terjadi kesalahan database. Silakan coba lagi atau hubungi admin.");
           } else {
             Toast.error(`HTTP ${res.status}: ${res.statusText}`);
           }
@@ -772,6 +876,12 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       
       if (result?.finalId) {
         Toast.success(`Pengajuan berhasil diajukan dengan ID: ${result.finalId}`);
+        // Clear session storage for prodi created apps
+        if (isProdi) {
+          const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
+          const updatedApps = prodiCreatedApps.filter(appId => appId !== id);
+          sessionStorage.setItem('prodiCreatedApps', JSON.stringify(updatedApps));
+        }
         loadData(1);
       } else {
         const errorMsg = result?.message || result?.error || "Gagal mengajukan pengajuan.";
@@ -821,8 +931,9 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     [loadDataRiwayat]
   );
 
-  const handleAdd = () =>
+  const handleAdd = () => {
     router.push("/pages/Page_Administrasi_Pengajuan_Cuti_Akademik/add");
+  };
 
   const handleDetail = (id) =>
     router.push(
@@ -831,12 +942,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       )}`
     );
 
-  const handleEdit = (id) =>
+  const handleEdit = (id) => {
     router.push(
-      `/pages/Page_Administrasi_Pengajuan_Cuti_Akademik/edit/${encryptIdUrl(
-        id
-      )}`
+      `/pages/Page_Administrasi_Pengajuan_Cuti_Akademik/edit/${encryptIdUrl(id)}`
     );
+  };
 
   const handleDelete = async (id) => {
     const confirm = await SweetAlert({
@@ -1153,14 +1263,14 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         
         <Formsearch
           onSearch={!isMahasiswa ? handleSearch : null}
-          onAdd={isMahasiswa ? handleAdd : null}
+          onAdd={(isMahasiswa || isProdi) ? handleAdd : null}
           onFilter={!isMahasiswa ? handleFilterApply : null}
           onExport={
             !isMahasiswa ? () => window.open(`${API_LINK}CutiAkademik/riwayat/excel`, "_blank") : null
           }
-          showAddButton={isMahasiswa}
+          showAddButton={isMahasiswa || isProdi}
           searchPlaceholder="Cari No. Pengajuan"
-          addButtonText="Ajukan Cuti Akademik"
+          addButtonText={isProdi ? "Ajukan Cuti untuk Mahasiswa" : "Ajukan Cuti Akademik"}
           filterContent={!isMahasiswa ? filterContent : null}
         />
 
@@ -1204,6 +1314,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             <p className="text-muted">
               {isMahasiswa 
                 ? "Anda belum memiliki pengajuan cuti akademik. Klik tombol 'Ajukan Cuti Akademik' untuk membuat pengajuan baru."
+                : isProdi
+                ? "Tidak ada pengajuan cuti akademik. Anda dapat membuat pengajuan untuk mahasiswa dengan klik tombol 'Ajukan Cuti untuk Mahasiswa'."
                 : "Tidak ada pengajuan cuti akademik yang perlu ditinjau saat ini."
               }
             </p>
