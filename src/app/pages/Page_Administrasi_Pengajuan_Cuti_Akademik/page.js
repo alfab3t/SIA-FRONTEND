@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Paging from "@/components/common/Paging";
 import Table from "@/components/common/Table";
 import Toast from "@/components/common/Toast";
+import Button from "@/components/common/Button";
 import DropDown from "@/components/common/Dropdown";
 import MainContent from "@/components/layout/MainContent";
 import Formsearch from "@/components/common/Formsearch";
@@ -1261,18 +1262,16 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       <div className="mb-4">
         <h5>Daftar Pengajuan Cuti Akademik</h5>
         
-        <Formsearch
-          onSearch={!isMahasiswa ? handleSearch : null}
-          onAdd={(isMahasiswa || isProdi) ? handleAdd : null}
-          onFilter={!isMahasiswa ? handleFilterApply : null}
-          onExport={
-            !isMahasiswa ? () => window.open(`${API_LINK}CutiAkademik/riwayat/excel`, "_blank") : null
-          }
-          showAddButton={isMahasiswa || isProdi}
-          searchPlaceholder="Cari No. Pengajuan"
-          addButtonText={isProdi ? "Ajukan Cuti untuk Mahasiswa" : "Ajukan Cuti Akademik"}
-          filterContent={!isMahasiswa ? filterContent : null}
-        />
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div></div>
+          {(isMahasiswa || isProdi) && (
+            <Button
+              classType="primary"
+              label={isProdi ? "Ajukan Cuti untuk Mahasiswa" : "Ajukan Cuti Akademik"}
+              onClick={handleAdd}
+            />
+          )}
+        </div>
 
         {loading ? (
           <div className="text-center py-4">
@@ -1330,10 +1329,14 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           
           <Formsearch
             onSearch={handleSearchRiwayat}
-            searchPlaceholder="Pencarian"
+            onFilter={handleFilterApply}
+            onExport={() => window.open(`${API_LINK}CutiAkademik/riwayat/excel`, "_blank")}
+            searchPlaceholder="Cari No. Pengajuan"
             showAddButton={false}
-            showFilterButton={false}
-            showExportButton={false}
+            showFilterButton={true}
+            showExportButton={true}
+            exportButtonText="Unduh Excel"
+            filterContent={filterContent}
           />
 
           {loading ? (
