@@ -574,7 +574,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           params.append('userId', userIdentifier);
         }
         if (statusForRiwayat) params.append('status', statusForRiwayat);
-        if (searchRiwayat) params.append('search', searchRiwayat);
+        // DON'T send search to backend - we'll filter in frontend
+        // if (searchRiwayat) params.append('search', searchRiwayat);
 
         
         const url = `${API_LINK}CutiAkademik/riwayat?${params}`;
@@ -655,16 +656,10 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         });
 
         console.log("Filtered completed data for riwayat:", completedData);
-        console.log("Sample item structure:", completedData[0]);
 
         
-        const totalItems = completedData.length;
-        const startIndex = (page - 1) * pageSize;
-        const endIndex = startIndex + pageSize;
-        const paginatedData = completedData.slice(startIndex, endIndex);
-
-        
-        const formattedDataPromises = paginatedData.map(async (item, index) => {
+        // Process ALL data first (no pagination yet)
+        const formattedDataPromises = completedData.map(async (item, index) => {
           let namaMahasiswa = "-";
           let prodi = "-";
           
@@ -720,7 +715,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           }
 
           return {
-            No: startIndex + index + 1, 
+            No: index + 1, // Temporary number, will be updated after pagination
             id: item.cak_id || item.id,
             "No Cuti Akademik": item.id || item.cak_id || "-",
             "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
@@ -735,17 +730,116 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
         
         console.log("Waiting for all detail requests to complete...");
-        const formattedData = await Promise.all(formattedDataPromises);
+        let allFormattedData = await Promise.all(formattedDataPromises);
 
-        console.log("Formatted riwayat data with student details:", formattedData);
-        console.log(`Showing ${formattedData.length} items of ${totalItems} total (page ${page})`);
-        
-        if (formattedData.length > 0) {
-          console.log("Sample nama mahasiswa:", formattedData[0]["Nama Mahasiswa"]);
+        console.log("All formatted data before search filter:", allFormattedData.length);
+
+        // FRONTEND SEARCH FILTERING - Search in ALL fields
+        if (searchRiwayat && searchRiwayat.trim() !== "") {
+          const searchTerm = searchRiwayat.toLowerCase().trim();
+          console.log("=== FRONTEND SEARCH FILTERING ===");
+          console.log("Search term:", searchTerm);
+          console.log("Total data before search:", allFormattedData.length);
+          
+          allFormattedData = allFormattedData.filter(item => {
+            // Search in all text fields - convert to string and handle null/undefined values
+            const searchableFields = [
+              String(item["No Cuti Akademik"] || ""),
+              String(item["Tanggal Pengajuan"] || ""),
+              String(item["Nomor SK"] || ""),
+              String(item.NIM || ""),
+              String(item["Nama Mahasiswa"] || ""),
+              String(item.Prodi || "")
+            ];
+            
+            // Join all fields and normalize for search
+            const searchableText = searchableFields
+              .join(" ")
+              .toLowerCase()
+              .replace(/\s+/g, " ") // Replace multiple spaces with single space
+              .trim();
+            
+            // Check if search term exists in the combined text
+            const isMatch = searchableText.includes(searchTerm);
+            
+            // Also check individual fields for exact matches
+            const exactFieldMatch = searchableFields.some(field => 
+              String(field).toLowerCase().includes(searchTerm)
+            );
+            
+            const finalMatch = isMatch || exactFieldMatch;
+            
+            if (finalMatch) {
+              console.log("Match found:", {
+                noCuti: item["No Cuti Akademik"],
+                nim: item.NIM,
+                nama: item["Nama Mahasiswa"],
+                prodi: item.Prodi,
+                searchableText: searchableText.substring(0, 100) + "...",
+                matchType: isMatch ? "combined" : "individual"
+              });
+            }
+            
+            return finalMatch;
+          });
+          
+          console.log(`Search results: ${allFormattedData.length} items found out of original data`);
         }
 
-        setDataRiwayat(formattedData);
-        setTotalDataRiwayat(totalItems); 
+        // FRONTEND SORTING - Apply sorting to filtered data
+        if (sortBy && sortBy !== "") {
+          console.log("=== FRONTEND SORTING ===");
+          console.log("Sort by:", sortBy);
+          
+          allFormattedData.sort((a, b) => {
+            let valueA, valueB;
+            
+            switch (sortBy) {
+              case "tanggal_desc":
+                valueA = new Date(a["Tanggal Pengajuan"] || "1900-01-01");
+                valueB = new Date(b["Tanggal Pengajuan"] || "1900-01-01");
+                return valueB - valueA; // Descending
+                
+              case "tanggal_asc":
+                valueA = new Date(a["Tanggal Pengajuan"] || "1900-01-01");
+                valueB = new Date(b["Tanggal Pengajuan"] || "1900-01-01");
+                return valueA - valueB; // Ascending
+                
+              case "id_asc":
+                valueA = String(a["No Cuti Akademik"] || "");
+                valueB = String(b["No Cuti Akademik"] || "");
+                return valueA.localeCompare(valueB); // Ascending
+                
+              case "id_desc":
+                valueA = String(a["No Cuti Akademik"] || "");
+                valueB = String(b["No Cuti Akademik"] || "");
+                return valueB.localeCompare(valueA); // Descending
+                
+              default:
+                return 0;
+            }
+          });
+          
+          console.log("Data sorted successfully");
+        }
+
+        // Apply pagination to filtered data
+        const totalFilteredItems = allFormattedData.length;
+        const startIndex = (page - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        const paginatedData = allFormattedData.slice(startIndex, endIndex);
+
+        // Update row numbers for paginated data
+        const finalData = paginatedData.map((item, index) => ({
+          ...item,
+          No: startIndex + index + 1
+        }));
+
+        console.log("Final paginated data:", finalData.length);
+        console.log(`Showing ${finalData.length} items of ${totalFilteredItems} total (page ${page})`);
+
+        setDataRiwayat(finalData);
+        setTotalDataRiwayat(totalFilteredItems); 
         setCurrentPageRiwayat(page);
       } catch (err) {
         console.error("Error loading riwayat:", err);
@@ -758,7 +852,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         setLoading(false);
       }
     },
-    [userData, searchRiwayat, isProdi, isWadir1, isFinance, isDAAK, isAdmin]
+    [userData, searchRiwayat, sortBy, isProdi, isWadir1, isFinance, isDAAK, isAdmin, isMahasiswa, pageSize]
   );
   
   const handleAjukan = async (id) => {
@@ -920,7 +1014,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     setSortBy(sortRef.current.value);
     setSortStatus(statusRef.current.value);
     loadData(1);
-  }, [loadData]);
+    // Also reload riwayat data if it's visible to apply sorting
+    if (showRiwayat) {
+      loadDataRiwayat(1);
+    }
+  }, [loadData, loadDataRiwayat, showRiwayat]);
 
   const handleNavigation = useCallback(
     (page) => loadData(page),
@@ -1330,8 +1428,24 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           <Formsearch
             onSearch={handleSearchRiwayat}
             onFilter={handleFilterApply}
-            onExport={() => window.open(`${API_LINK}CutiAkademik/riwayat/excel`, "_blank")}
-            searchPlaceholder="Cari No. Pengajuan"
+            onExport={() => {
+              // Build export URL with current search parameter
+              const params = new URLSearchParams();
+              if (searchRiwayat && searchRiwayat.trim() !== "") {
+                params.append('search', searchRiwayat.trim());
+              }
+              if (!isAdmin && userData?.username) {
+                const userIdentifier = isMahasiswa ? 
+                  (userData?.mhsId || userData?.nama || userData?.username) : 
+                  userData?.username;
+                params.append('userId', userIdentifier);
+              }
+              
+              const exportUrl = `${API_LINK}CutiAkademik/riwayat/excel${params.toString() ? '?' + params.toString() : ''}`;
+              console.log("Export URL:", exportUrl);
+              window.open(exportUrl, "_blank");
+            }}
+            searchPlaceholder="Cari No. Pengajuan, NIM, Nama, atau Prodi"
             showAddButton={false}
             showFilterButton={true}
             showExportButton={true}
