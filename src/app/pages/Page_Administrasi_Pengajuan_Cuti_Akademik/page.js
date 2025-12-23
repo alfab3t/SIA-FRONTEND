@@ -147,20 +147,13 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           }
           statusFilter = ""; 
         } else if (isProdi) {
-          
-          if (fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI") {
-            
-            statusFilter = ""; 
-            mhsId = "%";
-            userId = userData?.username || "";
-            console.log("NDA-PRODI can see all applications");
-          } else {
-            
-            statusFilter = "Belum Disetujui Prodi";
-            userId = userData?.username || "";
-            mhsId = "%";
-            console.log("Regular PRODI - filtering for approval workflow");
-          }
+          // For Prodi users, show:
+          // 1. Draft applications created by Prodi
+          // 2. Applications waiting for Prodi approval
+          statusFilter = ""; // Don't filter by status at API level, we'll filter in frontend
+          userId = userData?.username || "";
+          mhsId = "%";
+          console.log("PRODI - will show drafts created by Prodi and applications needing Prodi approval");
         } else if (isWadir1) {
           
           statusFilter = "Belum Disetujui Wadir 1";
@@ -294,6 +287,34 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               return true; 
             }
             return false; 
+          } else if (isProdi) {
+            // For Prodi users, show:
+            // 1. Draft applications created by Prodi
+            // 2. Applications waiting for Prodi approval ("Belum Disetujui Prodi")
+            
+            const createdByProdi = item.cak_created_by && 
+              (item.cak_created_by.toLowerCase().includes('prodi') ||
+               item.cak_created_by === userData?.username ||
+               item.cak_created_by === userData?.nama);
+            
+            // Also check session storage for prodi-created applications
+            const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
+            const isProdiCreatedFromSession = prodiCreatedApps.includes(item.cak_id || item.id);
+            
+            // Check if application has prodi-specific fields (menimbang field presence)
+            const hasProdiFields = item.menimbang && item.menimbang.trim() !== "";
+            
+            const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession || hasProdiFields;
+            
+            // Show if:
+            // 1. Draft created by Prodi, OR
+            // 2. Status is "Belum Disetujui Prodi"
+            if ((currentStatus === "Draft" && isCreatedByProdi) || 
+                currentStatus === "Belum Disetujui Prodi") {
+              return true;
+            }
+            
+            return false;
           } else {
             
             
@@ -306,6 +327,17 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         });
 
         console.log("Filtered pending data:", pendingData);
+        console.log("=== PRODI FILTERING DEBUG ===");
+        if (isProdi) {
+          console.log("Total items from API:", actualData.length);
+          console.log("Items after Prodi filtering:", pendingData.length);
+          console.log("Sample filtered items:", pendingData.slice(0, 3).map(item => ({
+            id: item.id || item.cak_id,
+            status: item.status || item.cak_status,
+            createdBy: item.cak_created_by,
+            menimbang: item.menimbang ? "has menimbang" : "no menimbang"
+          })));
+        }
 
         
         const totalPendingItems = pendingData.length;
