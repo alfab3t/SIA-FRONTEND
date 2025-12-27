@@ -94,8 +94,8 @@ export default function AddMeninggalDunia() {
             const studentData = {
               Value: item.mhsId || item.id || item.nim,
               Text: `${item.mhsId || item.id || item.nim} - ${item.nama || item.mhsNama || item.name}`,
-              Prodi: item.prodi || item.konNama || item.programStudi || "",
-              Angkatan: item.angkatan || item.tahunAngkatan || item.year || ""
+              Prodi: item.prodi || item.programStudi || item.konNama || item.programStudi || "",
+              Angkatan: item.mhsAngkatan || item.angkatan || item.tahunAngkatan || item.year || ""
             };
             console.log("Formatted student:", studentData);
             return studentData;
@@ -186,8 +186,8 @@ export default function AddMeninggalDunia() {
           }
           
           // Update form with API data
-          const finalProdi = prodiData?.nama || prodiData?.prodi || detailData?.prodi || detailData?.konNama || selectedStudent?.Prodi || "";
-          const finalAngkatan = detailData?.angkatan || detailData?.tahunAngkatan || selectedStudent?.Angkatan || "";
+          const finalProdi = prodiData?.nama || prodiData?.prodi || prodiData?.proNama || detailData?.prodi || detailData?.programStudi || detailData?.konNama || selectedStudent?.Prodi || "";
+          const finalAngkatan = detailData?.mhsAngkatan || detailData?.angkatan || detailData?.tahunAngkatan || selectedStudent?.Angkatan || "";
           
           console.log("Final data to set:", {
             prodi: finalProdi,
@@ -207,8 +207,8 @@ export default function AddMeninggalDunia() {
           setFormData(prev => ({
             ...prev,
             mhsId: mhsId,
-            prodi: detailData?.prodi || detailData?.konNama || selectedStudent?.Prodi || prev.prodi,
-            tahunAngkatan: detailData?.angkatan || detailData?.tahunAngkatan || selectedStudent?.Angkatan || prev.tahunAngkatan
+            prodi: detailData?.prodi || detailData?.programStudi || detailData?.konNama || selectedStudent?.Prodi || prev.prodi,
+            tahunAngkatan: detailData?.mhsAngkatan || detailData?.angkatan || detailData?.tahunAngkatan || selectedStudent?.Angkatan || prev.tahunAngkatan
           }));
         }
         
@@ -334,22 +334,18 @@ export default function AddMeninggalDunia() {
     try {
       const fd = new FormData();
       
-      // Add the 4 required parameters
+      // Add only the fields that match the backend DTO
       fd.append("MhsId", formData.mhsId);
-      fd.append("Prodi", formData.prodi);
-      fd.append("TahunAngkatan", formData.tahunAngkatan);
       
-      // Add the file
+      // Add the file with the exact field name from DTO
       if (formData.lampiranMeninggal && formData.lampiranMeninggal instanceof File) {
-        fd.append("LampiranMeninggal", formData.lampiranMeninggal, formData.lampiranMeninggal.name);
-        console.log("Lampiran Meninggal file:", formData.lampiranMeninggal.name, formData.lampiranMeninggal.size);
+        fd.append("LampiranFile", formData.lampiranMeninggal, formData.lampiranMeninggal.name);
+        console.log("Lampiran file:", formData.lampiranMeninggal.name, formData.lampiranMeninggal.size);
       }
 
-      console.log("FORM DATA SEND =", {
+      console.log("FORM DATA SEND (matching backend DTO) =", {
         MhsId: formData.mhsId,
-        Prodi: formData.prodi,
-        TahunAngkatan: formData.tahunAngkatan,
-        LampiranMeninggalFile: formData.lampiranMeninggal?.name
+        LampiranFile: formData.lampiranMeninggal?.name
       });
 
       const res = await fetch(`${API_LINK}MeninggalDunia`, {
