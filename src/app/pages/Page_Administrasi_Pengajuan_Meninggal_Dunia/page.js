@@ -643,7 +643,236 @@ export default function Page_MeninggalDunia() {
     );
 
 
-    // Action handlers
+    // State for SK upload modal
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const [selectedMeninggalId, setSelectedMeninggalId] = useState(null);
+    const [selectedSKFile, setSelectedSKFile] = useState(null);
+    const [selectedSPKBFile, setSelectedSPKBFile] = useState(null);
+    const [skFilePreview, setSKFilePreview] = useState(null);
+    const [spkbFilePreview, setSPKBFilePreview] = useState(null);
+    const [uploadLoading, setUploadLoading] = useState(false);
+
+    // SK Upload handlers
+    const handleUploadSK = (id) => {
+        console.log("Opening upload modal for ID:", id);
+        setSelectedMeninggalId(id);
+        setShowUploadModal(true);
+        setSelectedSKFile(null);
+        setSelectedSPKBFile(null);
+        setSKFilePreview(null);
+        setSPKBFilePreview(null);
+    };
+
+    const handleSKFileSelect = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/jpg', 'image/png'];
+        if (!allowedTypes.includes(file.type)) {
+            Toast.error("Format file tidak didukung. Gunakan PDF, DOC, DOCX, JPG, JPEG, atau PNG.");
+            return;
+        }
+
+        // Validate file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            Toast.error("Ukuran file maksimal 10MB.");
+            return;
+        }
+
+        setSelectedSKFile(file);
+        
+        // Create preview for images
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => setSKFilePreview(e.target.result);
+            reader.readAsDataURL(file);
+        } else {
+            setSKFilePreview(null);
+        }
+    };
+
+    const handleSPKBFileSelect = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/jpg', 'image/png'];
+        if (!allowedTypes.includes(file.type)) {
+            Toast.error("Format file tidak didukung. Gunakan PDF, DOC, DOCX, JPG, JPEG, atau PNG.");
+            return;
+        }
+
+        // Validate file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            Toast.error("Ukuran file maksimal 10MB.");
+            return;
+        }
+
+        setSelectedSPKBFile(file);
+        
+        // Create preview for images
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => setSPKBFilePreview(e.target.result);
+            reader.readAsDataURL(file);
+        } else {
+            setSPKBFilePreview(null);
+        }
+    };
+
+    const handleUploadConfirm = async () => {
+        if (!selectedSKFile || !selectedMeninggalId) {
+            Toast.error("Pilih file SK terlebih dahulu.");
+            return;
+        }
+
+        setUploadLoading(true);
+
+        try {
+            const formData = new FormData();
+            formData.append('SkFile', selectedSKFile);
+            if (selectedSPKBFile) {
+                formData.append('SpkbFile', selectedSPKBFile);
+            }
+
+            console.log("=== SK UPLOAD MENINGGAL DUNIA ===");
+            console.log("ID:", selectedMeninggalId);
+            console.log("SK File:", selectedSKFile.name);
+            console.log("SPKB File:", selectedSPKBFile?.name || "None");
+
+            const response = await fetch(`${API_LINK}MeninggalDunia/${selectedMeninggalId}/upload-sk`, {
+                method: 'POST',
+                body: formData
+            });
+
+            console.log("Upload response status:", response.status);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("Upload error:", errorText);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log("Upload result:", result);
+
+            Toast.success("SK berhasil diupload!");
+            setShowUploadModal(false);
+            setSelectedSKFile(null);
+            setSelectedSPKBFile(null);
+            setSKFilePreview(null);
+            setSPKBFilePreview(null);
+            setSelectedMeninggalId(null);
+            
+            // Reload data to reflect changes
+            loadPengajuan(pengajuanPage);
+            if (isProdi || isWadir1 || isFinance || isDAAK || isAdmin) {
+                loadRiwayat(riwayatPage);
+            }
+
+        } catch (error) {
+            console.error("Upload error:", error);
+            Toast.error(`Gagal upload SK: ${error.message}`);
+        } finally {
+            setUploadLoading(false);
+        }
+    };
+
+    const handleUploadCancel = () => {
+        setShowUploadModal(false);
+        setSelectedSKFile(null);
+        setSelectedSPKBFile(null);
+        setSKFilePreview(null);
+        setSPKBFilePreview(null);
+        setSelectedMeninggalId(null);
+    };
+
+    const handleDownloadSK = (id) => {
+        // Download SK file using the file endpoint
+        window.open(`${API_LINK}MeninggalDunia/report/${id}`, "_blank");
+    };
+
+    const handleAjukan = async (id) => {
+        const confirm = await SweetAlert({
+            title: "Ajukan Pengajuan Meninggal Dunia",
+            text: "Setelah diajukan, data tidak dapat diedit kembali. Ajukan sekarang?",
+            icon: "warning",
+            confirmText: "Ya, Ajukan!",
+            confirmButtonColor: "#1e88e5",
+        });
+
+        if (!confirm) return;
+
+        setLoadingPengajuan(true);
+
+        try {
+            console.log("=== AJUKAN MENINGGAL DUNIA ===");
+            console.log("Draft ID:", id);
+
+            const url = `${API_LINK}MeninggalDunia/finalize/${id}`;
+            console.log("Finalize URL:", url);
+
+            const res = await fetch(url, {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                }
+            });
+
+            console.log("Finalize response status:", res.status);
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error("API Error Response:", errorText);
+                
+                try {
+                    const errorData = JSON.parse(errorText);
+                    const errorMsg = errorData.message || errorData.error || `HTTP ${res.status}: ${res.statusText}`;
+                    Toast.error(`Gagal mengajukan: ${errorMsg}`);
+                } catch {
+                    Toast.error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                return;
+            }
+
+            const raw = await res.text();
+            console.log("Finalize raw response:", raw);
+
+            let result;
+            try {
+                result = JSON.parse(raw);
+                console.log("Finalize result:", result);
+            } catch (parseError) {
+                console.error("JSON Parse error:", parseError);
+                Toast.error("Response server tidak valid. Periksa console untuk detail.");
+                return;
+            }
+
+            if (result?.officialId) {
+                Toast.success(`Pengajuan berhasil diajukan dengan ID: ${result.officialId}`);
+                
+                // Clear session storage for prodi created apps
+                if (isProdi) {
+                    const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedMeninggalApps') || '[]');
+                    const updatedApps = prodiCreatedApps.filter(appId => appId !== id);
+                    sessionStorage.setItem('prodiCreatedMeninggalApps', JSON.stringify(updatedApps));
+                }
+                
+                loadPengajuan(1);
+            } else {
+                const errorMsg = result?.message || result?.error || "Gagal mengajukan pengajuan.";
+                Toast.error(errorMsg);
+            }
+        } catch (err) {
+            console.error("Ajukan error:", err);
+            Toast.error(`Gagal mengajukan: ${err.message}`);
+        } finally {
+            setLoadingPengajuan(false);
+        }
+    };
+
     const handleSearch = useCallback(
         (query) => {
             console.log("Search query:", query);
@@ -1007,8 +1236,11 @@ export default function Page_MeninggalDunia() {
                             onDetail={handleDetail}
                             onEdit={handleEdit}
                             onDelete={handleDelete}
+                            onAjukan={handleAjukan}
                             onApprove={handleApprove}
                             onReject={handleReject}
+                            onUploadSK={handleUploadSK}
+                            onDownloadSK={handleDownloadSK}
                         />
 
                         {pengajuanTotalData > 0 && (
@@ -1102,6 +1334,123 @@ export default function Page_MeninggalDunia() {
                             <p className="text-muted">Belum ada riwayat meninggal dunia yang tersedia.</p>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* SK Upload Modal */}
+            {showUploadModal && (
+                <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog modal-lg">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">Upload SK Meninggal Dunia</h5>
+                                <button 
+                                    type="button" 
+                                    className="btn-close" 
+                                    onClick={handleUploadCancel}
+                                    disabled={uploadLoading}
+                                ></button>
+                            </div>
+                            <div className="modal-body">
+                                <div className="mb-3">
+                                    <label className="form-label">Pilih File SK *</label>
+                                    <input
+                                        type="file"
+                                        className="form-control"
+                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                        onChange={handleSKFileSelect}
+                                        disabled={uploadLoading}
+                                    />
+                                    <div className="form-text">
+                                        Format yang didukung: PDF, DOC, DOCX, JPG, JPEG, PNG (Maksimal 10MB)
+                                    </div>
+                                </div>
+
+                                <div className="mb-3">
+                                    <label className="form-label">Pilih File SPKB (Opsional)</label>
+                                    <input
+                                        type="file"
+                                        className="form-control"
+                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                        onChange={handleSPKBFileSelect}
+                                        disabled={uploadLoading}
+                                    />
+                                    <div className="form-text">
+                                        Format yang didukung: PDF, DOC, DOCX, JPG, JPEG, PNG (Maksimal 10MB)
+                                    </div>
+                                </div>
+
+                                {selectedSKFile && (
+                                    <div className="mb-3">
+                                        <div className="alert alert-info">
+                                            <strong>File SK dipilih:</strong> {selectedSKFile.name} ({(selectedSKFile.size / 1024 / 1024).toFixed(2)} MB)
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedSPKBFile && (
+                                    <div className="mb-3">
+                                        <div className="alert alert-info">
+                                            <strong>File SPKB dipilih:</strong> {selectedSPKBFile.name} ({(selectedSPKBFile.size / 1024 / 1024).toFixed(2)} MB)
+                                        </div>
+                                    </div>
+                                )}
+
+                                {skFilePreview && (
+                                    <div className="mb-3">
+                                        <label className="form-label">Preview SK:</label>
+                                        <div className="text-center">
+                                            <img 
+                                                src={skFilePreview} 
+                                                alt="Preview SK" 
+                                                className="img-fluid" 
+                                                style={{ maxHeight: '300px', border: '1px solid #ddd', borderRadius: '4px' }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {spkbFilePreview && (
+                                    <div className="mb-3">
+                                        <label className="form-label">Preview SPKB:</label>
+                                        <div className="text-center">
+                                            <img 
+                                                src={spkbFilePreview} 
+                                                alt="Preview SPKB" 
+                                                className="img-fluid" 
+                                                style={{ maxHeight: '300px', border: '1px solid #ddd', borderRadius: '4px' }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary" 
+                                    onClick={handleUploadCancel}
+                                    disabled={uploadLoading}
+                                >
+                                    Batal
+                                </button>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-primary" 
+                                    onClick={handleUploadConfirm}
+                                    disabled={!selectedSKFile || uploadLoading}
+                                >
+                                    {uploadLoading ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2"></span>
+                                            Mengupload...
+                                        </>
+                                    ) : (
+                                        'Upload SK'
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </MainContent>
