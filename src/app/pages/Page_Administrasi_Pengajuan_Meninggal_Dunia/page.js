@@ -741,7 +741,9 @@ export default function Page_MeninggalDunia() {
             console.log("SK File:", selectedSKFile.name);
             console.log("SPKB File:", selectedSPKBFile?.name || "None");
 
-            const response = await fetch(`${API_LINK}MeninggalDunia/${selectedMeninggalId}/upload-sk`, {
+            // Encode the ID for the API call to handle special characters
+            const encodedId = encodeURIComponent(selectedMeninggalId);
+            const response = await fetch(`${API_LINK}MeninggalDunia/${encodedId}/upload-sk`, {
                 method: 'POST',
                 body: formData
             });
@@ -789,8 +791,9 @@ export default function Page_MeninggalDunia() {
     };
 
     const handleDownloadSK = (id) => {
-        // Download SK file using the file endpoint
-        window.open(`${API_LINK}MeninggalDunia/report/${id}`, "_blank");
+        // Encode the ID for the download URL to handle special characters
+        const encodedId = encodeURIComponent(id);
+        window.open(`${API_LINK}MeninggalDunia/report/${encodedId}`, "_blank");
     };
 
     const handleAjukan = async (id) => {
@@ -810,7 +813,9 @@ export default function Page_MeninggalDunia() {
             console.log("=== AJUKAN MENINGGAL DUNIA ===");
             console.log("Draft ID:", id);
 
-            const url = `${API_LINK}MeninggalDunia/finalize/${id}`;
+            // Encode the ID for the API call to handle special characters
+            const encodedId = encodeURIComponent(id);
+            const url = `${API_LINK}MeninggalDunia/finalize/${encodedId}`;
             console.log("Finalize URL:", url);
 
             const res = await fetch(url, {
@@ -887,14 +892,19 @@ export default function Page_MeninggalDunia() {
         router.push("/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/add");
     };
 
-    const handleDetail = (id) =>
+    const handleDetail = (id) => {
+        // Double encode the ID to handle special characters like forward slashes
+        const encodedId = encodeURIComponent(encryptIdUrl(id));
         router.push(
-            `/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/detail/${encryptIdUrl(id)}`
+            `/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/detail/${encodedId}`
         );
+    };
 
     const handleEdit = (id) => {
+        // Double encode the ID to handle special characters like forward slashes
+        const encodedId = encodeURIComponent(encryptIdUrl(id));
         router.push(
-            `/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/edit/${encryptIdUrl(id)}`
+            `/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/edit/${encodedId}`
         );
     };
 
@@ -912,7 +922,9 @@ export default function Page_MeninggalDunia() {
         setLoadingPengajuan(true);
 
         try {
-            const url = `${API_LINK}MeninggalDunia/${id}`;
+            // Encode the ID for the API call to handle special characters
+            const encodedId = encodeURIComponent(id);
+            const url = `${API_LINK}MeninggalDunia/${encodedId}`;
             const res = await fetch(url, { method: "DELETE" });
             
             if (!res.ok) {
@@ -958,20 +970,23 @@ export default function Page_MeninggalDunia() {
             
             let url, payload;
             
+            // Encode the ID for the API call to handle special characters
+            const encodedItemId = encodeURIComponent(itemId);
+            
             if (isProdi) {
-                url = `${API_LINK}MeninggalDunia/approve/${itemId}`;
+                url = `${API_LINK}MeninggalDunia/approve/${encodedItemId}`;
                 payload = {
                     approvedBy: approvedBy,
                     role: "prodi"
                 };
             } else if (isWadir1) {
-                url = `${API_LINK}MeninggalDunia/approve/${itemId}`;
+                url = `${API_LINK}MeninggalDunia/approve/${encodedItemId}`;
                 payload = {
                     approvedBy: approvedBy,
                     role: "wadir1"
                 };
             } else if (isFinance) {
-                url = `${API_LINK}MeninggalDunia/approve/${itemId}`;
+                url = `${API_LINK}MeninggalDunia/approve/${encodedItemId}`;
                 payload = {
                     approvedBy: approvedBy,
                     role: "finance"
@@ -1074,7 +1089,9 @@ export default function Page_MeninggalDunia() {
 
             console.log("Reject payload:", payload);
 
-            const url = `${API_LINK}MeninggalDunia/reject/${itemId}`;
+            // Encode the ID for the API call to handle special characters
+            const encodedItemId = encodeURIComponent(itemId);
+            const url = `${API_LINK}MeninggalDunia/reject/${encodedItemId}`;
             console.log("API URL:", url);
 
             const res = await fetch(url, {

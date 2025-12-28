@@ -1,0 +1,450 @@
+"use client";
+
+import { useState, useMemo, useEffect } from "react";
+import MainContent from "@/components/layout/MainContent";
+import Toast from "@/components/common/Toast";
+import Button from "@/components/common/Button";
+import { useRouter, useParams } from "next/navigation";
+import { API_LINK } from "@/lib/constant";
+import { getUserData } from "@/context/user";
+import { decryptIdUrl } from "@/lib/encryptor";
+
+export default function DetailMeninggalDunia() {
+  const router = useRouter();
+  const params = useParams();
+  const userData = useMemo(() => getUserData(), []);
+
+  const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [detailData, setDetailData] = useState(null);
+  const [error, setError] = useState(null);
+
+  // Handle hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Get the ID from URL params with proper URL encoding handling
+  const recordId = useMemo(() => {
+    if (!params?.id) return null;
+    
+    console.log("=== ID PROCESSING DEBUG ===");
+    console.log("Raw params.id:", params.id);
+    
+    try {
+      // First decode the URL encoding
+      const urlDecodedId = decodeURIComponent(params.id);
+      console.log("URL decoded ID:", urlDecodedId);
+      
+      // Then try to decrypt (for encrypted IDs from main page)
+      const decryptedId = decryptIdUrl(urlDecodedId);
+      console.log("Decrypted ID:", decryptedId);
+      return decryptedId;
+    } catch (decryptError) {
+      console.log("Decryption failed, trying direct URL decode:", decryptError);
+      try {
+        // Fallback to just URL decoding
+        const decodedId = decodeURIComponent(params.id);
+        console.log("Final decoded ID:", decodedId);
+        return decodedId;
+      } catch (urlError) {
+        console.log("URL decoding also failed, using original:", urlError);
+        return params.id;
+      }
+    }
+  }, [params?.id]);
+
+  // Load record data with comprehensive error handling
+  useEffect(() => {
+    if (!recordId) {
+      console.log("No recordId available");
+      setLoading(false);
+      setError("ID tidak valid");
+      return;
+    }
+
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        console.log("=== LOADING MENINGGAL DUNIA DETAIL ===");
+        console.log("Record ID:", recordId);
+        
+        // Encode the ID for the API call to handle special characters
+        const encodedRecordId = encodeURIComponent(recordId);
+        console.log("Encoded Record ID for API:", encodedRecordId);
+        console.log("API URL:", `${API_LINK}MeninggalDunia/${encodedRecordId}`);
+
+        // Use backend GET {id} endpoint
+        const response = await fetch(`${API_LINK}MeninggalDunia/${encodedRecordId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+
+        console.log("Detail response status:", response.status);
+        console.log("Detail response headers:", response.headers);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("API Error Response:", errorText);
+          
+          let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.message || errorMessage;
+          } catch (parseError) {
+            console.log("Could not parse error response as JSON");
+          }
+          
+          throw new Error(errorMessage);
+        }
+
+        const responseText = await response.text();
+        console.log("Raw response text:", responseText);
+
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error("JSON Parse Error:", parseError);
+          throw new Error("Invalid JSON response from server");
+        }
+
+        console.log("Parsed detail data:", data);
+        
+        // Validate response structure
+        if (!data || typeof data !== 'object') {
+          throw new Error("Invalid data structure received from server");
+        }
+
+        // Log all expected fields for debugging
+        console.log("=== BACKEND RESPONSE VALIDATION ===");
+        console.log("mhsId:", data.mhsId);
+        console.log("mhsNama:", data.mhsNama);
+        console.log("konNama:", data.konNama);
+        console.log("mhsAngkatan:", data.mhsAngkatan);
+        console.log("konSingkatan:", data.konSingkatan);
+        console.log("lampiran:", data.lampiran);
+        console.log("status:", data.status);
+        console.log("createdBy:", data.createdBy);
+        console.log("approveDir1Date:", data.approveDir1Date);
+        console.log("approveDir1By:", data.approveDir1By);
+        console.log("suratNo:", data.suratNo);
+        console.log("noSpkb:", data.noSpkb);
+        console.log("sk:", data.sk);
+        console.log("spkb:", data.spkb);
+        
+        setDetailData(data);
+        
+      } catch (error) {
+        console.error("Error loading detail:", error);
+        setError(error.message);
+        Toast.error(`Gagal memuat detail pengajuan: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [recordId]);
+
+  const handleBack = () => {
+    // Navigate back to main page
+    router.push("/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia");
+  };
+
+  // Handle file downloads using backend report endpoint
+  const handleDownloadReport = () => {
+    if (!recordId) {
+      Toast.error("ID tidak valid untuk download.");
+      return;
+    }
+    
+    // Encode the ID for the download URL to handle special characters
+    const encodedRecordId = encodeURIComponent(recordId);
+    const downloadUrl = `${API_LINK}MeninggalDunia/report/${encodedRecordId}`;
+    console.log("Download URL:", downloadUrl);
+    window.open(downloadUrl, "_blank");
+  };
+
+  // Status badge styling
+  const getStatusBadgeClass = (status) => {
+    if (!status) return 'badge bg-light text-dark';
+    
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
+      case 'draft':
+        return 'badge bg-secondary';
+      case 'disetujui':
+        return 'badge bg-success';
+      case 'ditolak':
+        return 'badge bg-danger';
+      case 'belum disetujui prodi':
+        return 'badge bg-warning text-dark';
+      case 'belum disetujui wadir 1':
+        return 'badge bg-warning text-dark';
+      case 'belum disetujui finance':
+        return 'badge bg-warning text-dark';
+      case 'menunggu upload sk':
+        return 'badge bg-info';
+      default:
+        return 'badge bg-light text-dark';
+    }
+  };
+
+  if (!mounted) {
+    return (
+      <MainContent
+        title="Detail Pengajuan Meninggal Dunia"
+        layout="Admin"
+        breadcrumb={[
+          { label: "Sistem Informasi Akademik" },
+          { label: "Administrasi Akademik" },
+          { label: "Meninggal Dunia" },
+          { label: "Detail Pengajuan" },
+        ]}
+      >
+        <div className="text-center py-4">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-2">Memuat halaman...</p>
+        </div>
+      </MainContent>
+    );
+  }
+
+  if (loading) {
+    return (
+      <MainContent
+        title="Detail Pengajuan Meninggal Dunia"
+        layout="Admin"
+        breadcrumb={[
+          { label: "Sistem Informasi Akademik" },
+          { label: "Administrasi Akademik" },
+          { label: "Meninggal Dunia" },
+          { label: "Detail Pengajuan" },
+        ]}
+      >
+        <div className="text-center py-4">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-2">Memuat data pengajuan...</p>
+        </div>
+      </MainContent>
+    );
+  }
+
+  if (error || !detailData) {
+    return (
+      <MainContent
+        title="Detail Pengajuan Meninggal Dunia"
+        layout="Admin"
+        breadcrumb={[
+          { label: "Sistem Informasi Akademik" },
+          { label: "Administrasi Akademik" },
+          { label: "Meninggal Dunia" },
+          { label: "Detail Pengajuan" },
+        ]}
+      >
+        <div className="text-center py-5">
+          <div className="mb-3">
+            <i className="fas fa-exclamation-triangle fa-3x text-warning"></i>
+          </div>
+          <h5 className="text-muted">Data tidak ditemukan</h5>
+          <p className="text-muted">
+            {error || "Pengajuan meninggal dunia tidak dapat ditemukan."}
+          </p>
+          <div className="mt-3">
+            <Button
+              classType="primary"
+              label="Kembali"
+              onClick={handleBack}
+            />
+          </div>
+          <div className="mt-3">
+            <small className="text-muted">
+              ID yang dicari: {recordId}
+            </small>
+          </div>
+        </div>
+      </MainContent>
+    );
+  }
+
+  return (
+    <MainContent
+      title="Detail Pengajuan Meninggal Dunia"
+      layout="Admin"
+      breadcrumb={[
+        { label: "Sistem Informasi Akademik" },
+        { label: "Administrasi Akademik" },
+        { label: "Meninggal Dunia" },
+        { label: "Detail Pengajuan" },
+      ]}
+    >
+      <div className="card">
+        <div className="card-header d-flex justify-content-between align-items-center">
+          <h5 className="card-title mb-0">
+            <i className="fas fa-info-circle me-2"></i>
+            Informasi Pengajuan Meninggal Dunia
+          </h5>
+          <span className={getStatusBadgeClass(detailData.status)}>
+            {detailData.status || 'Status tidak diketahui'}
+          </span>
+        </div>
+        <div className="card-body">
+          {/* Data Mahasiswa */}
+          <div className="row mb-4">
+            <div className="col-12">
+              <h6 className="text-primary border-bottom pb-2 mb-3">
+                <i className="fas fa-user me-2"></i>Data Mahasiswa
+              </h6>
+            </div>
+            <div className="col-md-6 mb-3">
+              <label className="form-label fw-bold">ID Mahasiswa:</label>
+              <p className="form-control-plaintext">{detailData.mhsId || '-'}</p>
+            </div>
+            <div className="col-md-6 mb-3">
+              <label className="form-label fw-bold">Nama Mahasiswa:</label>
+              <p className="form-control-plaintext">{detailData.mhsNama || '-'}</p>
+            </div>
+            <div className="col-md-6 mb-3">
+              <label className="form-label fw-bold">Program Studi:</label>
+              <p className="form-control-plaintext">{detailData.konNama || '-'}</p>
+            </div>
+            <div className="col-md-6 mb-3">
+              <label className="form-label fw-bold">Singkatan Prodi:</label>
+              <p className="form-control-plaintext">{detailData.konSingkatan || '-'}</p>
+            </div>
+            <div className="col-md-6 mb-3">
+              <label className="form-label fw-bold">Tahun Angkatan:</label>
+              <p className="form-control-plaintext">{detailData.mhsAngkatan || '-'}</p>
+            </div>
+          </div>
+
+          {/* Data Pengajuan */}
+          <div className="row mb-4">
+            <div className="col-12">
+              <h6 className="text-primary border-bottom pb-2 mb-3">
+                <i className="fas fa-file-alt me-2"></i>Data Pengajuan
+              </h6>
+            </div>
+            <div className="col-md-6 mb-3">
+              <label className="form-label fw-bold">Status:</label>
+              <p className="form-control-plaintext">
+                <span className={getStatusBadgeClass(detailData.status)}>
+                  {detailData.status || 'Status tidak diketahui'}
+                </span>
+              </p>
+            </div>
+            <div className="col-md-6 mb-3">
+              <label className="form-label fw-bold">Dibuat Oleh:</label>
+              <p className="form-control-plaintext">{detailData.createdBy || '-'}</p>
+            </div>
+            <div className="col-md-12 mb-3">
+              <label className="form-label fw-bold">Lampiran File:</label>
+              <div className="d-flex align-items-center">
+                <p className="form-control-plaintext me-3 mb-0">
+                  {detailData.lampiran || 'Tidak ada file'}
+                </p>
+                {detailData.lampiran && (
+                  <Button
+                    classType="outline-primary"
+                    label="Download Lampiran"
+                    onClick={handleDownloadReport}
+                    size="sm"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Data Persetujuan */}
+          {(detailData.approveDir1Date || detailData.approveDir1By) && (
+            <div className="row mb-4">
+              <div className="col-12">
+                <h6 className="text-primary border-bottom pb-2 mb-3">
+                  <i className="fas fa-check-circle me-2"></i>Data Persetujuan
+                </h6>
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label fw-bold">Tanggal Persetujuan Wadir 1:</label>
+                <p className="form-control-plaintext">{detailData.approveDir1Date || '-'}</p>
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label fw-bold">Disetujui Oleh:</label>
+                <p className="form-control-plaintext">{detailData.approveDir1By || '-'}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Data Surat & Dokumen */}
+          {(detailData.suratNo || detailData.noSpkb || detailData.sk || detailData.spkb) && (
+            <div className="row mb-4">
+              <div className="col-12">
+                <h6 className="text-primary border-bottom pb-2 mb-3">
+                  <i className="fas fa-file-contract me-2"></i>Data Surat & Dokumen
+                </h6>
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label fw-bold">Nomor Surat:</label>
+                <p className="form-control-plaintext">{detailData.suratNo || '-'}</p>
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label fw-bold">Nomor SPKB:</label>
+                <p className="form-control-plaintext">{detailData.noSpkb || '-'}</p>
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label fw-bold">File SK:</label>
+                <div className="d-flex align-items-center">
+                  <p className="form-control-plaintext me-3 mb-0">
+                    {detailData.sk ? detailData.sk : 'Belum ada file SK'}
+                  </p>
+                  {detailData.sk && (
+                    <Button
+                      classType="outline-success"
+                      label="Download SK"
+                      onClick={handleDownloadReport}
+                      size="sm"
+                    />
+                  )}
+                </div>
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label fw-bold">File SPKB:</label>
+                <div className="d-flex align-items-center">
+                  <p className="form-control-plaintext me-3 mb-0">
+                    {detailData.spkb ? detailData.spkb : 'Belum ada file SPKB'}
+                  </p>
+                  {detailData.spkb && (
+                    <Button
+                      classType="outline-success"
+                      label="Download SPKB"
+                      onClick={handleDownloadReport}
+                      size="sm"
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="d-flex justify-content-end mt-4">
+            <Button
+              classType="secondary"
+              label="Kembali"
+              onClick={handleBack}
+            />
+          </div>
+        </div>
+      </div>
+    </MainContent>
+  );
+}
