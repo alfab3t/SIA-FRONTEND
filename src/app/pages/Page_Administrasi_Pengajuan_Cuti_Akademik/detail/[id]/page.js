@@ -165,18 +165,13 @@ export default function DetailCutiAkademikPage() {
         {/* INFORMASI CUTI AKADEMIK        */}
         {/* ============================== */}
 
-        <h4 className="fw-bold">Informasi Pengajuan</h4>
+        <h4 className="fw-bold">Detail Pengajuan Cuti Akademik</h4>
         <hr />
 
         <div className="row">
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Nomor Cuti</label>
+            <label className="form-label fw-semibold">Nomor SK</label>
             <p>{detail?.id || "-"}</p>
-          </div>
-
-          <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Tanggal Pengajuan</label>
-            <p>{formatTanggalPengajuan(detail?.tglPengajuan)}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
@@ -185,7 +180,7 @@ export default function DetailCutiAkademikPage() {
           </div>
 
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Semester</label>
+            <label className="form-label fw-semibold">Mengajukan Cuti untuk Semester</label>
             <p>{detail?.semester || "-"}</p>
           </div>
 
@@ -197,14 +192,14 @@ export default function DetailCutiAkademikPage() {
           {/* Tambahan field persetujuan di bagian status utama */}
           {detail?.approvalProdi && (
             <div className="col-lg-6 mb-3">
-              <label className="form-label fw-semibold">Persetujuan Prodi Oleh</label>
+              <label className="form-label fw-semibold">Persetujuan Prodi oleh</label>
               <p>{detail.approvalProdi}</p>
             </div>
           )}
 
           {detail?.approvalDir1 && (
             <div className="col-lg-6 mb-3">
-              <label className="form-label fw-semibold">Persetujuan Wadir1 Oleh</label>
+              <label className="form-label fw-semibold">Persetujuan Wakil Direktur 1 oleh</label>
               <p>{detail.approvalDir1}</p>
             </div>
           )}
@@ -215,7 +210,7 @@ export default function DetailCutiAkademikPage() {
           <>
             <br />
             <h5 className="fw-bold">Status Persetujuan</h5>
-            <hr />
+
             <div className="row">
               <div className="col-lg-6 mb-3">
                 <label className="form-label fw-semibold">Status Approval Prodi</label>
@@ -293,8 +288,6 @@ export default function DetailCutiAkademikPage() {
         {/* DATA MAHASISWA                */}
         {/* ============================== */}
 
-        <h4 className="fw-bold">Data Mahasiswa</h4>
-        <hr />
 
         <div className="row">
           <div className="col-lg-6 mb-3">
@@ -318,14 +311,11 @@ export default function DetailCutiAkademikPage() {
           </div>
         </div>
 
-        <br />
 
         {/* ============================== */}
         {/* DOWNLOAD FILE                 */}
         {/* ============================== */}
-
-        <h4 className="fw-bold">Lampiran</h4>
-        <hr />
+   
 
         <div className="row">
 
