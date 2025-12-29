@@ -157,17 +157,48 @@ export default function DetailMeninggalDunia() {
     router.push("/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia");
   };
 
-  // Handle file downloads using backend report endpoint
+  // Handle file downloads using backend file endpoint
   const handleDownloadReport = () => {
-    if (!recordId) {
-      Toast.error("ID tidak valid untuk download.");
+    if (!recordId || !detailData?.lampiran) {
+      Toast.error("File lampiran tidak tersedia untuk didownload.");
       return;
     }
     
-    // Encode the ID for the download URL to handle special characters
-    const encodedRecordId = encodeURIComponent(recordId);
-    const downloadUrl = `${API_LINK}MeninggalDunia/report/${encodedRecordId}`;
-    console.log("Download URL:", downloadUrl);
+    // Use backend file endpoint for downloading lampiran
+    const filename = detailData.lampiran;
+    const downloadUrl = `${API_LINK}MeninggalDunia/file/${filename}`;
+    console.log("Download Lampiran URL:", downloadUrl);
+    console.log("Original filename:", filename);
+    window.open(downloadUrl, "_blank");
+  };
+
+  // Handle SK file download
+  const handleDownloadSK = () => {
+    if (!recordId || !detailData?.sk) {
+      Toast.error("File SK tidak tersedia untuk didownload.");
+      return;
+    }
+    
+    // Use backend file endpoint for downloading SK
+    const filename = detailData.sk;
+    const downloadUrl = `${API_LINK}MeninggalDunia/file/${filename}`;
+    console.log("Download SK URL:", downloadUrl);
+    console.log("Original SK filename:", filename);
+    window.open(downloadUrl, "_blank");
+  };
+
+  // Handle SPKB file download  
+  const handleDownloadSPKB = () => {
+    if (!recordId || !detailData?.spkb) {
+      Toast.error("File SPKB tidak tersedia untuk didownload.");
+      return;
+    }
+    
+    // Use backend file endpoint for downloading SPKB
+    const filename = detailData.spkb;
+    const downloadUrl = `${API_LINK}MeninggalDunia/file/${filename}`;
+    console.log("Download SPKB URL:", downloadUrl);
+    console.log("Original SPKB filename:", filename);
     window.open(downloadUrl, "_blank");
   };
 
@@ -410,7 +441,7 @@ export default function DetailMeninggalDunia() {
                     <Button
                       classType="outline-success"
                       label="Download SK"
-                      onClick={handleDownloadReport}
+                      onClick={handleDownloadSK}
                       size="sm"
                     />
                   )}
@@ -426,7 +457,7 @@ export default function DetailMeninggalDunia() {
                     <Button
                       classType="outline-success"
                       label="Download SPKB"
-                      onClick={handleDownloadReport}
+                      onClick={handleDownloadSPKB}
                       size="sm"
                     />
                   )}

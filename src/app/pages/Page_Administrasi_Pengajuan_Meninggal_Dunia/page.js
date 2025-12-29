@@ -790,10 +790,44 @@ export default function Page_MeninggalDunia() {
         setSelectedMeninggalId(null);
     };
 
-    const handleDownloadSK = (id) => {
-        // Encode the ID for the download URL to handle special characters
-        const encodedId = encodeURIComponent(id);
-        window.open(`${API_LINK}MeninggalDunia/report/${encodedId}`, "_blank");
+    const handleDownloadSK = async (id) => {
+        try {
+            console.log("=== DOWNLOAD SK FROM MAIN PAGE ===");
+            console.log("Record ID:", id);
+            
+            // First, get the detail to obtain the SK filename
+            const encodedId = encodeURIComponent(id);
+            const detailResponse = await fetch(`${API_LINK}MeninggalDunia/${encodedId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!detailResponse.ok) {
+                throw new Error(`HTTP ${detailResponse.status}: ${detailResponse.statusText}`);
+            }
+
+            const detailData = await detailResponse.json();
+            console.log("Detail data for SK download:", detailData);
+
+            if (!detailData.sk) {
+                Toast.error("File SK tidak tersedia untuk didownload.");
+                return;
+            }
+
+            // Now download the SK file using the filename
+            const filename = detailData.sk;
+            const downloadUrl = `${API_LINK}MeninggalDunia/file/${filename}`;
+            console.log("Download SK URL:", downloadUrl);
+            console.log("Original SK filename:", filename);
+            window.open(downloadUrl, "_blank");
+
+        } catch (error) {
+            console.error("Error downloading SK:", error);
+            Toast.error(`Gagal download SK: ${error.message}`);
+        }
     };
 
     const handleAjukan = async (id) => {
