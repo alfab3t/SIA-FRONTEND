@@ -320,14 +320,11 @@ export default function DetailMeninggalDunia() {
       ]}
     >
       <div className="card">
-        <div className="card-header d-flex justify-content-between align-items-center">
+        <div className="card-header">
           <h5 className="card-title mb-0">
             <i className="fas fa-info-circle me-2"></i>
             Informasi Pengajuan Meninggal Dunia
           </h5>
-          <span className={getStatusBadgeClass(detailData.status)}>
-            {detailData.status || 'Status tidak diketahui'}
-          </span>
         </div>
         <div className="card-body">
           {/* Data Mahasiswa */}
@@ -376,23 +373,50 @@ export default function DetailMeninggalDunia() {
             </div>
             <div className="col-md-6 mb-3">
               <label className="form-label fw-bold">Dibuat Oleh:</label>
-              <p className="form-control-plaintext">{detailData.createdBy || '-'}</p>
+              <p className="form-control-plaintext">
+                {(() => {
+                  const createdBy = detailData.createdBy || '';
+                  
+                  // Jika createdBy adalah 'system', coba ambil dari userData
+                  if (createdBy.toLowerCase() === 'system') {
+                    // Tampilkan username user yang sedang login jika tersedia
+                    if (userData?.username) {
+                      return userData.username;
+                    }
+                    // Atau tampilkan nama user jika username tidak ada
+                    if (userData?.nama) {
+                      return userData.nama;
+                    }
+                    return 'System';
+                  }
+                  
+                  // Tampilkan createdBy asli jika ada dan bukan kosong
+                  if (createdBy && createdBy !== '-') {
+                    return createdBy;
+                  }
+                  
+                  // Fallback ke username user saat ini jika tersedia
+                  if (userData?.username) {
+                    return userData.username;
+                  }
+                  
+                  return '-';
+                })()}
+              </p>
             </div>
             <div className="col-md-12 mb-3">
               <label className="form-label fw-bold">Lampiran File:</label>
-              <div className="d-flex align-items-center">
-                <p className="form-control-plaintext me-3 mb-0">
-                  {detailData.lampiran || 'Tidak ada file'}
-                </p>
-                {detailData.lampiran && (
-                  <Button
-                    classType="outline-primary"
-                    label="Download Lampiran"
-                    onClick={handleDownloadReport}
-                    size="sm"
-                  />
-                )}
-              </div>
+              <p className="form-control-plaintext mb-2">
+                {detailData.lampiran || 'Tidak ada file'}
+              </p>
+              {detailData.lampiran && (
+                <Button
+                  classType="outline-primary"
+                  label="Download Lampiran"
+                  onClick={handleDownloadReport}
+                  size="sm"
+                />
+              )}
             </div>
           </div>
 
@@ -433,35 +457,31 @@ export default function DetailMeninggalDunia() {
               </div>
               <div className="col-md-6 mb-3">
                 <label className="form-label fw-bold">File SK:</label>
-                <div className="d-flex align-items-center">
-                  <p className="form-control-plaintext me-3 mb-0">
-                    {detailData.sk ? detailData.sk : 'Belum ada file SK'}
-                  </p>
-                  {detailData.sk && (
-                    <Button
-                      classType="outline-success"
-                      label="Download SK"
-                      onClick={handleDownloadSK}
-                      size="sm"
-                    />
-                  )}
-                </div>
+                <p className="form-control-plaintext mb-2">
+                  {detailData.sk ? detailData.sk : 'Belum ada file SK'}
+                </p>
+                {detailData.sk && (
+                  <Button
+                    classType="outline-success"
+                    label="Download SK"
+                    onClick={handleDownloadSK}
+                    size="sm"
+                  />
+                )}
               </div>
               <div className="col-md-6 mb-3">
                 <label className="form-label fw-bold">File SPKB:</label>
-                <div className="d-flex align-items-center">
-                  <p className="form-control-plaintext me-3 mb-0">
-                    {detailData.spkb ? detailData.spkb : 'Belum ada file SPKB'}
-                  </p>
-                  {detailData.spkb && (
-                    <Button
-                      classType="outline-success"
-                      label="Download SPKB"
-                      onClick={handleDownloadSPKB}
-                      size="sm"
-                    />
-                  )}
-                </div>
+                <p className="form-control-plaintext mb-2">
+                  {detailData.spkb ? detailData.spkb : 'Belum ada file SPKB'}
+                </p>
+                {detailData.spkb && (
+                  <Button
+                    classType="outline-success"
+                    label="Download SPKB"
+                    onClick={handleDownloadSPKB}
+                    size="sm"
+                  />
+                )}
               </div>
             </div>
           )}
