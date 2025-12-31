@@ -10,39 +10,40 @@ import Formsearch from "@/components/common/Formsearch";
 import { useRouter } from "next/navigation";
 import fetchData from "@/lib/fetch";
 import { API_LINK } from "@/lib/constant";
-import { encryptIdUrl } from "@/lib/encryptor";
-import SweetAlert from "@/components/common/SweetAlert";
 import { getSSOData, getUserData } from "@/context/user";
-import DateFormatter from "@/lib/dateFormater";
+import SweetAlert from "@/components/common/SweetAlert";
 
-// Nama file: Page_Administrasi_Pengajuan_Pengunduran_Diri.js
 export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
+  const router = useRouter();
   const ssoData = useMemo(() => getSSOData(), []);
   const userData = useMemo(() => getUserData(), []);
-  const router = useRouter();
-  const [dataPengunduranDiri, setDataPengunduranDiri] = useState([]); // Ubah nama state
+
+  const [dataDraft, setDataDraft] = useState([]);
+  const [dataRiwayat, setDataRiwayat] = useState([]);
+  const [dataPengunduranDiri, setDataPengunduranDiri] = useState([]);
   const [loading, setLoading] = useState(true);
-  const sortRef = useRef();
-  const statusRef = useRef();
   const [isClient, setIsClient] = useState(false);
 
-  // Data untuk Urutkan (Sort)
+  const sortRef = useRef();
+  const statusRef = useRef();
+
+  /* ================= FILTER ================= */
+
   const dataFilterSort = [
-    { Value: "[Tanggal Pengajuan] desc", Text: "Tanggal Pengajuan [↓]" },
-    { Value: "[Tanggal Pengajuan] asc", Text: "Tanggal Pengajuan [↑]" },
-    { Value: "[No Pengajuan] asc", Text: "No Pengajuan [↑]" },
-    { Value: "[Nama Mahasiswa] asc", Text: "Nama Mahasiswa [↑]" },
+    { Value: "a.pd_created_date desc", Text: "Tanggal Pengajuan [↓]" },
+    { Value: "a.pd_created_date asc", Text: "Tanggal Pengajuan [↑]" },
+    { Value: "a.pd_id asc", Text: "No Pengajuan PD [↑]" },
+    { Value: "mhs_nama asc", Text: "Nama Mahasiswa [↑]" }
   ];
 
-  // Data untuk Status Pengajuan Pengunduran Diri (Sesuai Screenshot)
   const dataFilterStatus = [
-    { Value: "", Text: "Semua Status" }, 
-    { Value: "Menunggu Upload SK", Text: "Menunggu Upload SK" }, 
+    { Value: "", Text: "Semua Status" },
+    { Value: "Draft", Text: "Draft" },
+    { Value: "Belum Disetujui Prodi", Text: "Menunggu Prodi" },
+    { Value: "Belum Disetujui Wadir 1", Text: "Menunggu Wadir 1" },
+    { Value: "Menunggu Upload SK", Text: "Menunggu Upload SK" },
     { Value: "Disetujui", Text: "Disetujui" },
-    { Value: "Ditolak", Text: "Ditolak" },
-    // Tambahkan status lain jika ada, misal:
-    // { Value: "Belum Disetujui Prodi", Text: "Belum Disetujui Prodi" },
-    // { Value: "Belum Disetujui Wadir 1", Text: "Belum Disetujui Wadir 1" },
+    { Value: "Ditolak", Text: "Ditolak" }
   ];
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -50,240 +51,429 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
   const [pageSize] = useState(10);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState(dataFilterSort[0].Value);
-  const [sortStatus, setSortStatus] = useState(dataFilterStatus[0].Value);
+  const [sortStatus, setSortStatus] = useState("");
+
+  const canCreate = useMemo(() => {
+    if (!isClient || !userData?.role) return false;
+    const role = userData.role.toUpperCase();
+    return (
+      role.includes("MAHASISWA") ||
+      role.includes("PRODI") ||
+      role.includes("ADMIN") ||
+      role.includes("USER_ADMIN") ||
+      role === "NDA_PRODI"
+    );
+  }, [isClient, userData]);
+
+  const canApprove = useMemo(() => {
+    if (!isClient || !userData?.role) return false;
+    const role = userData.role.toUpperCase();
+    return (
+      role.includes("PRODI") ||
+      role.includes("WADIR") ||
+      role.includes("USER_ADMIN") ||
+      role === "NDA_PRODI"
+    );
+  }, [isClient, userData]);
+
+  // Hanya user_prodi/NDA_PRODI yang bisa melihat Daftar Pengajuan (Draft)
+  const canSeeDraft = useMemo(() => {
+    if (!isClient || !userData?.role) return false;
+    const role = userData.role.toUpperCase();
+    return (
+      role.includes("PRODI") ||
+      role === "NDA_PRODI"
+    );
+  }, [isClient, userData]);
 
   const loadData = useCallback(
-    async (page, sort, cari, status) => {
+    async (page = 1, sort = sortBy, keyword = "", status = "") => {
       try {
         setLoading(true);
 
-        // Ubah endpoint dan parameter
-        const response = await fetchData(
-          API_LINK + "PengunduranDiri/GetAllPengajuan", // Ganti dengan API endpoint Pengunduran Diri
-          {
-            Status: status === "" ? null : status,
-            ...(cari !== "" ? { SearchKeyword: cari } : {}),
-            Urut: sort,
-            PageNumber: page,
-            PageSize: pageSize,
-          },
-          "GET"
-        );
+        const username = userData?.username || "";
+        const role = userData?.role || "";
+        const displayName = userData?.displayName || userData?.fullName || "";
 
-        if (response.error) {
-          console.error("API Error:", response.message);
-          throw new Error(response.message || "Gagal mengambil data pengajuan pengunduran diri.");
+        if (!username) {
+          setDataPengunduranDiri([]);
+          return;
         }
 
-        const { data, totalData } = response;
-        
-        // --- Perbaikan Mapping Data Pengunduran Diri ---
-        const pagedData = data.map((item, index) => ({
-          No: (page - 1) * pageSize + index + 1,
-          id: item.idPengunduranDiri || item.id,
-          
-          // Kolom sesuai screenshot Daftar Pengajuan Pengunduran Diri
-          "No Pengajuan": item.noPengajuan || "-",
-          "Tanggal Pengajuan": DateFormatter.formatDate(item.tanggalPengajuan) || "-",
-          "Nomor SK": item.nomorSK || "-",
-          
-          // Logika Persetujuan (✔/❌)
-          "Disetujui Prodi": item.isApprovedProdi ? "✔" : "❌", 
-          "Disetujui Wadir 1": item.isApprovedWadir1 ? "✔" : "❌", 
-          
-          Status: item.statusPengajuan || "Status Tidak Diketahui", 
-          
-          // Kolom Cetak SK
-          "Cetak SK": (item.linkSK || item.nomorSK) ? "🖨️" : "-", // Ikon cetak
-          
-          Aksi: [
-            "Detail",
-            // Aksi Edit & Delete/Upload (sesuaikan permission)
-            ...(isClient && userData?.permission?.includes("undurdiri.edit")
-              ? ["Edit"] 
-              : []),
-            // Aksi Upload/Download SK (sesuai ikon upload di screenshot)
-            ...(isClient && userData?.permission?.includes("undurdiri.upload_sk")
-              ? ["Upload"] // Ganti 'Toggle' menjadi 'Upload' atau 'Delete'
-              : []),
-          ],
-          Alignment: [
-            "center", // No
-            "center", // No Pengajuan
-            "center", // Tanggal Pengajuan
-            "center", // Nomor SK
-            "center", // Disetujui Prodi
-            "center", // Disetujui Wadir 1
-            "center", // Status
-            "center", // Cetak SK
-            "center", // Aksi
-          ],
-        }));
-        // --- Akhir Perbaikan Mapping Data ---
+        const params = {
+          username,
+          keyword,
+          sortBy: sort,
+          konsentrasi: "",
+          role,
+          displayName: role.toUpperCase().includes("ADMIN") ? "" : displayName
+        };
 
-        setDataPengunduranDiri(pagedData || []);
-        setTotalData(totalData || 0);
+        // Simulasi data - ganti dengan API call yang sebenarnya
+        const mockData = [
+          {
+            id: "043/PMA/PD/XI/2025",
+            pdId: "043/PMA/PD/XI/2025",
+            tanggalPengajuan: "12 Des 2025",
+            noSK: "-",
+            nim: "0320220118",
+            namaMahasiswa: "MUHAMMAD JILBRAN",
+            prodi: "MI(PM)",
+            status: "Belum Disetujui Wadir 1",
+            disetujuiProdi: true,
+            disetujuiWadir1: false
+          },
+          {
+            id: "042/PMA/PD/XI/2025",
+            pdId: "042/PMA/PD/XI/2025",
+            tanggalPengajuan: "12 Nov 2025",
+            noSK: "-",
+            nim: "0320220118",
+            namaMahasiswa: "MUHAMMAD JILBRAN",
+            prodi: "MI(PM)",
+            status: "Belum Disetujui Wadir 1",
+            disetujuiProdi: true,
+            disetujuiWadir1: false
+          },
+          {
+            id: "DRAFT",
+            pdId: "DRAFT",
+            tanggalPengajuan: "22 Des 2025",
+            noSK: "-",
+            nim: "0320220118",
+            namaMahasiswa: "MUHAMMAD JILBRAN",
+            prodi: "MI(PM)",
+            status: "Draft",
+            disetujuiProdi: false,
+            disetujuiWadir1: false
+          }
+        ];
+
+        const mapped = mockData.map((item, index) => {
+          const role = userData?.role?.toUpperCase() || "";
+          const status = item.status || "";
+          
+          let actions = ["Detail"]; // Semua item minimal punya Detail
+          
+          // Status Disetujui - Detail dan Unduh Berkas
+          if (status === "Disetujui" || status === "DISETUJUI") {
+            actions = ["Detail", "Unduh Berkas"];
+          }
+          // User Admin - Cetak SK dan Unggah Berkas untuk status "Menunggu Upload SK"
+          else if ((role.includes("USER_ADMIN") || role.includes("ADMIN")) && 
+                   (status === "Menunggu Upload SK" || status === "MENUNGGU UPLOAD SK")) {
+            actions = ["Detail", "Cetak SK", "Unggah Berkas"];
+          }
+          else if (canApprove) {
+            if ((status === "Belum Disetujui Prodi" || status === "BELUM DISETUJUI PRODI") && 
+                (role.includes("PRODI") || role === "NDA_PRODI")) {
+              actions = ["Detail", "Approve", "Reject"];
+            } else if ((status === "Belum Disetujui Wadir 1" || status === "BELUM DISETUJUI WADIR 1") && 
+                       role.includes("WADIR")) {
+              actions = ["Detail", "Approve", "Reject"];
+            }
+          }
+          
+          if ((canCreate || role === "NDA_PRODI") && (status === "Draft" || status === "DRAFT")) {
+            actions = ["Detail", "Edit", "Delete", "Ajukan"];
+          }
+
+          return {
+            No: (page - 1) * pageSize + index + 1,
+            id: item.id || item.pdId || "",
+            "No Pengajuan": item.pdId || "-",
+            "Tanggal Pengajuan": item.tanggalPengajuan || "-",
+            "Nomor SK": item.noSK || "-",
+            "NIM": item.nim || "-",
+            "Nama Mahasiswa": item.namaMahasiswa || "-",
+            "Prodi": item.prodi || "-",
+            "Disetujui Prodi": item.disetujuiProdi ? "✓" : "✗",
+            "Disetujui Wadir 1": item.disetujuiWadir1 ? "✓" : "✗",
+            "Status": item.status || "Draft",
+            "Aksi": actions,
+            Alignment: ["center", "center", "center", "center", "center", "left", "left", "center", "center", "center", "center"]
+          };
+        });
+
+        // Pisahkan data berdasarkan status
+        const draftData = [];
+        const riwayatData = [];
+        
+        mapped.forEach((item, index) => {
+          if (item.Status === "Draft" || item.Status === "DRAFT") {
+            draftData.push({ ...item, No: draftData.length + 1 });
+          } else {
+            riwayatData.push({ ...item, No: riwayatData.length + 1 });
+          }
+        });
+
+        setDataPengunduranDiri(mapped);
+        setDataDraft(draftData);
+        setDataRiwayat(riwayatData);
+        setTotalData(mapped.length);
         setCurrentPage(page);
+
+        if (mapped.length === 0) {
+          Toast.info("Tidak ada data pengajuan pengunduran diri yang ditemukan");
+        }
       } catch (err) {
-        Toast.error(err.message);
+        Toast.error("Gagal memuat data: " + err.message);
         setDataPengunduranDiri([]);
-        setTotalData(0);
+        setDataDraft([]);
+        setDataRiwayat([]);
       } finally {
         setLoading(false);
       }
     },
-    [pageSize, isClient, userData]
+    [pageSize, sortBy, userData, canCreate, canApprove]
   );
 
-  // --- Handler Fungsi ---
+  /* ================= HANDLER ================= */
 
-  const handleSearch = useCallback(
-    (query) => {
-      setSearch(query);
-      setCurrentPage(1);
-      loadData(1, sortBy, query, sortStatus);
-    },
-    [sortBy, sortStatus, loadData]
-  );
+  const handleSearch = (q) => {
+    setSearch(q);
+    loadData(1, sortBy, q, sortStatus);
+  };
 
-  const handleFilterApply = useCallback(() => {
-    const newSortBy = sortRef.current.value;
-    const newSortStatus = statusRef.current.value;
+  const handleFilterApply = () => {
+    const s = sortRef.current.value;
+    const st = statusRef.current.value;
 
-    setSortBy(newSortBy);
-    setSortStatus(newSortStatus);
-    setCurrentPage(1);
-    loadData(1, newSortBy, search, newSortStatus);
-  }, [search, loadData]);
+    setSortBy(s);
+    setSortStatus(st);
+    loadData(1, s, search, st);
+  };
 
-  const handleNavigation = useCallback(
-    (page) => {
-      loadData(page, sortBy, search, sortStatus);
-    },
-    [sortBy, search, sortStatus, loadData]
-  );
+  const handleDetail = (id) => {
+    const encodedId = encodeURIComponent(id);
+    router.push(`/pages/Page_Administrasi_Pengajuan_Pengunduran_Diri/detail/${encodedId}`);
+  };
 
-  const handleAdd = useCallback(() => {
-    // Arahkan ke halaman tambah pengunduran diri
-    router.push("/pages/administrasi/pengunduran-diri/add");
-  }, [router]);
+  const handleEdit = (id) => {
+    const encodedId = encodeURIComponent(id);
+    router.push(`/pages/Page_Administrasi_Pengajuan_Pengunduran_Diri/edit/${encodedId}`);
+  };
 
-  const handleDetail = useCallback(
-    (id) =>
-      // Arahkan ke halaman detail pengunduran diri
-      router.push(
-        `/pages/administrasi/pengunduran-diri/detail/${encryptIdUrl(id)}`
-      ),
-    [router]
-  );
+  const handleApprove = async (id) => {
+    const confirm = await SweetAlert({
+      title: "Setujui Pengajuan",
+      text: "Apakah Anda yakin ingin menyetujui pengajuan ini?",
+      icon: "info",
+      confirmText: "Ya, Setujui!",
+      confirmButtonColor: "#28a745",
+    });
 
-  const handleEdit = useCallback(
-    (id) =>
-      // Arahkan ke halaman edit pengunduran diri
-      router.push(`/pages/administrasi/pengunduran-diri/edit/${encryptIdUrl(id)}`),
-    [router]
-  );
+    if (!confirm) return;
 
-  // Ganti handleToggle menjadi handleUpload (untuk mengupload SK)
-  const handleUpload = useCallback(
-    async (id) => {
-      // Logika untuk upload SK atau aksi lain yang diwakili oleh ikon upload
-      const result = await SweetAlert({
-        title: "Upload SK Pengunduran Diri",
-        text: "Apakah Anda yakin ingin mengupload atau memperbarui SK untuk pengajuan ini?",
-        icon: "info",
-        confirmText: "Ya, Upload!",
-      });
+    try {
+      // Simulasi API call
+      Toast.success("Pengajuan berhasil disetujui");
+      loadData(); // Reload data
+    } catch (err) {
+      Toast.error("Gagal menyetujui pengajuan: " + err.message);
+    }
+  };
 
-      if (!result) return;
+  const handleReject = async (id) => {
+    const confirm = await SweetAlert({
+      title: "Tolak Pengajuan",
+      text: "Apakah Anda yakin ingin menolak pengajuan ini?",
+      icon: "warning",
+      confirmText: "Ya, Tolak!",
+      confirmButtonColor: "#dc3545",
+    });
 
-      // Implementasi fungsi upload SK di sini
-      Toast.success("Aksi upload SK sedang diproses...");
-      // loadData(currentPage, sortBy, search, sortStatus); // Muat ulang data setelah aksi
-    },
-    []
-  );
+    if (!confirm) return;
+
+    try {
+      // Simulasi API call
+      Toast.success("Pengajuan berhasil ditolak");
+      loadData(); // Reload data
+    } catch (err) {
+      Toast.error("Gagal menolak pengajuan: " + err.message);
+    }
+  };
+
+  const handleAjukan = async (id) => {
+    const confirm = await SweetAlert({
+      title: "Ajukan Pengajuan",
+      text: "Setelah diajukan, data tidak dapat diedit kembali. Ajukan sekarang?",
+      icon: "warning",
+      confirmText: "Ya, Ajukan!",
+      confirmButtonColor: "#1e88e5",
+    });
+
+    if (!confirm) return;
+
+    try {
+      // Simulasi API call
+      Toast.success("Draft berhasil diajukan");
+      loadData(); // Reload data
+    } catch (err) {
+      Toast.error("Gagal mengajukan draft: " + err.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    const confirm = await SweetAlert({
+      title: "Hapus Pengajuan",
+      text: "Yakin ingin menghapus pengajuan ini?",
+      icon: "warning",
+      confirmText: "Ya, Hapus!",
+      confirmButtonColor: "#d33",
+    });
+
+    if (!confirm) return;
+
+    try {
+      // Simulasi API call
+      Toast.success("Draft pengajuan berhasil dihapus");
+      loadData(); // Reload data
+    } catch (err) {
+      Toast.error("Gagal menghapus draft: " + err.message);
+    }
+  };
+
+  const handleUploadSK = (id) => {
+    // Redirect ke halaman upload SK
+    const encodedId = encodeURIComponent(id);
+    router.push(`/pages/Page_Administrasi_Pengajuan_Pengunduran_Diri/upload-sk/${encodedId}`);
+  };
+
+  const handleUnduhBerkas = async (id) => {
+    try {
+      // Buka URL download di tab baru
+      window.open(`${API_LINK}PengunduranDiri/download-sk/${encodeURIComponent(id)}`, '_blank');
+    } catch (err) {
+      Toast.error("Gagal mengunduh berkas: " + err.message);
+    }
+  };
+
+  const handleCetakSK = (id) => {
+    // Buka URL cetak SK di tab baru
+    window.open(`${API_LINK}PengunduranDiri/cetak-sk/${encodeURIComponent(id)}`, '_blank');
+  };
+
+  /* ================= INIT ================= */
 
   useEffect(() => {
     setIsClient(true);
-
     if (!ssoData) {
       Toast.error("Sesi anda habis. Silakan login kembali.");
-      router.push("./auth/login");
+      router.push("/auth/login");
       return;
     }
-    
-    loadData(1, sortBy, search, sortStatus); 
-  }, [ssoData, router, loadData, sortBy, search, sortStatus]);
+    loadData();
+  }, [ssoData, loadData, router]);
 
-  const filterContent = useMemo(
-    () => (
-      <>
-        <DropDown
-          ref={sortRef}
-          arrData={dataFilterSort}
-          type="pilih"
-          label="Urutkan"
-          forInput="sortBy"
-          defaultValue={sortBy}
-        />
-        <DropDown
-          ref={statusRef}
-          arrData={dataFilterStatus}
-          type="pilih"
-          label="Status"
-          forInput="sortStatus"
-          defaultValue={sortStatus}
-        />
-      </>
-    ),
-    [sortBy, sortStatus]
+  /* ================= FILTER UI ================= */
+
+  const filterContent = (
+    <>
+      <DropDown
+        ref={sortRef}
+        arrData={dataFilterSort}
+        label="Urutkan"
+        defaultValue={sortBy}
+      />
+      <DropDown
+        ref={statusRef}
+        arrData={dataFilterStatus}
+        label="Status"
+        defaultValue={sortStatus}
+      />
+    </>
   );
+
+  /* ================= RENDER ================= */
 
   return (
     <MainContent
       layout="Admin"
       loading={loading}
-      title="Daftar Pengajuan Pengunduran Diri" // Ubah judul
+      title="Pengajuan Pengunduran Diri"
       breadcrumb={[
         { label: "Sistem Informasi Akademik" },
         { label: "Administrasi Akademik" },
-        { label: "Pengunduran Diri" },
-      ]} // Ubah breadcrumb
+        { label: "Pengunduran Diri" }
+      ]}
     >
-      <div>
-        <Formsearch
-          onSearch={handleSearch}
-          onAdd={handleAdd}
-          onFilter={handleFilterApply}
-          showAddButton={
-            // Sesuaikan permission untuk tambah pengunduran diri
-            isClient && userData?.permission?.includes("undurdiri.create")
-          }
-          showExportButton={false}
-          searchPlaceholder="Cari No. Pengajuan" // Ubah placeholder
-          addButtonText="Tambah Pengajuan"
-          filterContent={filterContent}
-        />
-      </div>
-      <div className="row align-items-center g-3">
-        <div className="col-12">
+      <Formsearch
+        onSearch={handleSearch}
+        onAdd={() =>
+          router.push("/pages/Page_Administrasi_Pengajuan_Pengunduran_Diri/add")
+        }
+        onFilter={handleFilterApply}
+        showAddButton={canSeeDraft}
+        addButtonText="Tambah Pengajuan Pengunduran Diri Mahasiswa"
+        searchPlaceholder="Cari No. Pengajuan / Nama Mahasiswa"
+        filterContent={filterContent}
+      />
+
+      {/* Tabel Draft Pengajuan - Hanya untuk user_prodi/NDA_PRODI */}
+      {canSeeDraft && (
+        <div className="mb-4">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h5 className="mb-0">
+              <i className="bi bi-file-earmark-plus me-2"></i>
+              Daftar Pengajuan Pengunduran Diri
+            </h5>
+            <span className="badge bg-secondary">
+              {dataDraft.length} pengajuan
+            </span>
+          </div>
+          
           <Table
-            data={dataPengunduranDiri} 
+            data={dataDraft}
             onDetail={handleDetail}
             onEdit={handleEdit}
-            onUpload={handleUpload} // Ganti onToggle/onDelete menjadi onUpload
+            onDelete={handleDelete}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onAjukan={handleAjukan}
+            onUnggahBerkas={handleUploadSK}
+            onUnduhBerkas={handleUnduhBerkas}
+            onCetakSK={handleCetakSK}
           />
-          {totalData > 0 && (
-            <Paging
-              pageSize={pageSize}
-              pageCurrent={currentPage}
-              totalData={totalData}
-              navigation={handleNavigation}
-            />
-          )}
         </div>
+      )}
+
+      {/* Tabel Riwayat Pengajuan */}
+      <div className="mb-4">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 className="mb-0">
+            <i className="bi bi-journal-text me-2"></i>
+            Daftar Riwayat Pengajuan Pengunduran Diri
+          </h5>
+          <span className="badge bg-primary">
+            {dataRiwayat.length} pengajuan
+          </span>
+        </div>
+        
+        <Table
+          data={dataRiwayat}
+          onDetail={handleDetail}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onAjukan={handleAjukan}
+          onUnggahBerkas={handleUploadSK}
+          onUnduhBerkas={handleUnduhBerkas}
+          onCetakSK={handleCetakSK}
+        />
       </div>
+
+      {totalData > 0 && (
+        <Paging
+          pageSize={pageSize}
+          pageCurrent={currentPage}
+          totalData={totalData}
+          navigation={(p) =>
+            loadData(p, sortBy, search, sortStatus)
+          }
+        />
+      )}
     </MainContent>
   );
 }

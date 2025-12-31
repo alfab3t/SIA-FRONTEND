@@ -44,7 +44,7 @@ const CKEditor = dynamic(
   { ssr: false }
 );
 
-const Editor = ({ label, name, value, onChange, error, placeholder }) => {
+const Editor = ({ label, name, value, onChange, error, placeholder, editorKey }) => {
   const handleEditorChange = useCallback(
     (event, editor) => {
       try {
@@ -61,8 +61,9 @@ const Editor = ({ label, name, value, onChange, error, placeholder }) => {
     <div className="mb-3">
       <Label text={label} htmlFor={name} tooltip={label} />
       <CKEditor
+        key={editorKey}
         editor={ClassicEditor}
-        data={value}
+        data={value || ""}
         onChange={handleEditorChange}
         config={{
           placeholder: placeholder || "Mulai mengetik...",
@@ -158,4 +159,5 @@ Editor.propTypes = {
   onChange: PropTypes.func.isRequired,
   error: PropTypes.string,
   placeholder: PropTypes.string,
+  editorKey: PropTypes.string,
 };

@@ -16,6 +16,7 @@ import DropDown from "@/components/common/Dropdown";
 import SearchableDropdown from "@/components/common/SearchableDropdown";
 import ProfilMahasiswaModal from "@/components/common/ProfilMahasiswaModal";
 import Toast from "@/components/common/Toast";
+import SweetAlert from "@/components/common/SweetAlert";
 import { API_LINK } from "@/lib/constant";
 import { getUserData } from "@/context/user";
 import { useRouter } from "next/navigation";
@@ -150,7 +151,7 @@ export default function Page_Add_DropOut() {
         }));
 
         console.log("Normalized prodi data:", normalized);
-        setProdiList(normalized);
+        setProdiList(normalized || []);
         
         if (normalized.length === 0) {
           Toast.info("Tidak ada data program studi yang tersedia");
@@ -201,7 +202,8 @@ export default function Page_Add_DropOut() {
   useEffect(() => {
     if (!userData) return;
 
-    if (userData.role?.toUpperCase() === "PRODI") {
+    // Hanya auto-set untuk role PRODI, user_admin bisa pilih manual
+    if (userData.role?.toUpperCase() === "PRODI" && userData.prodiId) {
       setSelectedProdi(userData.prodiId);
       loadKonsentrasi(userData.prodiId);
     }
@@ -454,11 +456,18 @@ export default function Page_Add_DropOut() {
       return;
     }
 
+    const confirm = await SweetAlert({
+      title: "Simpan Draft",
+      text: "Apakah Anda yakin ingin menyimpan pengajuan sebagai draft?",
+      icon: "info",
+      confirmText: "Ya, Simpan!",
+      confirmButtonColor: "#1e88e5",
+    });
+
+    if (!confirm) return;
+
     const payload = {
       mhsId: selectedMhs,
-      prodiId: selectedProdi,
-      konsentrasiId: selectedKonsentrasi,
-      angkatan: angkatanMahasiswa,
       menimbang: formData.menimbang,
       mengingat: formData.mengingat,
       lampiran: "",
@@ -479,8 +488,9 @@ export default function Page_Add_DropOut() {
         return;
       }
 
-      Toast.success("Pengajuan Drop Out berhasil dibuat");
-      router.push(`/pages/administrasi/drop-out/detail/${data.id}`);
+      Toast.success("Pengajuan Drop Out berhasil dibuat sebagai draft");
+      // Redirect ke halaman detail atau list
+      router.push(`/pages/Page_Administrasi_Pengajuan_Drop_Out`);
     } catch (err) {
       console.error("Submit error:", err);
       Toast.error("Terjadi kesalahan server");

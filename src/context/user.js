@@ -30,20 +30,35 @@ function getDecryptedCookie(name) {
 
 export const getUserData = () => {
   const data = getDecryptedCookie(COOKIE_USER_DATA);
-  if (!data) return null;
+  if (!data) {
+    console.log("❌ getUserData: No user data found");
+    return null;
+  }
 
-  return {
+  // Khusus untuk NDA-PRODI, pastikan username tersedia
+  let normalizedUsername = data.username ||
+    data.kry_username ||
+    data.user_id ||
+    data.nip ||
+    data.mhs_id ||
+    data.nama ||
+    "";
+
+  // Jika masih kosong, coba ambil dari ssoData
+  if (!normalizedUsername) {
+    console.log("⚠️ Username kosong, mencoba ambil dari ssoData");
+    const ssoData = getDecryptedCookie(COOKIE_SSO_DATA);
+    if (ssoData && ssoData.username) {
+      normalizedUsername = ssoData.username;
+      console.log("✅ Username diambil dari ssoData:", normalizedUsername);
+    }
+  }
+
+  const result = {
     ...data,
 
     // 🔑 NORMALISASI USERNAME
-    username:
-      data.username ||
-      data.kry_username ||
-      data.user_id ||
-      data.nip ||
-      data.mhs_id ||
-      data.nama ||          // ⬅️ INI KUNCI UNTUK NDA-PRODI
-      "",
+    username: normalizedUsername,
 
     displayName:
       data.displayName ||
@@ -51,6 +66,16 @@ export const getUserData = () => {
       data.nama ||
       ""
   };
+
+  console.log("✅ getUserData result:", {
+    username: result.username,
+    displayName: result.displayName,
+    appId: result.appId,
+    roleId: result.roleId,
+    role: result.role
+  });
+
+  return result;
 };
 
 

@@ -16,9 +16,10 @@ export default function Table({
   onUpload = () => {},
   onFinal = () => {},
   onPrint = () => {},
-
-  // ⬅⬅⬅ Tambahkan ini
   onAjukan = () => {},
+  onUnggahBerkas = () => {},
+  onUnduhBerkas = () => {},
+  onCetakSK = () => {},
 }) {
   if (!data || data.length === 0) return <p>Tidak ada data.</p>;
 
@@ -52,9 +53,10 @@ export default function Table({
               onUpload={onUpload}
               onFinal={onFinal}
               onPrint={onPrint}
-
-              // ⬅⬅⬅ Tambahkan ini ke TableRow
               onAjukan={onAjukan}
+              onUnggahBerkas={onUnggahBerkas}
+              onUnduhBerkas={onUnduhBerkas}
+              onCetakSK={onCetakSK}
             />
           ))}
         </tbody>
@@ -77,7 +79,8 @@ Table.propTypes = {
   onUpload: PropTypes.func,
   onFinal: PropTypes.func,
   onPrint: PropTypes.func,
-
-  // ⬅⬅⬅ Tambahkan ini
   onAjukan: PropTypes.func,
+  onUnggahBerkas: PropTypes.func,
+  onUnduhBerkas: PropTypes.func,
+  onCetakSK: PropTypes.func,
 };

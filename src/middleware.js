@@ -65,6 +65,39 @@ export function middleware(request) {
   const isAuthenticated = hasJwt && hasSso;
   const isFullyAuthenticated = isAuthenticated && hasUser;
 
+  // Debug logging untuk NDA-PRODI
+  const ssoDataCookie = request.cookies.get(COOKIE_SSO);
+  let isNdaProdi = false;
+  if (ssoDataCookie) {
+    try {
+      const ssoData = JSON.parse(decodeURIComponent(ssoDataCookie.value));
+      isNdaProdi = ssoData.username && ssoData.username.toLowerCase().includes('nda_prodi');
+    } catch (e) {
+      // Ignore parsing errors
+    }
+  }
+
+  if (isNdaProdi) {
+    console.log("=== MIDDLEWARE DEBUG FOR NDA_PRODI ===");
+    console.log("Path:", pathname);
+    console.log("Cookies status:");
+    console.log("  JWT Token:", hasJwt);
+    console.log("  SSO Data:", hasSso);
+    console.log("  User Data:", hasUser);
+    console.log("  Permission Data:", hasPermissions);
+    console.log("  Is Authenticated:", isAuthenticated);
+    console.log("  Is Fully Authenticated:", isFullyAuthenticated);
+    
+    if (hasUser) {
+      const userDataCookie = request.cookies.get(COOKIE_USER_DATA);
+      console.log("  User Data Cookie exists:", !!userDataCookie);
+      if (userDataCookie) {
+        console.log("  User Data Cookie value length:", userDataCookie.value.length);
+      }
+    }
+    console.log("==========================================");
+  }
+
   // Debug logging for cuti akademik access
   if (pathname.includes("Cuti_Akademik")) {
     console.log("=== MIDDLEWARE DEBUG FOR CUTI AKADEMIK ===");
@@ -109,6 +142,13 @@ export function middleware(request) {
     if (!isFullyAuthenticated) {
       console.log("Middleware: Not fully authenticated, redirecting to login");
       console.log("  hasJwt:", hasJwt, "hasSso:", hasSso, "hasUser:", hasUser);
+      
+      // Untuk NDA-PRODI, berikan pesan yang lebih spesifik
+      if (isNdaProdi && !hasUser) {
+        console.log("Middleware: NDA-PRODI missing userData cookie, redirecting to SSO instead of login");
+        return NextResponse.redirect(ssoUrl);
+      }
+      
       return NextResponse.redirect(loginUrl);
     }
 

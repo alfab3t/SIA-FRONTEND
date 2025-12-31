@@ -39,9 +39,51 @@ export default function Sidebar({
   const [searchTerm, setSearchTerm] = useState("");
   const [openMenu, setOpenMenu] = useState(null);
   const [dynamicMenu, setDynamicMenu] = useState([]);
+  const [isLoadingMenu, setIsLoadingMenu] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
   const pathname = usePathname();
-  const ssoData = useMemo(() => getSSOData(), []);
-  const userData = useMemo(() => getUserData(), []);
+  const [ssoData, setSsoData] = useState(null);
+  const [userData, setUserData] = useState(null);
+
+  // Update data dengan retry mechanism
+  useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    const loadUserData = () => {
+      const sso = getSSOData();
+      const user = getUserData();
+      
+      console.log("🔍 Loading user data, attempt:", retryCount + 1);
+      console.log("🔍 ssoData:", sso);
+      console.log("🔍 userData:", user);
+      
+      if (sso && user) {
+        setSsoData(sso);
+        setUserData(user);
+        setIsInitialized(true);
+        return true;
+      }
+      
+      // Jika data belum ada dan masih bisa retry
+      if (retryCount < maxRetries) {
+        retryCount++;
+        console.log(`🔄 Data belum tersedia, retry ${retryCount}/${maxRetries} dalam 500ms...`);
+        setTimeout(loadUserData, 500);
+        return false;
+      }
+      
+      // Setelah max retries, set initialized dan biarkan useEffect berikutnya handle redirect
+      console.log("❌ Max retries reached, data masih tidak tersedia");
+      setSsoData(sso);
+      setUserData(user);
+      setIsInitialized(true);
+      return false;
+    };
+    
+    loadUserData();
+  }, []);
+  
   const width = collapsed ? 63 : 215;
 
   const processedMenus = useMemo(
@@ -50,7 +92,27 @@ export default function Sidebar({
   );
 
   useEffect(() => {
+    // Tunggu sampai initialized
+    if (!isInitialized) {
+      console.log("⏳ Waiting for initialization...");
+      return;
+    }
+    
+    console.log("🔍 Debug Sidebar - ssoData:", ssoData);
+    console.log("🔍 Debug Sidebar - userData:", userData);
+    
     if (!ssoData || !userData) {
+      console.log("❌ Data tidak tersedia - ssoData:", !!ssoData, "userData:", !!userData);
+      
+      // Jika ssoData ada tapi userData tidak ada, redirect ke SSO (bukan login)
+      if (ssoData && !userData) {
+        console.log("🔄 SSO data exists but user data missing, redirecting to SSO");
+        Toast.warn("Silakan pilih role Anda kembali.");
+        router.push("/auth/sso");
+        return;
+      }
+      
+      // Jika keduanya tidak ada, baru redirect ke login
       Toast.error("Sesi tidak valid, silakan login kembali.");
       Cookies.remove("ssoData");
       Cookies.remove("userData");
@@ -88,7 +150,7 @@ export default function Sidebar({
     };
 
     fetchMenu();
-  }, [ssoData, userData, router]);
+  }, [ssoData, userData, router, isInitialized]);
 
   useEffect(() => {
     const activeParent = processedMenus.find((item) =>

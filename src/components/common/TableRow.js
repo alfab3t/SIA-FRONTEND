@@ -20,7 +20,10 @@ export default function TableRow({
   onUpload,
   onFinal,
   onPrint,
-  onAjukan,   // <=== TAMBAHAN
+  onAjukan,
+  onUnggahBerkas,
+  onUnduhBerkas,
+  onCetakSK,
 }) {
   const renderAction = useCallback(
     (actions, id, status) =>
@@ -183,7 +186,53 @@ export default function TableRow({
               />
             );
 
+          case "Upload SK":
+            return (
+              <Icon
+                key={`${id}-${action}`}
+                name="cloud-upload"
+                type="Bold"
+                cssClass="btn px-1 py-0 text-success"
+                title="Upload SK"
+                onClick={() => onUnggahBerkas?.(id)}
+              />
+            );
 
+          case "Unggah Berkas":
+            return (
+              <Icon
+                key={`${id}-${action}`}
+                name="cloud-upload"
+                type="Bold"
+                cssClass="btn px-1 py-0 text-success"
+                title="Unggah Berkas Scan SK DO"
+                onClick={() => onUnggahBerkas?.(id)}
+              />
+            );
+
+          case "Unduh Berkas":
+            return (
+              <Icon
+                key={`${id}-${action}`}
+                name="download"
+                type="Bold"
+                cssClass="btn px-1 py-0 text-primary"
+                title="Unduh Berkas"
+                onClick={() => onUnduhBerkas?.(id)}
+              />
+            );
+
+          case "Cetak SK":
+            return (
+              <Icon
+                key={`${id}-${action}`}
+                name="printer"
+                type="Bold"
+                cssClass="btn px-1 py-0 text-primary"
+                title="Cetak SK Drop Out"
+                onClick={() => onCetakSK?.(id)}
+              />
+            );
 
           default: {
             try {
@@ -220,7 +269,10 @@ export default function TableRow({
       onSent,
       onToggle,
       onUpload,
-      onAjukan, // <=== TAMBAHAN
+      onAjukan,
+      onUnggahBerkas,
+      onUnduhBerkas,
+      onCetakSK,
     ]
   );
 
@@ -247,7 +299,7 @@ export default function TableRow({
           <td
             key={col + "-" + index}
             className="py-2 border-bottom"
-            style={{ textAlign: row.Alignment[index] || "center" }}
+            style={{ textAlign: (row.Alignment && row.Alignment[index]) || "center" }}
           >
             {cell}
           </td>
@@ -271,5 +323,8 @@ TableRow.propTypes = {
   onUpload: PropTypes.func,
   onFinal: PropTypes.func,
   onPrint: PropTypes.func,
-  onAjukan: PropTypes.func, // <=== TAMBAHAN
+  onAjukan: PropTypes.func,
+  onUnggahBerkas: PropTypes.func,
+  onUnduhBerkas: PropTypes.func,
+  onCetakSK: PropTypes.func,
 };
