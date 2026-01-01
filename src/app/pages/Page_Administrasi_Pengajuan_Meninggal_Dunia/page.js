@@ -320,29 +320,21 @@ export default function Page_MeninggalDunia() {
                         }
                         return false; 
                     } else if (isProdi) {
-                        // For Prodi users, show:
-                        // 1. Draft applications created by Prodi
-                        // 2. Applications waiting for Prodi approval ("Belum Disetujui Prodi")
+                        // For Prodi users, show ONLY:
+                        // 1. Draft status
+                        // 2. Belum Disetujui Wadir 1 status
+                        // Simple filtering based on status only
                         
-                        const createdByProdi = item.mdu_created_by && 
-                            (item.mdu_created_by.toLowerCase().includes('prodi') ||
-                             item.mdu_created_by === userData?.username ||
-                             item.mdu_created_by === userData?.nama);
+                        console.log("=== PRODI FILTERING DEBUG ===");
+                        console.log("Current status:", currentStatus);
+                        console.log("Item:", item);
                         
-                        // Also check session storage for prodi-created applications
-                        const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedMeninggalApps') || '[]');
-                        const isProdiCreatedFromSession = prodiCreatedApps.includes(item.mdu_id || item.id);
-                        
-                        const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession;
-                        
-                        // Show if:
-                        // 1. Draft created by Prodi, OR
-                        // 2. Status is "Belum Disetujui Prodi"
-                        if ((currentStatus === "Draft" && isCreatedByProdi) || 
-                            currentStatus === "Belum Disetujui Prodi") {
+                        if (currentStatus === "Draft" || currentStatus === "Belum Disetujui Wadir 1") {
+                            console.log("✓ Showing item with status:", currentStatus);
                             return true;
                         }
                         
+                        console.log("✗ Hiding item with status:", currentStatus);
                         return false;
                     } else {
                         // For other roles, exclude completed applications
@@ -386,20 +378,11 @@ export default function Page_MeninggalDunia() {
                             actions = ["Detail"];
                         }
                     } else if (isProdi) {
-                        const createdByProdi = item.mdu_created_by && 
-                            (item.mdu_created_by.toLowerCase().includes('prodi') || 
-                             item.mdu_created_by === userData?.username ||
-                             item.mdu_created_by === userData?.nama);
-                        
-                        const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedMeninggalApps') || '[]');
-                        const isProdiCreatedFromSession = prodiCreatedApps.includes(item.mdu_id || item.id);
-                        
-                        const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession;
-                        
-                        if (isDraft && isCreatedByProdi) {
+                        // For Prodi users, simple actions based on status
+                        if (currentStatus === "Draft") {
                             actions = ["Detail", "Edit", "Delete", "Ajukan"];
-                        } else if (currentStatus === "Belum Disetujui Prodi" && !isCreatedByProdi) {
-                            actions = ["Detail", "Approve", "Reject"];
+                        } else if (currentStatus === "Belum Disetujui Wadir 1") {
+                            actions = ["Detail"]; // Read-only for submitted applications
                         } else {
                             actions = ["Detail"];
                         }
@@ -438,15 +421,34 @@ export default function Page_MeninggalDunia() {
                         }
                     }
 
+                    // Function to determine Wadir 1 approval status icon
+                    const getWadir1Icon = (status) => {
+                        if (!status) return "⏳";
+                        
+                        const statusLower = status.toLowerCase();
+                        if (statusLower === "draft" || statusLower === "belum disetujui prodi") {
+                            return "⏳"; // Pending - not yet reached Wadir 1
+                        } else if (statusLower === "belum disetujui wadir 1") {
+                            return "✗"; // Waiting for Wadir 1 approval (silang)
+                        } else if (statusLower === "ditolak") {
+                            return "✗"; // Rejected (x)
+                        } else if (statusLower.includes("disetujui") || statusLower.includes("finance") || statusLower.includes("upload sk")) {
+                            return "✓"; // Approved (ceklis)
+                        } else {
+                            return "⏳"; // Default pending
+                        }
+                    };
+
                     return {
                         No: startIndex + index + 1,
-                        id: item.mdu_id || item.id || item.idDisplay,
+                        id: item.id || item.mdu_id || item.idDisplay,
                         "No Pengajuan": item.noPengajuan || item.id || item.idDisplay || item.mdu_id || "-",
                         "Tanggal Pengajuan": item.tanggalPengajuan || item.tanggal || item.mdu_created_date || "-",
                         "No SK": item.nomorSK || item.srt_no || item.suratNo || item.mdu_srt_no || "-",
+                        "Disetujui Wadir 1": getWadir1Icon(currentStatus),
                         Status: currentStatus || "-",
                         Aksi: actions,
-                        Alignment: Array(6).fill("center"),
+                        Alignment: Array(8).fill("center"), // Updated to 8 columns
                     };
                 });
 
