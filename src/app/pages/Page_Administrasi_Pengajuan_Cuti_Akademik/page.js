@@ -288,29 +288,31 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             }
             return false; 
           } else if (isProdi) {
-            // For Prodi users, show:
-            // 1. Draft applications created by Prodi
+            // For Prodi users, show only:
+            // 1. Draft applications created by Prodi (not by Mahasiswa)
             // 2. Applications waiting for Prodi approval ("Belum Disetujui Prodi")
+            // 3. Applications waiting for Wadir 1 approval ("Belum Disetujui Wadir 1")
             
-            const createdByProdi = item.cak_created_by && 
-              (item.cak_created_by.toLowerCase().includes('prodi') ||
-               item.cak_created_by === userData?.username ||
-               item.cak_created_by === userData?.nama);
-            
-            // Also check session storage for prodi-created applications
-            const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
-            const isProdiCreatedFromSession = prodiCreatedApps.includes(item.cak_id || item.id);
-            
-            // Check if application has prodi-specific fields (menimbang field presence)
-            const hasProdiFields = item.menimbang && item.menimbang.trim() !== "";
-            
-            const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession || hasProdiFields;
-            
-            // Show if:
-            // 1. Draft created by Prodi, OR
-            // 2. Status is "Belum Disetujui Prodi"
-            if ((currentStatus === "Draft" && isCreatedByProdi) || 
-                currentStatus === "Belum Disetujui Prodi") {
+            if (currentStatus === "Draft") {
+              // Check if this draft was created by Prodi
+              const createdByProdi = item.cak_created_by && 
+                (item.cak_created_by.toLowerCase().includes('prodi') ||
+                 item.cak_created_by === userData?.username ||
+                 item.cak_created_by === userData?.nama);
+              
+              // Also check session storage for prodi-created applications
+              const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
+              const isProdiCreatedFromSession = prodiCreatedApps.includes(item.cak_id || item.id);
+              
+              // Check if application has prodi-specific fields
+              const hasProdiFields = item.menimbang && item.menimbang.trim() !== "";
+              
+              const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession || hasProdiFields;
+              
+              // Only show Draft if it was created by Prodi
+              return isCreatedByProdi;
+            } else if (currentStatus === "Belum Disetujui Prodi" || 
+                       currentStatus === "Belum Disetujui Wadir 1") {
               return true;
             }
             
@@ -380,29 +382,14 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               actions = ["Detail"];
             }
           } else if (isProdi) {
-            // Check if this application was created by prodi using multiple detection methods
-            const createdByProdi = item.cak_created_by && 
-              (item.cak_created_by.toLowerCase().includes('prodi') || 
-               item.cak_created_by === userData?.username ||
-               item.cak_created_by === userData?.nama);
-            
-            // Also check session storage for prodi-created applications
-            const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
-            const isProdiCreatedFromSession = prodiCreatedApps.includes(item.cak_id || item.id);
-            
-            // Check if application has prodi-specific fields (menimbang field presence)
-            const hasProdiFields = item.menimbang && item.menimbang.trim() !== "";
-            
-            const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession || hasProdiFields;
-            
-            if (isDraft && isCreatedByProdi) {
-              // Prodi can edit/delete/submit their own draft applications
+            if (currentStatus === "Draft") {
+              // Prodi can edit/delete/submit draft applications
               actions = ["Detail", "Edit", "Delete", "Ajukan"];
-            } else if (currentStatus === "Belum Disetujui Prodi" && !isCreatedByProdi) {
-              // Prodi can approve/reject applications created by mahasiswa
+            } else if (currentStatus === "Belum Disetujui Prodi") {
+              // Prodi can approve/reject applications waiting for Prodi approval
               actions = ["Detail", "Approve", "Reject"];
             } else {
-              // For other statuses or applications not created by this prodi
+              // For other statuses (like "Belum Disetujui Wadir 1"), Prodi can only view
               actions = ["Detail"];
             }
           } else if (isWadir1) {
@@ -461,35 +448,42 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           }
 
           
-          const formatApprovalStatus = (approved, currentStatus, approvalType) => {
-            console.log(`${approvalType} approval value:`, approved, "Status:", currentStatus);
+          // Function to determine Prodi approval status icon
+          const getProdiIcon = (status, item) => {
+            if (!status) return "⏳";
             
-            // FIRST: Check if status indicates rejection for this approval type (case-insensitive)
-            if (currentStatus) {
-              const statusLower = currentStatus.toLowerCase();
-              if (statusLower.includes("ditolak")) {
-                if (approvalType === "Prodi" && statusLower.includes("prodi")) {
-                  return "❌"; // Red X - rejected by Prodi
-                }
-                if (approvalType === "Wadir" && (statusLower.includes("wadir") || statusLower.includes("dir"))) {
-                  return "❌"; // Red X - rejected by Wadir
-                }
-              }
+            const statusLower = status.toLowerCase();
+            
+            // For Draft status, always show X (not approved yet)
+            if (statusLower === "draft") {
+              return "✗"; // X - Draft not approved yet
+            } else if (statusLower === "belum disetujui prodi") {
+              return "✗"; // X - waiting for Prodi approval
+            } else if (statusLower.includes("ditolak") && statusLower.includes("prodi")) {
+              return "✗"; // X - rejected by Prodi
+            } else if (statusLower.includes("disetujui") || statusLower.includes("wadir") || statusLower.includes("finance")) {
+              return "✓"; // Checkmark - approved
+            } else {
+              return "⏳"; // Default pending
             }
+          };
+
+          // Function to determine Wadir 1 approval status icon
+          const getWadir1Icon = (status) => {
+            if (!status) return "⏳";
             
-            // SECOND: If approval field contains a username/value AND not rejected, it means approved
-            if (approved && approved !== "" && approved !== null && approved !== undefined) {
-              const statusLower = currentStatus ? currentStatus.toLowerCase() : "";
-              // Only show approved if the overall status is "Disetujui" or if this specific approval passed
-              if (currentStatus === "Disetujui" || 
-                  (approvalType === "Prodi" && !statusLower.includes("ditolak prodi")) ||
-                  (approvalType === "Wadir" && !statusLower.includes("ditolak wadir"))) {
-                return "✅"; // Green checkmark - approved
-              }
+            const statusLower = status.toLowerCase();
+            if (statusLower === "draft" || statusLower === "belum disetujui prodi") {
+              return "✗"; // X - not approved yet (Draft or waiting for Prodi)
+            } else if (statusLower === "belum disetujui wadir 1") {
+              return "✗"; // X - waiting for Wadir 1 approval
+            } else if (statusLower.includes("ditolak")) {
+              return "✗"; // X - rejected
+            } else if (statusLower.includes("disetujui") || statusLower.includes("finance") || statusLower.includes("upload sk")) {
+              return "✓"; // Checkmark - approved
+            } else {
+              return "⏳"; // Default pending
             }
-            
-            // THIRD: For empty/null values or pending status, show dash
-            return "-"; // Pending/not yet processed 
           };
 
           
@@ -525,10 +519,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             console.log("item.cak_srt_no:", item.cak_srt_no);
             console.log("Final noSK:", noSK);
           }
-          
-          
-          const prodiApproval = item.approveProdi || item.approve_prodi || item.cak_approval_prodi;
-          const wadirApproval = item.approveDir1 || item.approve_dir1 || item.cak_approval_dir1;
 
           return {
             No: startIndex + index + 1, 
@@ -536,8 +526,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             "No Pengajuan": item.id || item.idDisplay || item.cak_id || "-", 
             "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
             "No SK": noSK || "-", 
-            "Disetujui Prodi": formatApprovalStatus(prodiApproval, currentStatus, "Prodi"),
-            "Disetujui Wadir 1": formatApprovalStatus(wadirApproval, currentStatus, "Wadir"),
+            "Disetujui Prodi": getProdiIcon(currentStatus, item),
+            "Disetujui Wadir 1": getWadir1Icon(currentStatus),
             Status: currentStatus || "-",
             "SK Cuti Akademik": formatSKColumn(noSK, item.cak_id || item.id),
             Aksi: actions,
@@ -673,18 +663,21 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         const completedData = actualData.filter(item => {
           const currentStatus = item.status || item.cak_status || "";
           
-          
-          
-          const pendingStatuses = [
-            "Draft",
-            "Belum Disetujui Prodi", 
-            "Belum Disetujui Wadir 1",
-            "Belum Disetujui Finance",
-            "Menunggu Upload SK"
-          ];
-          
-          
-          return !pendingStatuses.includes(currentStatus) && currentStatus !== "";
+          if (isProdi) {
+            // For Prodi users, show only "Disetujui" status in Riwayat
+            return currentStatus === "Disetujui";
+          } else {
+            // For other roles, show all completed statuses (exclude pending statuses)
+            const pendingStatuses = [
+              "Draft",
+              "Belum Disetujui Prodi", 
+              "Belum Disetujui Wadir 1",
+              "Belum Disetujui Finance",
+              "Menunggu Upload SK"
+            ];
+            
+            return !pendingStatuses.includes(currentStatus) && currentStatus !== "";
+          }
         });
 
         console.log("Filtered completed data for riwayat:", completedData);
@@ -695,8 +688,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           let namaMahasiswa = "-";
           let prodi = "-";
           
-          
-          
+          // Fetch mahasiswa and prodi data from detail API
           if (item.mhsId || item.id) {
             try {
               const detailUrl = `${API_LINK}CutiAkademik/detail?id=${item.id || item.cak_id}`;
@@ -714,8 +706,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
                 const detailData = await detailResponse.json();
                 console.log("Detail data for", item.id, ":", detailData);
                 
-                
-                
+                // Extract nama mahasiswa from various possible field names
                 namaMahasiswa = detailData.mahasiswa ||           
                                detailData.mhs_nama || 
                                detailData.namaMahasiswa || 
@@ -724,8 +715,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
                                detailData.nama ||
                                detailData.name || "-";
                 
-                
-               
+                // Extract prodi from various possible field names
                 prodi = detailData.konsentrasi ||                 
                        detailData.prodiNama ||                    
                        detailData.konsentrasiSingkatan ||         
@@ -807,6 +797,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
                 nim: item.NIM,
                 nama: item["Nama Mahasiswa"],
                 prodi: item.Prodi,
+                nomorSK: item["Nomor SK"],
                 searchableText: searchableText.substring(0, 100) + "...",
                 matchType: isMatch ? "combined" : "individual"
               });
