@@ -20,6 +20,7 @@ export default function TableRow({
   onUpload,
   onFinal,
   onPrint,
+  onDownloadSK,
   onAjukan,   // <=== TAMBAHAN
 }) {
   const renderAction = useCallback(
@@ -133,6 +134,17 @@ export default function TableRow({
               />
             );
 
+          case "DownloadSK":
+            return (
+              <Icon
+                key={`${id}-${action}`}
+                name="download"
+                title="Download SK"
+                cssClass="text-success btn px-1 py-0"
+                onClick={() => onDownloadSK(id)}
+              />
+            );
+
           case "Sent":
             return (
               <Icon
@@ -216,6 +228,7 @@ export default function TableRow({
       onEdit,
       onFinal,
       onPrint,
+      onDownloadSK,
       onReject,
       onSent,
       onToggle,
@@ -233,6 +246,28 @@ export default function TableRow({
           cell = <Badge status={row[col]} />;
         } else if (col === "Aksi") {
           cell = renderAction(row[col], row.id, row.Status);
+        } else if (col === "SK Cuti Akademik") {
+          // Handle SK Cuti Akademik column specially (only exists for Admin role)
+          if (row[col] === "DownloadSK") {
+            // Show download button for Admin role
+            cell = (
+              <Icon
+                name="download"
+                title="Download SK"
+                cssClass="text-success btn px-1 py-0"
+                onClick={() => onDownloadSK(row.id)}
+              />
+            );
+          } else {
+            // Show dash or other content
+            cell = (
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(row[col] || "-"),
+                }}
+              ></div>
+            );
+          }
         } else {
           cell = (
             <div
@@ -271,5 +306,6 @@ TableRow.propTypes = {
   onUpload: PropTypes.func,
   onFinal: PropTypes.func,
   onPrint: PropTypes.func,
+  onDownloadSK: PropTypes.func,
   onAjukan: PropTypes.func, // <=== TAMBAHAN
 };

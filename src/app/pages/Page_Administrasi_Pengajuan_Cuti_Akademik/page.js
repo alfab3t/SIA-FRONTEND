@@ -50,6 +50,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const router = useRouter();
   const [dataCutiAkademik, setDataCutiAkademik] = useState([]);
   const [dataRiwayat, setDataRiwayat] = useState([]);
+  const [riwayatLoaded, setRiwayatLoaded] = useState(false);
+  const [loadingRiwayat, setLoadingRiwayat] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showRiwayat, setShowRiwayat] = useState(false);
 
@@ -318,13 +320,25 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             
             return false;
           } else {
-            
-            
-            if (currentStatus === "Disetujui") {
+            // For other roles (Wadir1, Finance, DAAK, Admin)
+            if (isDAAK || isAdmin) {
+              // For Admin/DAAK users, show specific statuses:
+              // 1. Belum Disetujui Prodi
+              // 2. Belum Disetujui Wadir 1  
+              // 3. Menunggu Upload SK
+              if (currentStatus === "Belum Disetujui Prodi" ||
+                  currentStatus === "Belum Disetujui Wadir 1" ||
+                  currentStatus === "Menunggu Upload SK") {
+                return true;
+              }
               return false;
+            } else {
+              // For Wadir1 and Finance, exclude completed applications
+              if (currentStatus === "Disetujui") {
+                return false;
+              }
+              return true;
             }
-            
-            return true;
           }
         });
 
@@ -430,8 +444,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             if (isReadyForSK) {
               // All approvals complete - admin can manage SK
               if (hasUploadedSK) {
-                // SK already uploaded, show download option
-                actions = ["Detail", "DownloadSK"];
+                // SK already uploaded, admin can only view (DownloadSK moved to SK column)
+                actions = ["Detail"];
               } else {
                 // No SK yet, show upload option
                 actions = ["Detail", "Upload"];
@@ -448,6 +462,23 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           }
 
           
+          // Function to format SK Cuti Akademik column (only for Admin role)
+          const formatSKCutiAkademikColumn = (skNo, itemId) => {
+            if (isAdmin || isDAAK) {
+              // Only Admin can see and download SK
+              if (skNo && skNo !== "" && skNo !== "-") {
+                // If SK exists, return DownloadSK action
+                return "DownloadSK";
+              } else {
+                // If no SK, return dash
+                return "-";
+              }
+            } else {
+              // Other roles cannot access SK download
+              return "-";
+            }
+          };
+
           // Function to determine Prodi approval status icon
           const getProdiIcon = (status, item) => {
             if (!status) return "⏳";
@@ -461,8 +492,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               return "✗"; // X - waiting for Prodi approval
             } else if (statusLower.includes("ditolak") && statusLower.includes("prodi")) {
               return "✗"; // X - rejected by Prodi
-            } else if (statusLower.includes("disetujui") || statusLower.includes("wadir") || statusLower.includes("finance")) {
-              return "✓"; // Checkmark - approved
+            } else if (statusLower === "menunggu upload sk" || 
+                       statusLower.includes("disetujui") || 
+                       statusLower.includes("wadir") || 
+                       statusLower.includes("finance")) {
+              return "✓"; // Checkmark - approved (including Menunggu Upload SK)
             } else {
               return "⏳"; // Default pending
             }
@@ -479,29 +513,17 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               return "✗"; // X - waiting for Wadir 1 approval
             } else if (statusLower.includes("ditolak")) {
               return "✗"; // X - rejected
-            } else if (statusLower.includes("disetujui") || statusLower.includes("finance") || statusLower.includes("upload sk")) {
-              return "✓"; // Checkmark - approved
+            } else if (statusLower === "menunggu upload sk" || 
+                       statusLower.includes("disetujui") || 
+                       statusLower.includes("finance") || 
+                       statusLower.includes("upload sk")) {
+              return "✓"; // Checkmark - approved (including Menunggu Upload SK)
             } else {
               return "⏳"; // Default pending
             }
           };
 
           
-          const formatSKColumn = (skNo, itemId) => {
-            if (skNo && skNo !== "" && skNo !== "-") {
-              return {
-                text: "🖨️ Cetak SK", // Blue printer icon when SK exists
-                clickable: true,
-                onClick: () => handleDownloadSK(itemId)
-              };
-            } else {
-              return {
-                text: "🖨️ Tidak Ada SK", // Gray printer icon when SK not available
-                clickable: false
-              };
-            }
-          };
-
           
           if (index === 0) {
             console.log("Sample item structure:", item);
@@ -520,7 +542,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             console.log("Final noSK:", noSK);
           }
 
-          return {
+          // Base row data
+          const rowData = {
             No: startIndex + index + 1, 
             id: item.cak_id || item.id || item.idDisplay, 
             "No Pengajuan": item.id || item.idDisplay || item.cak_id || "-", 
@@ -529,10 +552,19 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             "Disetujui Prodi": getProdiIcon(currentStatus, item),
             "Disetujui Wadir 1": getWadir1Icon(currentStatus),
             Status: currentStatus || "-",
-            "SK Cuti Akademik": formatSKColumn(noSK, item.cak_id || item.id),
-            Aksi: actions,
-            Alignment: Array(9).fill("center"), 
           };
+
+          // Add SK Cuti Akademik column ONLY for Admin role (positioned before Aksi)
+          if (isAdmin || isDAAK) {
+            rowData["SK Cuti Akademik"] = formatSKCutiAkademikColumn(noSK, item.cak_id || item.id);
+            rowData.Aksi = actions; // Aksi comes after SK Cuti Akademik
+            rowData.Alignment = Array(9).fill("center"); // 9 columns for Admin only
+          } else {
+            rowData.Aksi = actions; // Aksi comes directly after Status for other roles
+            rowData.Alignment = Array(8).fill("center"); // 8 columns for other roles (Mahasiswa, Prodi, Finance, Wadir)
+          }
+
+          return rowData;
         });
 
         console.log("Formatted data:", formattedData);
@@ -558,7 +590,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const loadDataRiwayat = useCallback(
     async (page = 1) => {
       try {
-        setLoading(true);
+        setLoadingRiwayat(true);
         console.log("=== LOADING RIWAYAT DATA ===");
 
         console.log("=== DEBUG LOAD RIWAYAT ===");
@@ -663,36 +695,53 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         const completedData = actualData.filter(item => {
           const currentStatus = item.status || item.cak_status || "";
           
-          if (isProdi) {
-            // For Prodi users, show only "Disetujui" status in Riwayat
-            return currentStatus === "Disetujui";
-          } else {
-            // For other roles, show all completed statuses (exclude pending statuses)
-            const pendingStatuses = [
-              "Draft",
-              "Belum Disetujui Prodi", 
-              "Belum Disetujui Wadir 1",
-              "Belum Disetujui Finance",
-              "Menunggu Upload SK"
-            ];
-            
-            return !pendingStatuses.includes(currentStatus) && currentStatus !== "";
-          }
+          // For all roles (Prodi, Wadir1, Finance, DAAK, Admin), show only "Disetujui" status in Riwayat
+          return currentStatus === "Disetujui";
         });
 
         console.log("Filtered completed data for riwayat:", completedData);
 
         
-        // Process ALL data first (no pagination yet)
+        // Process ALL data first (no pagination yet) - Optimized with fallback API calls
         const formattedDataPromises = completedData.map(async (item, index) => {
-          let namaMahasiswa = "-";
-          let prodi = "-";
-          
-          // Fetch mahasiswa and prodi data from detail API
-          if (item.mhsId || item.id) {
+          // Debug: Log the first item to see available fields
+          if (index === 0) {
+            console.log("=== RIWAYAT ITEM STRUCTURE DEBUG ===");
+            console.log("Available fields:", Object.keys(item));
+            console.log("Sample item:", item);
+          }
+
+          // Try to extract nama mahasiswa from various possible field names
+          let namaMahasiswa = item.mhs_nama || 
+                             item.namaMahasiswa || 
+                             item.nama_mahasiswa || 
+                             item.mahasiswaNama ||
+                             item.mahasiswa ||
+                             item.nama ||
+                             item.name ||
+                             item.studentName ||
+                             item.student_name ||
+                             item.cak_mhs_nama ||
+                             "";
+
+          // Try to extract prodi from various possible field names  
+          let prodi = item.kon_singkatan || 
+                     item.konsentrasi || 
+                     item.konsentrasiSingkatan ||
+                     item.prodi || 
+                     item.programStudi || 
+                     item.program_studi ||
+                     item.prodiNama ||
+                     item.jurusan ||
+                     item.kon_nama ||
+                     item.cak_prodi ||
+                     item.cak_konsentrasi ||
+                     "";
+
+          // If nama mahasiswa or prodi is missing, fetch from detail API
+          if (!namaMahasiswa || !prodi || namaMahasiswa === "" || prodi === "") {
             try {
               const detailUrl = `${API_LINK}CutiAkademik/detail?id=${item.id || item.cak_id}`;
-              console.log("Fetching detail from:", detailUrl);
               
               const detailResponse = await fetch(detailUrl, {
                 method: 'GET',
@@ -704,37 +753,38 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               
               if (detailResponse.ok) {
                 const detailData = await detailResponse.json();
-                console.log("Detail data for", item.id, ":", detailData);
                 
-                // Extract nama mahasiswa from various possible field names
-                namaMahasiswa = detailData.mahasiswa ||           
-                               detailData.mhs_nama || 
-                               detailData.namaMahasiswa || 
-                               detailData.nama_mahasiswa || 
-                               detailData.mahasiswaNama ||
-                               detailData.nama ||
-                               detailData.name || "-";
+                // Extract nama mahasiswa if not found in main data
+                if (!namaMahasiswa || namaMahasiswa === "") {
+                  namaMahasiswa = detailData.mahasiswa ||           
+                                 detailData.mhs_nama || 
+                                 detailData.namaMahasiswa || 
+                                 detailData.nama_mahasiswa || 
+                                 detailData.mahasiswaNama ||
+                                 detailData.nama ||
+                                 detailData.name || "-";
+                }
                 
-                // Extract prodi from various possible field names
-                prodi = detailData.konsentrasi ||                 
-                       detailData.prodiNama ||                    
-                       detailData.konsentrasiSingkatan ||         
-                       detailData.kon_singkatan || 
-                       detailData.prodi || 
-                       detailData.programStudi || 
-                       detailData.program_studi || 
-                       detailData.jurusan || "-";
-                       
-                console.log("Extracted - Nama:", namaMahasiswa, "Prodi:", prodi);
-              } else {
-                console.warn("Detail API returned:", detailResponse.status, detailResponse.statusText);
-                const errorText = await detailResponse.text();
-                console.warn("Detail API error body:", errorText);
+                // Extract prodi if not found in main data
+                if (!prodi || prodi === "") {
+                  prodi = detailData.konsentrasi ||                 
+                         detailData.prodiNama ||                    
+                         detailData.konsentrasiSingkatan ||         
+                         detailData.kon_singkatan || 
+                         detailData.prodi || 
+                         detailData.programStudi || 
+                         detailData.program_studi || 
+                         detailData.jurusan || "-";
+                }
               }
             } catch (error) {
               console.warn("Failed to fetch detail for", item.id, ":", error.message);
             }
           }
+
+          // Set defaults if still empty
+          if (!namaMahasiswa || namaMahasiswa === "") namaMahasiswa = "-";
+          if (!prodi || prodi === "") prodi = "-";
 
           return {
             No: index + 1, // Temporary number, will be updated after pagination
@@ -742,7 +792,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             "No Cuti Akademik": item.id || item.cak_id || "-",
             "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
             "Nomor SK": item.srt_no || item.suratNo || item.cak_srt_no || "-",
-            NIM: item.mhsId || item.mhs_id || "-",
+            NIM: item.mhsId || item.mhs_id || item.cak_mhs_id || "-",
             "Nama Mahasiswa": namaMahasiswa,
             Prodi: prodi,
             Aksi: ["Detail"],
@@ -751,10 +801,10 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         });
 
         
-        console.log("Waiting for all detail requests to complete...");
+        console.log("Processing data with fallback API calls if needed...");
         let allFormattedData = await Promise.all(formattedDataPromises);
 
-        console.log("All formatted data before search filter:", allFormattedData.length);
+        console.log("All formatted data ready:", allFormattedData.length);
 
         // FRONTEND SEARCH FILTERING - Search in ALL fields
         if (searchRiwayat && searchRiwayat.trim() !== "") {
@@ -864,6 +914,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         setDataRiwayat(finalData);
         setTotalDataRiwayat(totalFilteredItems); 
         setCurrentPageRiwayat(page);
+        setRiwayatLoaded(true); // Mark as loaded
       } catch (err) {
         console.error("Error loading riwayat:", err);
         Toast.error(`Gagal memuat data riwayat: ${err.message}`);
@@ -872,7 +923,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         setDataRiwayat([]);
         setTotalDataRiwayat(0);
       } finally {
-        setLoading(false);
+        setLoadingRiwayat(false);
       }
     },
     [userData, searchRiwayat, sortBy, isProdi, isWadir1, isFinance, isDAAK, isAdmin, isMahasiswa, pageSize]
@@ -1336,10 +1387,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     
     loadData(1);
     
-    
+    // Load Riwayat data immediately for eligible roles (optimized for faster loading)
     if (isProdi || isWadir1 || isFinance || isDAAK || isAdmin) {
       setShowRiwayat(true);
-      loadDataRiwayat(1);
+      // Load Riwayat data in parallel for faster performance
+      setTimeout(() => loadDataRiwayat(1), 50); // Small delay to prevent blocking main data
     }
   }, [ssoData, userData, loadData, loadDataRiwayat, isProdi, isWadir1, isFinance, isDAAK, isAdmin, router]);
 
@@ -1476,7 +1528,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             filterContent={filterContent}
           />
 
-          {loading ? (
+          {loadingRiwayat ? (
             <div className="text-center py-4">
               <div className="spinner-border" role="status">
                 <span className="visually-hidden">Loading...</span>
