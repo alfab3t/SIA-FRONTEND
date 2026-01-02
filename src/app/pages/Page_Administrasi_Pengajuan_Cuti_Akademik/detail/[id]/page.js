@@ -369,11 +369,12 @@ export default function DetailCutiAkademikPage() {
             <label className="form-label fw-semibold">Surat Pernyataan</label>
             <div>
               {detail?.lampiranSP ? (
-                <Button
-                  classType="primary"
-                  label="📄 Download Surat Pernyataan"
+                <button
+                  className="btn btn-outline-primary rounded-pill px-4 py-2"
                   onClick={() => handleDownload(detail.lampiranSP)}
-                />
+                >
+                  Download Surat Pernyataan
+                </button>
               ) : (
                 <span>Tidak ada file</span>
               )}
@@ -385,11 +386,12 @@ export default function DetailCutiAkademikPage() {
             <label className="form-label fw-semibold">Lampiran</label>
             <div>
               {detail?.lampiran ? (
-                <Button
-                  classType="primary"
-                  label="📎 Download Lampiran"
+                <button
+                  className="btn btn-outline-primary rounded-pill px-4 py-2"
                   onClick={() => handleDownload(detail.lampiran)}
-                />
+                >
+                  Download Lampiran
+                </button>
               ) : (
                 <span>Tidak ada file</span>
               )}

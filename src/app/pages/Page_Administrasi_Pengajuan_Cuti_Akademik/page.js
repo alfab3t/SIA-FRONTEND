@@ -57,6 +57,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
   const sortRef = useRef();
   const statusRef = useRef();
+  const prodiRef = useRef();
 
 
   let fixedRole = (userData?.role || "").toUpperCase();
@@ -98,6 +99,20 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     { Value: "Ditolak", Text: "Ditolak" },
   ];
 
+  const dataFilterProdi = [
+    { Value: "", Text: "— Semua Prodi —" },
+    { Value: "Manajemen Informatika", Text: "Manajemen Informatika" },
+    { Value: "Mekatronika", Text: "Mekatronika" },
+    { Value: "Teknik Alat Berat", Text: "Teknik Alat Berat" },
+    { Value: "Teknik Otomotif", Text: "Teknik Otomotif" },
+    { Value: "Teknik Pengolahan Hasil Perkebunan", Text: "Teknik Pengolahan Hasil Perkebunan" },
+    { Value: "Teknik Produksi dan Proses Manufaktur", Text: "Teknik Produksi dan Proses Manufaktur" },
+    { Value: "Teknologi Konstruksi Bangunan Gedung", Text: "Teknologi Konstruksi Bangunan Gedung" },
+    { Value: "Teknologi Rekayasa Logistik", Text: "Teknologi Rekayasa Logistik" },
+    { Value: "Teknologi Rekayasa Pemeliharaan Alat Berat", Text: "Teknologi Rekayasa Pemeliharaan Alat Berat" },
+    { Value: "Teknologi Rekayasa Perangkat Lunak", Text: "Teknologi Rekayasa Perangkat Lunak" },
+  ];
+
   const [currentPage, setCurrentPage] = useState(1);
   const [currentPageRiwayat, setCurrentPageRiwayat] = useState(1);
   const [totalData, setTotalData] = useState(0);
@@ -107,6 +122,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const [searchRiwayat, setSearchRiwayat] = useState("");
   const [sortBy, setSortBy] = useState(dataFilterSort[0].Value);
   const [sortStatus, setSortStatus] = useState(dataFilterStatus[0].Value);
+  const [filterProdi, setFilterProdi] = useState(dataFilterProdi[0].Value);
   
   const loadData = useCallback(
     async (page = 1) => {
@@ -893,6 +909,30 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           console.log(`Search results: ${allFormattedData.length} items found out of original data`);
         }
 
+        // FRONTEND PRODI FILTERING - Filter by selected prodi
+        if (filterProdi && filterProdi.trim() !== "") {
+          console.log("=== FRONTEND PRODI FILTERING ===");
+          console.log("Filter prodi:", filterProdi);
+          console.log("Total data before prodi filter:", allFormattedData.length);
+          
+          allFormattedData = allFormattedData.filter(item => {
+            const itemProdi = String(item.Prodi || "").trim();
+            const isMatch = itemProdi === filterProdi;
+            
+            if (isMatch) {
+              console.log("Prodi match found:", {
+                noCuti: item["No Cuti Akademik"],
+                nama: item["Nama Mahasiswa"],
+                prodi: itemProdi
+              });
+            }
+            
+            return isMatch;
+          });
+          
+          console.log(`Prodi filter results: ${allFormattedData.length} items found`);
+        }
+
         // FRONTEND SORTING - Apply sorting to filtered data
         if (sortBy && sortBy !== "") {
           console.log("=== FRONTEND SORTING ===");
@@ -960,7 +1000,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         setLoadingRiwayat(false);
       }
     },
-    [userData, searchRiwayat, sortBy, isProdi, isWadir1, isFinance, isDAAK, isAdmin, isMahasiswa, pageSize]
+    [userData, searchRiwayat, sortBy, filterProdi, isProdi, isWadir1, isFinance, isDAAK, isAdmin, isMahasiswa, pageSize]
   );
   
   const handleAjukan = async (id) => {
@@ -1127,6 +1167,12 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       loadDataRiwayat(1);
     }
   }, [loadData, loadDataRiwayat, showRiwayat]);
+
+  const handleFilterApplyRiwayat = useCallback(() => {
+    setSortBy(sortRef.current.value);
+    setFilterProdi(prodiRef.current.value);
+    loadDataRiwayat(1);
+  }, [loadDataRiwayat]);
 
   const handleNavigation = useCallback(
     (page) => loadData(page),
@@ -1450,6 +1496,27 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     </>
   );
 
+  const filterContentRiwayat = (
+    <>
+      <DropDown
+        ref={sortRef}
+        arrData={dataFilterSort}
+        type="pilih"
+        label="Urutkan"
+        forInput="sortBy"
+        defaultValue={sortBy}
+      />
+      <DropDown
+        ref={prodiRef}
+        arrData={dataFilterProdi}
+        type="pilih"
+        label="Prodi"
+        forInput="filterProdi"
+        defaultValue={filterProdi}
+      />
+    </>
+  );
+
   return (
     <MainContent
       layout="Admin"
@@ -1536,7 +1603,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           
           <Formsearch
             onSearch={handleSearchRiwayat}
-            onFilter={handleFilterApply}
+            onFilter={handleFilterApplyRiwayat}
             onExport={() => {
               // Build export URL with current search parameter
               const params = new URLSearchParams();
@@ -1559,7 +1626,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             showFilterButton={true}
             showExportButton={true}
             exportButtonText="Unduh Excel"
-            filterContent={filterContent}
+            filterContent={filterContentRiwayat}
           />
 
           {loadingRiwayat ? (

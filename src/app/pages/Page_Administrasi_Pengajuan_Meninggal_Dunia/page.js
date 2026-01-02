@@ -487,12 +487,17 @@ export default function Page_MeninggalDunia() {
     const prodiRef = useRef();
 
     const dataFilterProdi = [
-        { Value: "", Text: "— Semua —" },
-        { Value: "MI", Text: "MI" },
-        { Value: "SI", Text: "SI" },
-        { Value: "TPM", Text: "TPM" },
-        { Value: "TRPAB", Text: "TRPAB" },
-        { Value: "MK", Text: "MK" },
+        { Value: "", Text: "— Semua Prodi —" },
+        { Value: "Manajemen Informatika", Text: "Manajemen Informatika" },
+        { Value: "Mekatronika", Text: "Mekatronika" },
+        { Value: "Teknik Alat Berat", Text: "Teknik Alat Berat" },
+        { Value: "Teknik Otomotif", Text: "Teknik Otomotif" },
+        { Value: "Teknik Pengolahan Hasil Perkebunan", Text: "Teknik Pengolahan Hasil Perkebunan" },
+        { Value: "Teknik Produksi dan Proses Manufaktur", Text: "Teknik Produksi dan Proses Manufaktur" },
+        { Value: "Teknologi Konstruksi Bangunan Gedung", Text: "Teknologi Konstruksi Bangunan Gedung" },
+        { Value: "Teknologi Rekayasa Logistik", Text: "Teknologi Rekayasa Logistik" },
+        { Value: "Teknologi Rekayasa Pemeliharaan Alat Berat", Text: "Teknologi Rekayasa Pemeliharaan Alat Berat" },
+        { Value: "Teknologi Rekayasa Perangkat Lunak", Text: "Teknologi Rekayasa Perangkat Lunak" },
     ];
 
     const loadRiwayat = useCallback(
@@ -527,7 +532,8 @@ export default function Page_MeninggalDunia() {
                 }
                 if (statusForRiwayat) params.append('status', statusForRiwayat);
                 if (keyword && keyword.trim() !== "") params.append('keyword', keyword.trim());
-                if (prodi && prodi.trim() !== "") params.append('konsentrasi', prodi.trim());
+                // DON'T send prodi to backend - we'll filter in frontend like Cuti Akademik
+                // if (prodi && prodi.trim() !== "") params.append('konsentrasi', prodi.trim());
                 if (sort) params.append('sort', sort);
                 params.append('pageNumber', page);
                 params.append('pageSize', riwayatPageSize);
@@ -606,11 +612,89 @@ export default function Page_MeninggalDunia() {
 
                 console.log("Filtered completed data for riwayat:", completedData);
 
+                // Process ALL data first (no pagination yet) - Apply frontend prodi filtering like Cuti Akademik
+                let filteredData = completedData;
+
+                // FRONTEND PRODI FILTERING - Filter by selected prodi (same as Cuti Akademik)
+                if (prodi && prodi.trim() !== "") {
+                    console.log("=== FRONTEND PRODI FILTERING (MENINGGAL DUNIA) ===");
+                    console.log("Filter prodi:", prodi);
+                    console.log("Total data before prodi filter:", filteredData.length);
+                    
+                    filteredData = filteredData.filter(item => {
+                        // Get the formatted prodi display (full name with abbreviation)
+                        const formatProdiDisplay = (prodiValue) => {
+                            if (!prodiValue || prodiValue === "-") return "-";
+                            
+                            // Clean input first
+                            let cleanValue = prodiValue;
+                            if (prodiValue.includes('(') && prodiValue.includes(')')) {
+                                const match = prodiValue.match(/^([A-Z]+)\([A-Z]+\)$/);
+                                if (match) {
+                                    cleanValue = match[1];
+                                }
+                            }
+                            
+                            // Map abbreviations to full names with proper format
+                            const prodiMap = {
+                                "MI": "Manajemen Informatika (MI)",
+                                "MK": "Mekatronika (MK)",
+                                "TAB": "Teknik Alat Berat (TAB)",
+                                "TO": "Teknik Otomotif (TO)",
+                                "MO": "Teknik Otomotif (TO)",
+                                "TPHP": "Teknik Pengolahan Hasil Perkebunan (TPHP)",
+                                "TPM": "Teknik Produksi dan Proses Manufaktur (TPM)",
+                                "TPPM": "Teknik Produksi dan Proses Manufaktur (TPM)",
+                                "TKBG": "Teknologi Konstruksi Bangunan Gedung (TKBG)",
+                                "TRL": "Teknologi Rekayasa Logistik (TRL)",
+                                "TRPAB": "Teknologi Rekayasa Pemeliharaan Alat Berat (TRPAB)",
+                                "TRPL": "Teknologi Rekayasa Perangkat Lunak (TRPL)"
+                            };
+                            
+                            return prodiMap[cleanValue] || cleanValue;
+                        };
+
+                        // Extract just the program name (without abbreviation) for filtering
+                        const extractProgramName = (fullProdiDisplay) => {
+                            if (!fullProdiDisplay || fullProdiDisplay === "-") return "";
+                            
+                            // Remove the abbreviation part like "(MI)", "(TPM)", etc.
+                            const match = fullProdiDisplay.match(/^(.+?)\s*\([A-Z]+\)$/);
+                            if (match) {
+                                return match[1].trim();
+                            }
+                            
+                            return fullProdiDisplay;
+                        };
+
+                        const itemProdiFormatted = formatProdiDisplay(item.prodi || item.konsentrasi || "");
+                        const itemProdiName = extractProgramName(itemProdiFormatted);
+                        
+                        // Compare with the selected filter value (which is just the program name)
+                        const isMatch = itemProdiName === prodi;
+                        
+                        if (isMatch) {
+                            console.log("Prodi match found:", {
+                                noPengajuan: item.noPengajuan || item.id,
+                                nama: item.namaMahasiswa || item.mhs_nama,
+                                originalProdi: item.prodi || item.konsentrasi,
+                                formattedProdi: itemProdiFormatted,
+                                extractedName: itemProdiName,
+                                filterValue: prodi
+                            });
+                        }
+                        
+                        return isMatch;
+                    });
+                    
+                    console.log(`Prodi filter results: ${filteredData.length} items found`);
+                }
+
                 // Apply pagination to filtered data
-                const totalCompletedItems = completedData.length;
+                const totalFilteredItems = filteredData.length;
                 const startIndex = (page - 1) * riwayatPageSize;
                 const endIndex = startIndex + riwayatPageSize;
-                const paginatedData = completedData.slice(startIndex, endIndex);
+                const paginatedData = filteredData.slice(startIndex, endIndex);
 
                 const formattedData = paginatedData.map((item, index) => ({
                     No: startIndex + index + 1,
@@ -626,10 +710,10 @@ export default function Page_MeninggalDunia() {
                 }));
 
                 console.log("Final riwayat data:", formattedData);
-                console.log(`Showing ${formattedData.length} items of ${totalCompletedItems} total (page ${page})`);
+                console.log(`Showing ${formattedData.length} items of ${totalFilteredItems} total (page ${page})`);
 
                 setDataRiwayat(formattedData);
-                setRiwayatTotal(totalCompletedItems);
+                setRiwayatTotal(totalFilteredItems);
                 setRiwayatPage(page);
 
             } catch (err) {
