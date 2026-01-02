@@ -213,13 +213,17 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         const url = `${API_LINK}CutiAkademik?${params}`;
         console.log("API URL:", url);
 
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        });
+        // Add minimum loading time for better UX (but keep it fast - 250ms)
+        const [response] = await Promise.all([
+          fetch(url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          }),
+          new Promise(resolve => setTimeout(resolve, 250))
+        ]);
         
         console.log("Response Status:", response.status);
         
@@ -531,7 +535,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           }
 
           
-          const noSK = item.srt_no || item.suratNo || item.cak_srt_no || "";
+          const noSK = item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no || "";
           
           // Debug SK number reading
           if (index === 0) {
@@ -542,6 +546,34 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             console.log("Final noSK:", noSK);
           }
 
+          // Extract nama mahasiswa and prodi from backend data
+          let namaMahasiswa = item.NamaMahasiswa ||  // Primary field from backend DTO
+                             item.namaMahasiswa || 
+                             item.mhs_nama || 
+                             item.nama_mahasiswa || 
+                             "";
+
+          let prodi = item.Prodi ||  // Primary field from backend DTO
+                     item.prodi ||
+                     item.kon_nama ||  // This is what your SQL returns
+                     item.kon_singkatan || 
+                     "";
+
+          // Set defaults if empty
+          if (!namaMahasiswa || namaMahasiswa === "") namaMahasiswa = "-";
+          if (!prodi || prodi === "") prodi = "-";
+
+          // Debug backend data for first item
+          if (index === 0) {
+            console.log("=== MAIN TABLE BACKEND DATA DEBUG ===");
+            console.log("Backend NamaMahasiswa:", item.NamaMahasiswa);
+            console.log("Backend Prodi:", item.Prodi);
+            console.log("Backend SuratNo:", item.SuratNo);
+            console.log("Final namaMahasiswa:", namaMahasiswa);
+            console.log("Final prodi:", prodi);
+            console.log("Available fields:", Object.keys(item));
+          }
+
           // Base row data
           const rowData = {
             No: startIndex + index + 1, 
@@ -549,6 +581,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             "No Pengajuan": item.id || item.idDisplay || item.cak_id || "-", 
             "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
             "No SK": noSK || "-", 
+            "Nama Mahasiswa": namaMahasiswa,
+            Prodi: prodi,
             "Disetujui Prodi": getProdiIcon(currentStatus, item),
             "Disetujui Wadir 1": getWadir1Icon(currentStatus),
             Status: currentStatus || "-",
@@ -558,10 +592,10 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           if (isAdmin || isDAAK) {
             rowData["SK Cuti Akademik"] = formatSKCutiAkademikColumn(noSK, item.cak_id || item.id);
             rowData.Aksi = actions; // Aksi comes after SK Cuti Akademik
-            rowData.Alignment = Array(9).fill("center"); // 9 columns for Admin only
+            rowData.Alignment = Array(11).fill("center"); // 11 columns for Admin (added Nama Mahasiswa + Prodi)
           } else {
             rowData.Aksi = actions; // Aksi comes directly after Status for other roles
-            rowData.Alignment = Array(8).fill("center"); // 8 columns for other roles (Mahasiswa, Prodi, Finance, Wadir)
+            rowData.Alignment = Array(10).fill("center"); // 10 columns for other roles (added Nama Mahasiswa + Prodi)
           }
 
           return rowData;
@@ -635,13 +669,17 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         const url = `${API_LINK}CutiAkademik/riwayat?${params}`;
         console.log("Riwayat API URL:", url);
 
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        });
+        // Add minimum loading time for better UX (but keep it fast - 200ms)
+        const [response] = await Promise.all([
+          fetch(url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          }),
+          new Promise(resolve => setTimeout(resolve, 250))
+        ]);
         
         console.log("Riwayat Response Status:", response.status);
 
@@ -711,31 +749,27 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             console.log("Sample item:", item);
           }
 
-          // Try to extract nama mahasiswa from various possible field names
-          let namaMahasiswa = item.mhs_nama || 
+          // Use backend DTO field names (NamaMahasiswa and Prodi from your DTO)
+          let namaMahasiswa = item.NamaMahasiswa ||  // Primary field from backend DTO
                              item.namaMahasiswa || 
+                             item.mhs_nama || 
                              item.nama_mahasiswa || 
                              item.mahasiswaNama ||
                              item.mahasiswa ||
                              item.nama ||
                              item.name ||
-                             item.studentName ||
-                             item.student_name ||
-                             item.cak_mhs_nama ||
                              "";
 
-          // Try to extract prodi from various possible field names  
-          let prodi = item.kon_singkatan || 
+          // Use backend DTO field names (Prodi from your DTO)  
+          let prodi = item.Prodi ||  // Primary field from backend DTO
+                     item.prodi ||
+                     item.kon_nama ||  // This is what your SQL returns
+                     item.kon_singkatan || 
                      item.konsentrasi || 
                      item.konsentrasiSingkatan ||
-                     item.prodi || 
                      item.programStudi || 
                      item.program_studi ||
                      item.prodiNama ||
-                     item.jurusan ||
-                     item.kon_nama ||
-                     item.cak_prodi ||
-                     item.cak_konsentrasi ||
                      "";
 
           // If nama mahasiswa or prodi is missing, fetch from detail API
@@ -791,7 +825,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             id: item.cak_id || item.id,
             "No Cuti Akademik": item.id || item.cak_id || "-",
             "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
-            "Nomor SK": item.srt_no || item.suratNo || item.cak_srt_no || "-",
+            "Nomor SK": item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no || "-",
             NIM: item.mhsId || item.mhs_id || item.cak_mhs_id || "-",
             "Nama Mahasiswa": namaMahasiswa,
             Prodi: prodi,

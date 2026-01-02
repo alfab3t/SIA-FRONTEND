@@ -76,11 +76,15 @@ export default function DetailCutiAkademikPage() {
 
       const url = `${API_LINK}CutiAkademik/detail?id=${encodeURIComponent(realId)}`;
 
-
       console.log("DETAIL URL =", url);
 
-      const res = await fetch(url);
-      const raw = await res.text();
+      // Add minimum loading time for better UX (but keep it fast - 300ms)
+      const [response] = await Promise.all([
+        fetch(url),
+        new Promise(resolve => setTimeout(resolve, 300))
+      ]);
+
+      const raw = await response.text();
       console.log("RAW DETAIL =", raw);
 
       let data;
@@ -132,18 +136,49 @@ export default function DetailCutiAkademikPage() {
 };
 
 
+  // Use MainContent loading prop for consistent design
   if (loading) {
     return (
-      <MainContent title="Detail Cuti Akademik" layout="Admin">
-        <p>Loading...</p>
+      <MainContent 
+        title="Detail Cuti Akademik" 
+        layout="Admin"
+        loading={loading}
+        breadcrumb={[
+          { label: "Sistem Informasi Akademik" },
+          { label: "Administrasi Akademik" },
+          { label: "Cuti Akademik" },
+          { label: "Detail Pengajuan" },
+        ]}
+      >
+        <div className="text-center py-4">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-2">Memuat detail pengajuan...</p>
+        </div>
       </MainContent>
     );
   }
 
   if (!detail) {
     return (
-      <MainContent title="Detail Cuti Akademik" layout="Admin">
-        <p>Data tidak tersedia.</p>
+      <MainContent 
+        title="Detail Cuti Akademik" 
+        layout="Admin"
+        breadcrumb={[
+          { label: "Sistem Informasi Akademik" },
+          { label: "Administrasi Akademik" },
+          { label: "Cuti Akademik" },
+          { label: "Detail Pengajuan" },
+        ]}
+      >
+        <div className="text-center py-5">
+          <div className="mb-3">
+            <i className="fas fa-exclamation-triangle fa-3x text-muted"></i>
+          </div>
+          <h5 className="text-muted">Data tidak tersedia</h5>
+          <p className="text-muted">Detail pengajuan tidak dapat ditemukan.</p>
+        </div>
       </MainContent>
     );
   }
