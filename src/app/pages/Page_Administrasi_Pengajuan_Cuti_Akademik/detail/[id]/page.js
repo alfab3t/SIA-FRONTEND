@@ -6,7 +6,7 @@ import Toast from "@/components/common/Toast";
 import Button from "@/components/common/Button";
 import { useRouter, useParams } from "next/navigation";
 import { API_LINK } from "@/lib/constant";
-import { decryptIdUrl } from "@/lib/encryptor";
+import { decryptIdUrl, encryptIdUrl } from "@/lib/encryptor";
 import { getUserData } from "@/context/user";
 import { formatDate } from "@/lib/dateFormater";
 
@@ -114,6 +114,24 @@ export default function DetailCutiAkademikPage() {
 
   const handleBack = () =>
     router.push("/pages/Page_Administrasi_Pengajuan_Cuti_Akademik");
+
+  // ============================
+  // NAVIGATE TO PROFILE
+  // ============================
+  const handleViewProfile = () => {
+    if (!detail?.mhsId) {
+      Toast.error("ID Mahasiswa tidak tersedia.");
+      return;
+    }
+    
+    try {
+      const encryptedMhsId = encryptIdUrl(detail.mhsId);
+      router.push(`/pages/Profil_Mahasiswa/${encryptedMhsId}`);
+    } catch (error) {
+      console.error("Error encrypting mhsId:", error);
+      Toast.error("Gagal membuka profil mahasiswa.");
+    }
+  };
 
   // ============================
   // DOWNLOAD FILE (FIX)
@@ -350,6 +368,16 @@ export default function DetailCutiAkademikPage() {
           <div className="col-lg-6 mb-3">
             <label className="form-label fw-semibold">Konsentrasi</label>
             <p>{detail?.konsentrasi || "-"}</p>
+          </div>
+
+          <div className="col-lg-12 mb-3">
+            <span 
+              className="text-primary text-decoration-underline" 
+              style={{ cursor: 'pointer' }}
+              onClick={handleViewProfile}
+            >
+              Lihat Profil Mahasiswa
+            </span>
           </div>
         </div>
 

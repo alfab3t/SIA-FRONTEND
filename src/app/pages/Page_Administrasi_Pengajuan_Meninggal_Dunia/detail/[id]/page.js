@@ -7,7 +7,7 @@ import Button from "@/components/common/Button";
 import { useRouter, useParams } from "next/navigation";
 import { API_LINK } from "@/lib/constant";
 import { getUserData } from "@/context/user";
-import { decryptIdUrl } from "@/lib/encryptor";
+import { decryptIdUrl, encryptIdUrl } from "@/lib/encryptor";
 
 export default function DetailMeninggalDunia() {
   const router = useRouter();
@@ -155,6 +155,24 @@ export default function DetailMeninggalDunia() {
   const handleBack = () => {
     // Navigate back to main page
     router.push("/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia");
+  };
+
+  // ============================
+  // NAVIGATE TO PROFILE
+  // ============================
+  const handleViewProfile = () => {
+    if (!detailData?.mhsId) {
+      Toast.error("ID Mahasiswa tidak tersedia.");
+      return;
+    }
+    
+    try {
+      const encryptedMhsId = encryptIdUrl(detailData.mhsId);
+      router.push(`/pages/Profil_Mahasiswa/${encryptedMhsId}`);
+    } catch (error) {
+      console.error("Error encrypting mhsId:", error);
+      Toast.error("Gagal membuka profil mahasiswa.");
+    }
   };
 
   // Handle file downloads using backend file endpoint
@@ -353,6 +371,15 @@ export default function DetailMeninggalDunia() {
             <div className="col-md-6 mb-3">
               <label className="form-label fw-bold">Tahun Angkatan:</label>
               <p className="form-control-plaintext">{detailData.mhsAngkatan || '-'}</p>
+            </div>
+            <div className="col-md-12 mb-3">
+              <span 
+                className="text-primary text-decoration-underline" 
+                style={{ cursor: 'pointer' }}
+                onClick={handleViewProfile}
+              >
+                Lihat Profil Mahasiswa
+              </span>
             </div>
           </div>
 
