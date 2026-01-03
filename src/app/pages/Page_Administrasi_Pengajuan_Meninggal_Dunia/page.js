@@ -427,7 +427,7 @@ export default function Page_MeninggalDunia() {
                         
                         const statusLower = status.toLowerCase();
                         if (statusLower === "draft" || statusLower === "belum disetujui prodi") {
-                            return "⏳"; // Pending - not yet reached Wadir 1
+                            return "✗"; // Pending - not yet reached Wadir 1
                         } else if (statusLower === "belum disetujui wadir 1") {
                             return "✗"; // Waiting for Wadir 1 approval (silang)
                         } else if (statusLower === "ditolak") {
@@ -701,12 +701,11 @@ export default function Page_MeninggalDunia() {
                     id: item.mdu_id || item.id,
                     "No Pengajuan": item.noPengajuan || item.id || item.mdu_id || "-",
                     "Tanggal Pengajuan": item.tanggalPengajuan || item.tanggal || item.mdu_created_date || "-",
+                    "Nomor SK": item.nomorSK || item.srt_no || item.mdu_srt_no || "-",
                     "Nama Mahasiswa": item.namaMahasiswa || item.mhs_nama || "-",
                     Prodi: item.prodi || item.konsentrasi || "-",
-                    "Nomor SK": item.nomorSK || item.srt_no || item.mdu_srt_no || "-",
-                    Status: item.status || item.mdu_status || "-",
                     Aksi: ["Detail"],
-                    Alignment: Array(8).fill("center"),
+                    Alignment: Array(7).fill("center"),
                 }));
 
                 console.log("Final riwayat data:", formattedData);
