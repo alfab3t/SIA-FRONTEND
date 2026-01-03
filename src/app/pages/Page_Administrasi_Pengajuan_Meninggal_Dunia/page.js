@@ -109,9 +109,14 @@ export default function Page_MeninggalDunia() {
     const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
     const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI" || 
                     fixedRole === "KARYAWAN" && (userData?.nama && userData.nama.toLowerCase().includes('prodi'));
-    const isWadir1 = fixedRole === "ROL01" || fixedRole === "WADIR1";
-    const isFinance = fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE" || 
-                      (userData?.nama && userData.nama.toLowerCase().includes('finance'));
+    
+    // Finance detection - prioritize username check first
+    const isFinance = (userData?.nama && userData.nama.toLowerCase().includes('finance')) ||
+                      fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE";
+    
+    // Wadir1 detection - exclude if already detected as Finance
+    const isWadir1 = !isFinance && (fixedRole === "ROL01" || fixedRole === "WADIR1");
+    
     const isDAAK = fixedRole === "ROL21" || fixedRole === "DAAK";
     
     // Debug role detection
@@ -121,10 +126,11 @@ export default function Page_MeninggalDunia() {
     console.log("userData?.nama:", userData?.nama);
     console.log("permission?.roleName:", permission?.roleName);
     console.log("fixedRole:", fixedRole);
+    console.log("Username contains 'finance':", userData?.nama && userData.nama.toLowerCase().includes('finance'));
     console.log("Is Mahasiswa:", isMahasiswa);
     console.log("Is Prodi:", isProdi);
-    console.log("Is Wadir1:", isWadir1);
-    console.log("Is Finance:", isFinance);
+    console.log("Is Finance (calculated first):", isFinance);
+    console.log("Is Wadir1 (calculated after Finance):", isWadir1);
     console.log("Is DAAK:", isDAAK);
     
     // Admin should NOT include Finance, Wadir1, or Prodi users who have specific workflows
@@ -480,7 +486,7 @@ export default function Page_MeninggalDunia() {
     const [riwayatTotal, setRiwayatTotal] = useState(0);
     const riwayatPageSize = 10;
     const [riwayatSearch, setRiwayatSearch] = useState("");
-    const [filterSort, setFilterSort] = useState("mdu_created_date desc");
+    const [filterSort, setFilterSort] = useState("tanggal asc");
     const [filterProdi, setFilterProdi] = useState("");
 
     const sortRef = useRef();
@@ -506,39 +512,41 @@ export default function Page_MeninggalDunia() {
                 setLoadingRiwayat(true);
                 console.log("=== LOADING RIWAYAT MENINGGAL DUNIA ===");
 
-                let statusForRiwayat = ""; 
-                
-                if (isProdi) {
-                    statusForRiwayat = "";
-                } else if (isWadir1 || isFinance || isDAAK || isAdmin) {
-                    statusForRiwayat = "";
-                }
-
+                // Use GetAll endpoint with Status filter for "Disetujui" only
                 const params = new URLSearchParams();
                 
-                if (!isAdmin && userData?.username) {
-                    const userIdentifier = isMahasiswa ? 
-                        (userData?.mhsId || userData?.nama || userData?.username) : 
-                        userData?.username;
-                    
-                    console.log("=== RIWAYAT USER IDENTIFIER ===");
-                    console.log("Is Mahasiswa:", isMahasiswa);
-                    console.log("userData.nama:", userData?.nama);
-                    console.log("userData.mhsId:", userData?.mhsId);
-                    console.log("userData.username:", userData?.username);
-                    console.log("Final userIdentifier:", userIdentifier);
-                    
-                    params.append('userId', userIdentifier);
+                // Always filter for "Disetujui" status in Riwayat
+                params.append('Status', 'Disetujui');
+                
+                if (keyword && keyword.trim() !== "") {
+                    params.append('SearchKeyword', keyword.trim());
                 }
-                if (statusForRiwayat) params.append('status', statusForRiwayat);
-                if (keyword && keyword.trim() !== "") params.append('keyword', keyword.trim());
-                // DON'T send prodi to backend - we'll filter in frontend like Cuti Akademik
-                // if (prodi && prodi.trim() !== "") params.append('konsentrasi', prodi.trim());
-                if (sort) params.append('sort', sort);
-                params.append('pageNumber', page);
-                params.append('pageSize', riwayatPageSize);
+                
+                // Map sort parameter to GetAll endpoint format
+                let sortParam = sort;
+                if (sort === "tanggal asc") {
+                    sortParam = "tanggal asc";
+                } else if (sort === "tanggal desc") {
+                    sortParam = "tanggal desc";
+                } else if (sort === "nomor asc") {
+                    sortParam = "nomor asc";
+                } else if (sort === "nomor desc") {
+                    sortParam = "nomor desc";
+                } else if (sort === "mdu_created_date asc") {
+                    sortParam = "tanggal asc";
+                } else if (sort === "mdu_created_date desc") {
+                    sortParam = "tanggal desc";
+                } else if (sort === "mdu_id asc") {
+                    sortParam = "nomor asc";
+                } else if (sort === "mdu_id desc") {
+                    sortParam = "nomor desc";
+                }
+                
+                if (sortParam) params.append('Sort', sortParam);
+                params.append('PageNumber', page);
+                params.append('PageSize', riwayatPageSize);
 
-                const url = `${API_LINK}MeninggalDunia/Riwayat?${params}`;
+                const url = `${API_LINK}MeninggalDunia/GetAll?${params}`;
                 console.log("Riwayat API URL:", url);
 
                 const response = await fetch(url, {
@@ -595,19 +603,11 @@ export default function Page_MeninggalDunia() {
 
                 console.log("Processing riwayat array data:", actualData);
 
-                // Filter completed data for riwayat
+                // Since we're filtering by "Disetujui" status at API level, all data should be completed
+                // But let's double-check to ensure only "Disetujui" status is shown
                 const completedData = actualData.filter(item => {
                     const currentStatus = item.status || item.mdu_status || "";
-                    
-                    const pendingStatuses = [
-                        "Draft",
-                        "Belum Disetujui Prodi", 
-                        "Belum Disetujui Wadir 1",
-                        "Belum Disetujui Finance",
-                        "Menunggu Upload SK"
-                    ];
-                    
-                    return !pendingStatuses.includes(currentStatus) && currentStatus !== "";
+                    return currentStatus === "Disetujui";
                 });
 
                 console.log("Filtered completed data for riwayat:", completedData);
@@ -698,14 +698,16 @@ export default function Page_MeninggalDunia() {
 
                 const formattedData = paginatedData.map((item, index) => ({
                     No: startIndex + index + 1,
-                    id: item.mdu_id || item.id,
+                    id: item.id || item.mdu_id,
                     "No Pengajuan": item.noPengajuan || item.id || item.mdu_id || "-",
                     "Tanggal Pengajuan": item.tanggalPengajuan || item.tanggal || item.mdu_created_date || "-",
                     "Nomor SK": item.nomorSK || item.srt_no || item.mdu_srt_no || "-",
+                    "NIM": item.nim || item.mhs_nim || item.mahasiswaNim || "-",
                     "Nama Mahasiswa": item.namaMahasiswa || item.mhs_nama || "-",
                     Prodi: item.prodi || item.konsentrasi || "-",
+                    Status: item.status || item.mdu_status || "Disetujui",
                     Aksi: ["Detail"],
-                    Alignment: Array(7).fill("center"),
+                    Alignment: Array(9).fill("center"),
                 }));
 
                 console.log("Final riwayat data:", formattedData);
@@ -1290,10 +1292,10 @@ export default function Page_MeninggalDunia() {
             <DropDown
                 ref={sortRef}
                 arrData={[
-                    { Value: "mdu_created_date asc", Text: "Tanggal Pengajuan [↑]" },
-                    { Value: "mdu_created_date desc", Text: "Tanggal Pengajuan [↓]" },
-                    { Value: "mdu_id asc", Text: "Nomor Pengajuan [↑]" },
-                    { Value: "mdu_id desc", Text: "Nomor Pengajuan [↓]" },
+                    { Value: "tanggal asc", Text: "Tanggal Pengajuan [↑]" },
+                    { Value: "tanggal desc", Text: "Tanggal Pengajuan [↓]" },
+                    { Value: "nomor asc", Text: "Nomor Pengajuan [↑]" },
+                    { Value: "nomor desc", Text: "Nomor Pengajuan [↓]" },
                 ]}
                 type="pilih"
                 label="Urut Berdasarkan"
@@ -1344,67 +1346,70 @@ export default function Page_MeninggalDunia() {
             ]}
         >
             {/* ======================== TABEL PENGAJUAN =========================== */}
-            <div className="mb-4">
-                <h5>Daftar Pengajuan Meninggal Dunia</h5>
-                
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                    <div></div>
-                    {(isMahasiswa || isProdi) && (
-                        <Button
-                            classType="primary"
-                            label={isProdi ? "Ajukan Meninggal Dunia untuk Mahasiswa" : "Ajukan Meninggal Dunia"}
-                            onClick={handleAdd}
-                        />
-                    )}
-                </div>
-
-                {loadingPengajuan ? (
-                    <div className="text-center py-4">
-                        <div className="spinner-border" role="status">
-                            <span className="visually-hidden">Loading...</span>
-                        </div>
-                        <p className="mt-2">Memuat data pengajuan...</p>
-                    </div>
-                ) : dataPengajuan.length > 0 ? (
-                    <>
-                        <Table
-                            data={dataPengajuan}
-                            onDetail={handleDetail}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                            onAjukan={handleAjukan}
-                            onApprove={handleApprove}
-                            onReject={handleReject}
-                            onUploadSK={handleUploadSK}
-                            onDownloadSK={handleDownloadSK}
-                        />
-
-                        {pengajuanTotalData > 0 && (
-                            <Paging
-                                pageSize={pengajuanPageSize}
-                                pageCurrent={pengajuanPage}
-                                totalData={pengajuanTotalData}
-                                navigation={loadPengajuan}
+            {/* Finance role should NOT see Pengajuan table - only Riwayat */}
+            {!isFinance && (
+                <div className="mb-4">
+                    <h5>Daftar Pengajuan Meninggal Dunia</h5>
+                    
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                        <div></div>
+                        {(isMahasiswa || isProdi) && (
+                            <Button
+                                classType="primary"
+                                label={isProdi ? "Ajukan Meninggal Dunia untuk Mahasiswa" : "Ajukan Meninggal Dunia"}
+                                onClick={handleAdd}
                             />
                         )}
-                    </>
-                ) : (
-                    <div className="text-center py-5">
-                        <div className="mb-3">
-                            <i className="fas fa-inbox fa-3x text-muted"></i>
-                        </div>
-                        <h5 className="text-muted">Tidak ada data pengajuan</h5>
-                        <p className="text-muted">
-                            {isMahasiswa 
-                                ? "Anda belum memiliki pengajuan meninggal dunia. Klik tombol 'Ajukan Meninggal Dunia' untuk membuat pengajuan baru."
-                                : isProdi
-                                ? "Tidak ada pengajuan meninggal dunia. Anda dapat membuat pengajuan untuk mahasiswa dengan klik tombol 'Ajukan Meninggal Dunia untuk Mahasiswa'."
-                                : "Tidak ada pengajuan meninggal dunia yang perlu ditinjau saat ini."
-                            }
-                        </p>
                     </div>
-                )}
-            </div>
+
+                    {loadingPengajuan ? (
+                        <div className="text-center py-4">
+                            <div className="spinner-border" role="status">
+                                <span className="visually-hidden">Loading...</span>
+                            </div>
+                            <p className="mt-2">Memuat data pengajuan...</p>
+                        </div>
+                    ) : dataPengajuan.length > 0 ? (
+                        <>
+                            <Table
+                                data={dataPengajuan}
+                                onDetail={handleDetail}
+                                onEdit={handleEdit}
+                                onDelete={handleDelete}
+                                onAjukan={handleAjukan}
+                                onApprove={handleApprove}
+                                onReject={handleReject}
+                                onUploadSK={handleUploadSK}
+                                onDownloadSK={handleDownloadSK}
+                            />
+
+                            {pengajuanTotalData > 0 && (
+                                <Paging
+                                    pageSize={pengajuanPageSize}
+                                    pageCurrent={pengajuanPage}
+                                    totalData={pengajuanTotalData}
+                                    navigation={loadPengajuan}
+                                />
+                            )}
+                        </>
+                    ) : (
+                        <div className="text-center py-5">
+                            <div className="mb-3">
+                                <i className="fas fa-inbox fa-3x text-muted"></i>
+                            </div>
+                            <h5 className="text-muted">Tidak ada data pengajuan</h5>
+                            <p className="text-muted">
+                                {isMahasiswa 
+                                    ? "Anda belum memiliki pengajuan meninggal dunia. Klik tombol 'Ajukan Meninggal Dunia' untuk membuat pengajuan baru."
+                                    : isProdi
+                                    ? "Tidak ada pengajuan meninggal dunia. Anda dapat membuat pengajuan untuk mahasiswa dengan klik tombol 'Ajukan Meninggal Dunia untuk Mahasiswa'."
+                                    : "Tidak ada pengajuan meninggal dunia yang perlu ditinjau saat ini."
+                                }
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* ======================== TABEL RIWAYAT =========================== */}
             {(isProdi || isWadir1 || isFinance || isDAAK || isAdmin) && (
