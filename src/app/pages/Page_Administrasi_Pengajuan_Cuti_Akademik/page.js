@@ -1345,33 +1345,30 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     try {
       console.log("=== REJECT CUTI AKADEMIK ===");
       console.log("Item ID:", itemId);
-      console.log("User Role:", fixedRole);
+      console.log("User Data:", userData);
+      console.log("Fixed Role:", fixedRole);
+      console.log("Is Prodi:", isProdi);
+      console.log("Is Finance:", isFinance);
+      console.log("Is Wadir1:", isWadir1);
 
-      // Auto-generate rejection reason based on role
-      let autoReason = "";
-      let backendRole = "";
+      // Get username for backend role detection - try multiple fields
+      const username = userData?.nama || userData?.username || userData?.userid || "";
       
-      if (isProdi) {
-        autoReason = "Ditolak oleh Program Studi";
-        backendRole = "prodi";
-      } else if (isWadir1) {
-        autoReason = "Ditolak oleh Wakil Direktur 1";
-        backendRole = "wadir1";
-      } else if (isFinance) {
-        autoReason = "Ditolak oleh Bagian Keuangan";
-        backendRole = "finance";
-      } else {
-        autoReason = "Pengajuan ditolak";
-        backendRole = "prodi"; // default
+      if (!username) {
+        Toast.error("Data user tidak lengkap. Silakan login ulang.");
+        setLoading(false);
+        return;
       }
 
-      console.log("Auto Reason:", autoReason);
-      console.log("Backend Role:", backendRole);
+      console.log("Username for rejection:", username);
 
+      // Sesuai dengan backend RejectCutiAkademikRequest DTO
+      // Backend akan auto-detect role berdasarkan username
       const payload = {
-        id: itemId,
-        role: backendRole,
-        keterangan: autoReason
+        Id: itemId,
+        Username: username,
+        Role: "auto-detect", // Backend akan override ini dengan hasil DetectUserRoleAsync
+        Keterangan: null // Optional - backend akan auto-generate berdasarkan detected role
       };
 
       console.log("Reject payload:", payload);
@@ -1389,46 +1386,91 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       });
 
       console.log("Reject response status:", res.status);
+      console.log("Response headers:", [...res.headers.entries()]);
 
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("API Error Response:", errorText);
+        console.error("=== REJECT ERROR DETAILS ===");
+        console.error("Status:", res.status);
+        console.error("Status Text:", res.statusText);
+        console.error("Error Response:", errorText);
+        console.error("Request Payload:", JSON.stringify(payload, null, 2));
+        
+        let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
         
         try {
           const errorData = JSON.parse(errorText);
-          const errorMsg = errorData.message || errorData.error || errorData.details || `HTTP ${res.status}: ${res.statusText}`;
-          Toast.error(`Gagal menolak pengajuan: ${errorMsg}`);
+          console.error("Parsed Error Data:", errorData);
+          
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.details) {
+            errorMessage = errorData.details;
+          }
+          
+          // Handle validation errors
+          if (errorData.errors) {
+            const validationErrors = Object.values(errorData.errors).flat();
+            errorMessage = validationErrors.join(', ');
+          }
+          
         } catch (parseError) {
-          Toast.error(`Gagal menolak pengajuan: HTTP ${res.status}\n\n${errorText}`);
+          console.error("Failed to parse error response:", parseError);
+          errorMessage = `${errorMessage}\n\nRaw response: ${errorText}`;
         }
+        
+        Toast.error(`Gagal menolak pengajuan: ${errorMessage}`);
+        setLoading(false);
         return;
       }
 
-      // Read response as text first, then parse as JSON
-      const raw = await res.text();
-      console.log("Reject raw response:", raw);
+      // Read response
+      const responseText = await res.text();
+      console.log("Reject raw response:", responseText);
 
       let result;
       try {
-        result = JSON.parse(raw);
-        console.log("Reject Result:", result);
+        result = JSON.parse(responseText);
+        console.log("Reject parsed result:", result);
       } catch (parseError) {
         console.error("JSON Parse Error:", parseError);
-        Toast.error("Response server tidak valid:\n\n" + raw);
+        console.error("Raw response was:", responseText);
+        
+        // If response is not JSON but request was successful, assume success
+        if (res.status === 200) {
+          Toast.success("Pengajuan berhasil ditolak!");
+          loadData(1);
+          if (showRiwayat) loadDataRiwayat(1);
+          setLoading(false);
+          return;
+        }
+        
+        Toast.error("Response server tidak valid. Periksa console untuk detail.");
+        setLoading(false);
         return;
       }
 
-      if (result?.message && result.message.includes("berhasil")) {
-        Toast.success(result.message);
+      // Check result
+      if (result && (result.rejected === true || result.success === true || 
+          (result.message && result.message.toLowerCase().includes("berhasil")))) {
+        
+        const successMessage = result.message || 
+          `Pengajuan berhasil ditolak oleh ${result.role || 'sistem'}`;
+        
+        Toast.success(successMessage);
         loadData(1); // Reload data
         if (showRiwayat) loadDataRiwayat(1); // Reload riwayat if visible
+        
       } else {
-        throw new Error(result?.message || "Gagal menolak pengajuan");
+        const errorMessage = result?.message || result?.error || "Gagal menolak pengajuan";
+        console.error("Rejection failed:", result);
+        Toast.error(errorMessage);
       } 
-      
     } catch (err) {
-      console.error("Reject error:", err);
-      Toast.error(`Gagal menolak: ${err.message}`);
+      console.error("Reject catch error:", err);
+      Toast.error(`Gagal menolak pengajuan: ${err.message}`);
     } finally {
       setLoading(false);
     }
