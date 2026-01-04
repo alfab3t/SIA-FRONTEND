@@ -1258,25 +1258,54 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     setLoading(true);
 
     try {
-      console.log("=== APPROVE PRODI ===");
+      console.log("=== APPROVE CUTI AKADEMIK ===");
       console.log("ID:", itemId);
+      console.log("User Role:", fixedRole);
+      console.log("Is Prodi:", isProdi);
+      console.log("Is Finance:", isFinance);
+      console.log("Is Wadir1:", isWadir1);
 
-      
-      const menimbang = "Pengajuan cuti akademik telah memenuhi persyaratan dan disetujui oleh program studi.";
       const approvedBy = userData?.nama || userData?.username || userData?.userid || "";
-
-      console.log("Menimbang:", menimbang);
-      console.log("ApprovedBy:", approvedBy);
-
       
-      const url = `${API_LINK}CutiAkademik/approve/prodi`;
-      
-      const payload = {
-        id: itemId,
-        menimbang: menimbang,
-        approvedBy: approvedBy
-      };
+      if (!approvedBy) {
+        Toast.error("Data user tidak lengkap. Silakan login ulang.");
+        setLoading(false);
+        return;
+      }
 
+      let url, payload;
+
+      if (isProdi) {
+        // Use specific Prodi approval endpoint
+        const menimbang = "Pengajuan cuti akademik telah memenuhi persyaratan dan disetujui oleh program studi.";
+        
+        url = `${API_LINK}CutiAkademik/approve/prodi`;
+        payload = {
+          Id: itemId,
+          Menimbang: menimbang,
+          ApprovedBy: approvedBy
+        };
+        
+        console.log("=== PRODI APPROVAL ===");
+        console.log("Using /approve/prodi endpoint");
+      } else if (isFinance || isWadir1) {
+        // Use general approval endpoint with auto role detection
+        url = `${API_LINK}CutiAkademik/approve`;
+        payload = {
+          Id: itemId,
+          ApprovedBy: approvedBy,
+          Role: "" // Will be auto-detected by backend
+        };
+        
+        console.log(isFinance ? "=== FINANCE APPROVAL ===" : "=== WADIR1 APPROVAL ===");
+        console.log("Using /approve endpoint with auto role detection");
+      } else {
+        Toast.error("Role tidak dikenali untuk approval.");
+        setLoading(false);
+        return;
+      }
+
+      console.log("Approve URL:", url);
       console.log("Approve payload:", payload);
 
       const res = await fetch(url, {
