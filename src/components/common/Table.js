@@ -16,6 +16,7 @@ export default function Table({
   onUpload = () => {},
   onFinal = () => {},
   onPrint = () => {},
+  onDownloadSK = () => {},
 
   // ⬅⬅⬅ Tambahkan ini
   onAjukan = () => {},
@@ -52,6 +53,7 @@ export default function Table({
               onUpload={onUpload}
               onFinal={onFinal}
               onPrint={onPrint}
+              onDownloadSK={onDownloadSK}
 
               // ⬅⬅⬅ Tambahkan ini ke TableRow
               onAjukan={onAjukan}
@@ -77,6 +79,7 @@ Table.propTypes = {
   onUpload: PropTypes.func,
   onFinal: PropTypes.func,
   onPrint: PropTypes.func,
+  onDownloadSK: PropTypes.func,
 
   // ⬅⬅⬅ Tambahkan ini
   onAjukan: PropTypes.func,

@@ -6,7 +6,7 @@ import Toast from "@/components/common/Toast";
 import Button from "@/components/common/Button";
 import { useRouter, useParams } from "next/navigation";
 import { API_LINK } from "@/lib/constant";
-import { decryptIdUrl } from "@/lib/encryptor";
+import { decryptIdUrl, encryptIdUrl } from "@/lib/encryptor";
 import { getUserData } from "@/context/user";
 import { formatDate } from "@/lib/dateFormater";
 
@@ -76,11 +76,15 @@ export default function DetailCutiAkademikPage() {
 
       const url = `${API_LINK}CutiAkademik/detail?id=${encodeURIComponent(realId)}`;
 
-
       console.log("DETAIL URL =", url);
 
-      const res = await fetch(url);
-      const raw = await res.text();
+      // Add minimum loading time for better UX (but keep it fast - 300ms)
+      const [response] = await Promise.all([
+        fetch(url),
+        new Promise(resolve => setTimeout(resolve, 300))
+      ]);
+
+      const raw = await response.text();
       console.log("RAW DETAIL =", raw);
 
       let data;
@@ -112,6 +116,24 @@ export default function DetailCutiAkademikPage() {
     router.push("/pages/Page_Administrasi_Pengajuan_Cuti_Akademik");
 
   // ============================
+  // NAVIGATE TO PROFILE
+  // ============================
+  const handleViewProfile = () => {
+    if (!detail?.mhsId) {
+      Toast.error("ID Mahasiswa tidak tersedia.");
+      return;
+    }
+    
+    try {
+      const encryptedMhsId = encryptIdUrl(detail.mhsId);
+      router.push(`/pages/Profil_Mahasiswa/${encryptedMhsId}`);
+    } catch (error) {
+      console.error("Error encrypting mhsId:", error);
+      Toast.error("Gagal membuka profil mahasiswa.");
+    }
+  };
+
+  // ============================
   // DOWNLOAD FILE (FIX)
   // ============================
   const handleDownload = (fileName) => {
@@ -132,18 +154,49 @@ export default function DetailCutiAkademikPage() {
 };
 
 
+  // Use MainContent loading prop for consistent design
   if (loading) {
     return (
-      <MainContent title="Detail Cuti Akademik" layout="Admin">
-        <p>Loading...</p>
+      <MainContent 
+        title="Detail Cuti Akademik" 
+        layout="Admin"
+        loading={loading}
+        breadcrumb={[
+          { label: "Sistem Informasi Akademik" },
+          { label: "Administrasi Akademik" },
+          { label: "Cuti Akademik" },
+          { label: "Detail Pengajuan" },
+        ]}
+      >
+        <div className="text-center py-4">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-2">Memuat detail pengajuan...</p>
+        </div>
       </MainContent>
     );
   }
 
   if (!detail) {
     return (
-      <MainContent title="Detail Cuti Akademik" layout="Admin">
-        <p>Data tidak tersedia.</p>
+      <MainContent 
+        title="Detail Cuti Akademik" 
+        layout="Admin"
+        breadcrumb={[
+          { label: "Sistem Informasi Akademik" },
+          { label: "Administrasi Akademik" },
+          { label: "Cuti Akademik" },
+          { label: "Detail Pengajuan" },
+        ]}
+      >
+        <div className="text-center py-5">
+          <div className="mb-3">
+            <i className="fas fa-exclamation-triangle fa-3x text-muted"></i>
+          </div>
+          <h5 className="text-muted">Data tidak tersedia</h5>
+          <p className="text-muted">Detail pengajuan tidak dapat ditemukan.</p>
+        </div>
       </MainContent>
     );
   }
@@ -309,6 +362,16 @@ export default function DetailCutiAkademikPage() {
             <label className="form-label fw-semibold">Konsentrasi</label>
             <p>{detail?.konsentrasi || "-"}</p>
           </div>
+
+          <div className="col-lg-12 mb-3">
+            <span 
+              className="text-primary text-decoration-underline" 
+              style={{ cursor: 'pointer' }}
+              onClick={handleViewProfile}
+            >
+              Lihat Profil Mahasiswa
+            </span>
+          </div>
         </div>
 
 
@@ -324,11 +387,12 @@ export default function DetailCutiAkademikPage() {
             <label className="form-label fw-semibold">Surat Pernyataan</label>
             <div>
               {detail?.lampiranSP ? (
-                <Button
-                  classType="primary"
-                  label="📄 Download Surat Pernyataan"
+                <button
+                  className="btn btn-outline-primary rounded-pill px-4 py-2"
                   onClick={() => handleDownload(detail.lampiranSP)}
-                />
+                >
+                  Download Surat Pernyataan
+                </button>
               ) : (
                 <span>Tidak ada file</span>
               )}
@@ -340,11 +404,12 @@ export default function DetailCutiAkademikPage() {
             <label className="form-label fw-semibold">Lampiran</label>
             <div>
               {detail?.lampiran ? (
-                <Button
-                  classType="primary"
-                  label="📎 Download Lampiran"
+                <button
+                  className="btn btn-outline-primary rounded-pill px-4 py-2"
                   onClick={() => handleDownload(detail.lampiran)}
-                />
+                >
+                  Download Lampiran
+                </button>
               ) : (
                 <span>Tidak ada file</span>
               )}

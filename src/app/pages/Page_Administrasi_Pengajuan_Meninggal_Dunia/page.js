@@ -109,9 +109,14 @@ export default function Page_MeninggalDunia() {
     const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
     const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI" || 
                     fixedRole === "KARYAWAN" && (userData?.nama && userData.nama.toLowerCase().includes('prodi'));
-    const isWadir1 = fixedRole === "ROL01" || fixedRole === "WADIR1";
-    const isFinance = fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE" || 
-                      (userData?.nama && userData.nama.toLowerCase().includes('finance'));
+    
+    // Finance detection - prioritize username check first
+    const isFinance = (userData?.nama && userData.nama.toLowerCase().includes('finance')) ||
+                      fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE";
+    
+    // Wadir1 detection - exclude if already detected as Finance
+    const isWadir1 = !isFinance && (fixedRole === "ROL01" || fixedRole === "WADIR1");
+    
     const isDAAK = fixedRole === "ROL21" || fixedRole === "DAAK";
     
     // Debug role detection
@@ -121,10 +126,11 @@ export default function Page_MeninggalDunia() {
     console.log("userData?.nama:", userData?.nama);
     console.log("permission?.roleName:", permission?.roleName);
     console.log("fixedRole:", fixedRole);
+    console.log("Username contains 'finance':", userData?.nama && userData.nama.toLowerCase().includes('finance'));
     console.log("Is Mahasiswa:", isMahasiswa);
     console.log("Is Prodi:", isProdi);
-    console.log("Is Wadir1:", isWadir1);
-    console.log("Is Finance:", isFinance);
+    console.log("Is Finance (calculated first):", isFinance);
+    console.log("Is Wadir1 (calculated after Finance):", isWadir1);
     console.log("Is DAAK:", isDAAK);
     
     // Admin should NOT include Finance, Wadir1, or Prodi users who have specific workflows
@@ -320,29 +326,21 @@ export default function Page_MeninggalDunia() {
                         }
                         return false; 
                     } else if (isProdi) {
-                        // For Prodi users, show:
-                        // 1. Draft applications created by Prodi
-                        // 2. Applications waiting for Prodi approval ("Belum Disetujui Prodi")
+                        // For Prodi users, show ONLY:
+                        // 1. Draft status
+                        // 2. Belum Disetujui Wadir 1 status
+                        // Simple filtering based on status only
                         
-                        const createdByProdi = item.mdu_created_by && 
-                            (item.mdu_created_by.toLowerCase().includes('prodi') ||
-                             item.mdu_created_by === userData?.username ||
-                             item.mdu_created_by === userData?.nama);
+                        console.log("=== PRODI FILTERING DEBUG ===");
+                        console.log("Current status:", currentStatus);
+                        console.log("Item:", item);
                         
-                        // Also check session storage for prodi-created applications
-                        const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedMeninggalApps') || '[]');
-                        const isProdiCreatedFromSession = prodiCreatedApps.includes(item.mdu_id || item.id);
-                        
-                        const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession;
-                        
-                        // Show if:
-                        // 1. Draft created by Prodi, OR
-                        // 2. Status is "Belum Disetujui Prodi"
-                        if ((currentStatus === "Draft" && isCreatedByProdi) || 
-                            currentStatus === "Belum Disetujui Prodi") {
+                        if (currentStatus === "Draft" || currentStatus === "Belum Disetujui Wadir 1") {
+                            console.log("✓ Showing item with status:", currentStatus);
                             return true;
                         }
                         
+                        console.log("✗ Hiding item with status:", currentStatus);
                         return false;
                     } else {
                         // For other roles, exclude completed applications
@@ -386,20 +384,11 @@ export default function Page_MeninggalDunia() {
                             actions = ["Detail"];
                         }
                     } else if (isProdi) {
-                        const createdByProdi = item.mdu_created_by && 
-                            (item.mdu_created_by.toLowerCase().includes('prodi') || 
-                             item.mdu_created_by === userData?.username ||
-                             item.mdu_created_by === userData?.nama);
-                        
-                        const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedMeninggalApps') || '[]');
-                        const isProdiCreatedFromSession = prodiCreatedApps.includes(item.mdu_id || item.id);
-                        
-                        const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession;
-                        
-                        if (isDraft && isCreatedByProdi) {
+                        // For Prodi users, simple actions based on status
+                        if (currentStatus === "Draft") {
                             actions = ["Detail", "Edit", "Delete", "Ajukan"];
-                        } else if (currentStatus === "Belum Disetujui Prodi" && !isCreatedByProdi) {
-                            actions = ["Detail", "Approve", "Reject"];
+                        } else if (currentStatus === "Belum Disetujui Wadir 1") {
+                            actions = ["Detail"]; // Read-only for submitted applications
                         } else {
                             actions = ["Detail"];
                         }
@@ -438,15 +427,34 @@ export default function Page_MeninggalDunia() {
                         }
                     }
 
+                    // Function to determine Wadir 1 approval status icon
+                    const getWadir1Icon = (status) => {
+                        if (!status) return "⏳";
+                        
+                        const statusLower = status.toLowerCase();
+                        if (statusLower === "draft" || statusLower === "belum disetujui prodi") {
+                            return "✗"; // Pending - not yet reached Wadir 1
+                        } else if (statusLower === "belum disetujui wadir 1") {
+                            return "✗"; // Waiting for Wadir 1 approval (silang)
+                        } else if (statusLower === "ditolak") {
+                            return "✗"; // Rejected (x)
+                        } else if (statusLower.includes("disetujui") || statusLower.includes("finance") || statusLower.includes("upload sk")) {
+                            return "✓"; // Approved (ceklis)
+                        } else {
+                            return "⏳"; // Default pending
+                        }
+                    };
+
                     return {
                         No: startIndex + index + 1,
-                        id: item.mdu_id || item.id || item.idDisplay,
+                        id: item.id || item.mdu_id || item.idDisplay,
                         "No Pengajuan": item.noPengajuan || item.id || item.idDisplay || item.mdu_id || "-",
                         "Tanggal Pengajuan": item.tanggalPengajuan || item.tanggal || item.mdu_created_date || "-",
                         "No SK": item.nomorSK || item.srt_no || item.suratNo || item.mdu_srt_no || "-",
+                        "Disetujui Wadir 1": getWadir1Icon(currentStatus),
                         Status: currentStatus || "-",
                         Aksi: actions,
-                        Alignment: Array(6).fill("center"),
+                        Alignment: Array(8).fill("center"), // Updated to 8 columns
                     };
                 });
 
@@ -478,19 +486,24 @@ export default function Page_MeninggalDunia() {
     const [riwayatTotal, setRiwayatTotal] = useState(0);
     const riwayatPageSize = 10;
     const [riwayatSearch, setRiwayatSearch] = useState("");
-    const [filterSort, setFilterSort] = useState("mdu_created_date desc");
+    const [filterSort, setFilterSort] = useState("tanggal asc");
     const [filterProdi, setFilterProdi] = useState("");
 
     const sortRef = useRef();
     const prodiRef = useRef();
 
     const dataFilterProdi = [
-        { Value: "", Text: "— Semua —" },
-        { Value: "MI", Text: "MI" },
-        { Value: "SI", Text: "SI" },
-        { Value: "TPM", Text: "TPM" },
-        { Value: "TRPAB", Text: "TRPAB" },
-        { Value: "MK", Text: "MK" },
+        { Value: "", Text: "— Semua Prodi —" },
+        { Value: "Manajemen Informatika", Text: "Manajemen Informatika" },
+        { Value: "Mekatronika", Text: "Mekatronika" },
+        { Value: "Teknik Alat Berat", Text: "Teknik Alat Berat" },
+        { Value: "Teknik Otomotif", Text: "Teknik Otomotif" },
+        { Value: "Teknik Pengolahan Hasil Perkebunan", Text: "Teknik Pengolahan Hasil Perkebunan" },
+        { Value: "Teknik Produksi dan Proses Manufaktur", Text: "Teknik Produksi dan Proses Manufaktur" },
+        { Value: "Teknologi Konstruksi Bangunan Gedung", Text: "Teknologi Konstruksi Bangunan Gedung" },
+        { Value: "Teknologi Rekayasa Logistik", Text: "Teknologi Rekayasa Logistik" },
+        { Value: "Teknologi Rekayasa Pemeliharaan Alat Berat", Text: "Teknologi Rekayasa Pemeliharaan Alat Berat" },
+        { Value: "Teknologi Rekayasa Perangkat Lunak", Text: "Teknologi Rekayasa Perangkat Lunak" },
     ];
 
     const loadRiwayat = useCallback(
@@ -499,38 +512,41 @@ export default function Page_MeninggalDunia() {
                 setLoadingRiwayat(true);
                 console.log("=== LOADING RIWAYAT MENINGGAL DUNIA ===");
 
-                let statusForRiwayat = ""; 
-                
-                if (isProdi) {
-                    statusForRiwayat = "";
-                } else if (isWadir1 || isFinance || isDAAK || isAdmin) {
-                    statusForRiwayat = "";
-                }
-
+                // Use GetAll endpoint with Status filter for "Disetujui" only
                 const params = new URLSearchParams();
                 
-                if (!isAdmin && userData?.username) {
-                    const userIdentifier = isMahasiswa ? 
-                        (userData?.mhsId || userData?.nama || userData?.username) : 
-                        userData?.username;
-                    
-                    console.log("=== RIWAYAT USER IDENTIFIER ===");
-                    console.log("Is Mahasiswa:", isMahasiswa);
-                    console.log("userData.nama:", userData?.nama);
-                    console.log("userData.mhsId:", userData?.mhsId);
-                    console.log("userData.username:", userData?.username);
-                    console.log("Final userIdentifier:", userIdentifier);
-                    
-                    params.append('userId', userIdentifier);
+                // Always filter for "Disetujui" status in Riwayat
+                params.append('Status', 'Disetujui');
+                
+                if (keyword && keyword.trim() !== "") {
+                    params.append('SearchKeyword', keyword.trim());
                 }
-                if (statusForRiwayat) params.append('status', statusForRiwayat);
-                if (keyword && keyword.trim() !== "") params.append('keyword', keyword.trim());
-                if (prodi && prodi.trim() !== "") params.append('konsentrasi', prodi.trim());
-                if (sort) params.append('sort', sort);
-                params.append('pageNumber', page);
-                params.append('pageSize', riwayatPageSize);
+                
+                // Map sort parameter to GetAll endpoint format
+                let sortParam = sort;
+                if (sort === "tanggal asc") {
+                    sortParam = "tanggal asc";
+                } else if (sort === "tanggal desc") {
+                    sortParam = "tanggal desc";
+                } else if (sort === "nomor asc") {
+                    sortParam = "nomor asc";
+                } else if (sort === "nomor desc") {
+                    sortParam = "nomor desc";
+                } else if (sort === "mdu_created_date asc") {
+                    sortParam = "tanggal asc";
+                } else if (sort === "mdu_created_date desc") {
+                    sortParam = "tanggal desc";
+                } else if (sort === "mdu_id asc") {
+                    sortParam = "nomor asc";
+                } else if (sort === "mdu_id desc") {
+                    sortParam = "nomor desc";
+                }
+                
+                if (sortParam) params.append('Sort', sortParam);
+                params.append('PageNumber', page);
+                params.append('PageSize', riwayatPageSize);
 
-                const url = `${API_LINK}MeninggalDunia/Riwayat?${params}`;
+                const url = `${API_LINK}MeninggalDunia/GetAll?${params}`;
                 console.log("Riwayat API URL:", url);
 
                 const response = await fetch(url, {
@@ -587,47 +603,118 @@ export default function Page_MeninggalDunia() {
 
                 console.log("Processing riwayat array data:", actualData);
 
-                // Filter completed data for riwayat
+                // Since we're filtering by "Disetujui" status at API level, all data should be completed
+                // But let's double-check to ensure only "Disetujui" status is shown
                 const completedData = actualData.filter(item => {
                     const currentStatus = item.status || item.mdu_status || "";
-                    
-                    const pendingStatuses = [
-                        "Draft",
-                        "Belum Disetujui Prodi", 
-                        "Belum Disetujui Wadir 1",
-                        "Belum Disetujui Finance",
-                        "Menunggu Upload SK"
-                    ];
-                    
-                    return !pendingStatuses.includes(currentStatus) && currentStatus !== "";
+                    return currentStatus === "Disetujui";
                 });
 
                 console.log("Filtered completed data for riwayat:", completedData);
 
+                // Process ALL data first (no pagination yet) - Apply frontend prodi filtering like Cuti Akademik
+                let filteredData = completedData;
+
+                // FRONTEND PRODI FILTERING - Filter by selected prodi (same as Cuti Akademik)
+                if (prodi && prodi.trim() !== "") {
+                    console.log("=== FRONTEND PRODI FILTERING (MENINGGAL DUNIA) ===");
+                    console.log("Filter prodi:", prodi);
+                    console.log("Total data before prodi filter:", filteredData.length);
+                    
+                    filteredData = filteredData.filter(item => {
+                        // Get the formatted prodi display (full name with abbreviation)
+                        const formatProdiDisplay = (prodiValue) => {
+                            if (!prodiValue || prodiValue === "-") return "-";
+                            
+                            // Clean input first
+                            let cleanValue = prodiValue;
+                            if (prodiValue.includes('(') && prodiValue.includes(')')) {
+                                const match = prodiValue.match(/^([A-Z]+)\([A-Z]+\)$/);
+                                if (match) {
+                                    cleanValue = match[1];
+                                }
+                            }
+                            
+                            // Map abbreviations to full names with proper format
+                            const prodiMap = {
+                                "MI": "Manajemen Informatika (MI)",
+                                "MK": "Mekatronika (MK)",
+                                "TAB": "Teknik Alat Berat (TAB)",
+                                "TO": "Teknik Otomotif (TO)",
+                                "MO": "Teknik Otomotif (TO)",
+                                "TPHP": "Teknik Pengolahan Hasil Perkebunan (TPHP)",
+                                "TPM": "Teknik Produksi dan Proses Manufaktur (TPM)",
+                                "TPPM": "Teknik Produksi dan Proses Manufaktur (TPM)",
+                                "TKBG": "Teknologi Konstruksi Bangunan Gedung (TKBG)",
+                                "TRL": "Teknologi Rekayasa Logistik (TRL)",
+                                "TRPAB": "Teknologi Rekayasa Pemeliharaan Alat Berat (TRPAB)",
+                                "TRPL": "Teknologi Rekayasa Perangkat Lunak (TRPL)"
+                            };
+                            
+                            return prodiMap[cleanValue] || cleanValue;
+                        };
+
+                        // Extract just the program name (without abbreviation) for filtering
+                        const extractProgramName = (fullProdiDisplay) => {
+                            if (!fullProdiDisplay || fullProdiDisplay === "-") return "";
+                            
+                            // Remove the abbreviation part like "(MI)", "(TPM)", etc.
+                            const match = fullProdiDisplay.match(/^(.+?)\s*\([A-Z]+\)$/);
+                            if (match) {
+                                return match[1].trim();
+                            }
+                            
+                            return fullProdiDisplay;
+                        };
+
+                        const itemProdiFormatted = formatProdiDisplay(item.prodi || item.konsentrasi || "");
+                        const itemProdiName = extractProgramName(itemProdiFormatted);
+                        
+                        // Compare with the selected filter value (which is just the program name)
+                        const isMatch = itemProdiName === prodi;
+                        
+                        if (isMatch) {
+                            console.log("Prodi match found:", {
+                                noPengajuan: item.noPengajuan || item.id,
+                                nama: item.namaMahasiswa || item.mhs_nama,
+                                originalProdi: item.prodi || item.konsentrasi,
+                                formattedProdi: itemProdiFormatted,
+                                extractedName: itemProdiName,
+                                filterValue: prodi
+                            });
+                        }
+                        
+                        return isMatch;
+                    });
+                    
+                    console.log(`Prodi filter results: ${filteredData.length} items found`);
+                }
+
                 // Apply pagination to filtered data
-                const totalCompletedItems = completedData.length;
+                const totalFilteredItems = filteredData.length;
                 const startIndex = (page - 1) * riwayatPageSize;
                 const endIndex = startIndex + riwayatPageSize;
-                const paginatedData = completedData.slice(startIndex, endIndex);
+                const paginatedData = filteredData.slice(startIndex, endIndex);
 
                 const formattedData = paginatedData.map((item, index) => ({
                     No: startIndex + index + 1,
-                    id: item.mdu_id || item.id,
+                    id: item.id || item.mdu_id,
                     "No Pengajuan": item.noPengajuan || item.id || item.mdu_id || "-",
                     "Tanggal Pengajuan": item.tanggalPengajuan || item.tanggal || item.mdu_created_date || "-",
+                    "Nomor SK": item.nomorSK || item.srt_no || item.mdu_srt_no || "-",
+                    "NIM": item.nim || item.mhs_nim || item.mahasiswaNim || "-",
                     "Nama Mahasiswa": item.namaMahasiswa || item.mhs_nama || "-",
                     Prodi: item.prodi || item.konsentrasi || "-",
-                    "Nomor SK": item.nomorSK || item.srt_no || item.mdu_srt_no || "-",
-                    Status: item.status || item.mdu_status || "-",
+                    Status: item.status || item.mdu_status || "Disetujui",
                     Aksi: ["Detail"],
-                    Alignment: Array(8).fill("center"),
+                    Alignment: Array(9).fill("center"),
                 }));
 
                 console.log("Final riwayat data:", formattedData);
-                console.log(`Showing ${formattedData.length} items of ${totalCompletedItems} total (page ${page})`);
+                console.log(`Showing ${formattedData.length} items of ${totalFilteredItems} total (page ${page})`);
 
                 setDataRiwayat(formattedData);
-                setRiwayatTotal(totalCompletedItems);
+                setRiwayatTotal(totalFilteredItems);
                 setRiwayatPage(page);
 
             } catch (err) {
@@ -741,7 +828,9 @@ export default function Page_MeninggalDunia() {
             console.log("SK File:", selectedSKFile.name);
             console.log("SPKB File:", selectedSPKBFile?.name || "None");
 
-            const response = await fetch(`${API_LINK}MeninggalDunia/${selectedMeninggalId}/upload-sk`, {
+            // Encode the ID for the API call to handle special characters
+            const encodedId = encodeURIComponent(selectedMeninggalId);
+            const response = await fetch(`${API_LINK}MeninggalDunia/${encodedId}/upload-sk`, {
                 method: 'POST',
                 body: formData
             });
@@ -788,9 +877,44 @@ export default function Page_MeninggalDunia() {
         setSelectedMeninggalId(null);
     };
 
-    const handleDownloadSK = (id) => {
-        // Download SK file using the file endpoint
-        window.open(`${API_LINK}MeninggalDunia/report/${id}`, "_blank");
+    const handleDownloadSK = async (id) => {
+        try {
+            console.log("=== DOWNLOAD SK FROM MAIN PAGE ===");
+            console.log("Record ID:", id);
+            
+            // First, get the detail to obtain the SK filename
+            const encodedId = encodeURIComponent(id);
+            const detailResponse = await fetch(`${API_LINK}MeninggalDunia/${encodedId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!detailResponse.ok) {
+                throw new Error(`HTTP ${detailResponse.status}: ${detailResponse.statusText}`);
+            }
+
+            const detailData = await detailResponse.json();
+            console.log("Detail data for SK download:", detailData);
+
+            if (!detailData.sk) {
+                Toast.error("File SK tidak tersedia untuk didownload.");
+                return;
+            }
+
+            // Now download the SK file using the filename
+            const filename = detailData.sk;
+            const downloadUrl = `${API_LINK}MeninggalDunia/file/${filename}`;
+            console.log("Download SK URL:", downloadUrl);
+            console.log("Original SK filename:", filename);
+            window.open(downloadUrl, "_blank");
+
+        } catch (error) {
+            console.error("Error downloading SK:", error);
+            Toast.error(`Gagal download SK: ${error.message}`);
+        }
     };
 
     const handleAjukan = async (id) => {
@@ -810,7 +934,9 @@ export default function Page_MeninggalDunia() {
             console.log("=== AJUKAN MENINGGAL DUNIA ===");
             console.log("Draft ID:", id);
 
-            const url = `${API_LINK}MeninggalDunia/finalize/${id}`;
+            // Encode the ID for the API call to handle special characters
+            const encodedId = encodeURIComponent(id);
+            const url = `${API_LINK}MeninggalDunia/finalize/${encodedId}`;
             console.log("Finalize URL:", url);
 
             const res = await fetch(url, {
@@ -887,14 +1013,19 @@ export default function Page_MeninggalDunia() {
         router.push("/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/add");
     };
 
-    const handleDetail = (id) =>
+    const handleDetail = (id) => {
+        // Double encode the ID to handle special characters like forward slashes
+        const encodedId = encodeURIComponent(encryptIdUrl(id));
         router.push(
-            `/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/detail/${encryptIdUrl(id)}`
+            `/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/detail/${encodedId}`
         );
+    };
 
     const handleEdit = (id) => {
+        // Double encode the ID to handle special characters like forward slashes
+        const encodedId = encodeURIComponent(encryptIdUrl(id));
         router.push(
-            `/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/edit/${encryptIdUrl(id)}`
+            `/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/edit/${encodedId}`
         );
     };
 
@@ -912,7 +1043,9 @@ export default function Page_MeninggalDunia() {
         setLoadingPengajuan(true);
 
         try {
-            const url = `${API_LINK}MeninggalDunia/${id}`;
+            // Encode the ID for the API call to handle special characters
+            const encodedId = encodeURIComponent(id);
+            const url = `${API_LINK}MeninggalDunia/${encodedId}`;
             const res = await fetch(url, { method: "DELETE" });
             
             if (!res.ok) {
@@ -958,20 +1091,23 @@ export default function Page_MeninggalDunia() {
             
             let url, payload;
             
+            // Encode the ID for the API call to handle special characters
+            const encodedItemId = encodeURIComponent(itemId);
+            
             if (isProdi) {
-                url = `${API_LINK}MeninggalDunia/approve/${itemId}`;
+                url = `${API_LINK}MeninggalDunia/approve/${encodedItemId}`;
                 payload = {
                     approvedBy: approvedBy,
                     role: "prodi"
                 };
             } else if (isWadir1) {
-                url = `${API_LINK}MeninggalDunia/approve/${itemId}`;
+                url = `${API_LINK}MeninggalDunia/approve/${encodedItemId}`;
                 payload = {
                     approvedBy: approvedBy,
                     role: "wadir1"
                 };
             } else if (isFinance) {
-                url = `${API_LINK}MeninggalDunia/approve/${itemId}`;
+                url = `${API_LINK}MeninggalDunia/approve/${encodedItemId}`;
                 payload = {
                     approvedBy: approvedBy,
                     role: "finance"
@@ -1074,7 +1210,9 @@ export default function Page_MeninggalDunia() {
 
             console.log("Reject payload:", payload);
 
-            const url = `${API_LINK}MeninggalDunia/reject/${itemId}`;
+            // Encode the ID for the API call to handle special characters
+            const encodedItemId = encodeURIComponent(itemId);
+            const url = `${API_LINK}MeninggalDunia/reject/${encodedItemId}`;
             console.log("API URL:", url);
 
             const res = await fetch(url, {
@@ -1154,10 +1292,10 @@ export default function Page_MeninggalDunia() {
             <DropDown
                 ref={sortRef}
                 arrData={[
-                    { Value: "mdu_created_date asc", Text: "Tanggal Pengajuan [↑]" },
-                    { Value: "mdu_created_date desc", Text: "Tanggal Pengajuan [↓]" },
-                    { Value: "mdu_id asc", Text: "Nomor Pengajuan [↑]" },
-                    { Value: "mdu_id desc", Text: "Nomor Pengajuan [↓]" },
+                    { Value: "tanggal asc", Text: "Tanggal Pengajuan [↑]" },
+                    { Value: "tanggal desc", Text: "Tanggal Pengajuan [↓]" },
+                    { Value: "nomor asc", Text: "Nomor Pengajuan [↑]" },
+                    { Value: "nomor desc", Text: "Nomor Pengajuan [↓]" },
                 ]}
                 type="pilih"
                 label="Urut Berdasarkan"
@@ -1208,67 +1346,70 @@ export default function Page_MeninggalDunia() {
             ]}
         >
             {/* ======================== TABEL PENGAJUAN =========================== */}
-            <div className="mb-4">
-                <h5>Daftar Pengajuan Meninggal Dunia</h5>
-                
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                    <div></div>
-                    {(isMahasiswa || isProdi) && (
-                        <Button
-                            classType="primary"
-                            label={isProdi ? "Ajukan Meninggal Dunia untuk Mahasiswa" : "Ajukan Meninggal Dunia"}
-                            onClick={handleAdd}
-                        />
-                    )}
-                </div>
-
-                {loadingPengajuan ? (
-                    <div className="text-center py-4">
-                        <div className="spinner-border" role="status">
-                            <span className="visually-hidden">Loading...</span>
-                        </div>
-                        <p className="mt-2">Memuat data pengajuan...</p>
-                    </div>
-                ) : dataPengajuan.length > 0 ? (
-                    <>
-                        <Table
-                            data={dataPengajuan}
-                            onDetail={handleDetail}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                            onAjukan={handleAjukan}
-                            onApprove={handleApprove}
-                            onReject={handleReject}
-                            onUploadSK={handleUploadSK}
-                            onDownloadSK={handleDownloadSK}
-                        />
-
-                        {pengajuanTotalData > 0 && (
-                            <Paging
-                                pageSize={pengajuanPageSize}
-                                pageCurrent={pengajuanPage}
-                                totalData={pengajuanTotalData}
-                                navigation={loadPengajuan}
+            {/* Finance role should NOT see Pengajuan table - only Riwayat */}
+            {!isFinance && (
+                <div className="mb-4">
+                    <h5>Daftar Pengajuan Meninggal Dunia</h5>
+                    
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                        <div></div>
+                        {(isMahasiswa || isProdi) && (
+                            <Button
+                                classType="primary"
+                                label={isProdi ? "Ajukan Meninggal Dunia untuk Mahasiswa" : "Ajukan Meninggal Dunia"}
+                                onClick={handleAdd}
                             />
                         )}
-                    </>
-                ) : (
-                    <div className="text-center py-5">
-                        <div className="mb-3">
-                            <i className="fas fa-inbox fa-3x text-muted"></i>
-                        </div>
-                        <h5 className="text-muted">Tidak ada data pengajuan</h5>
-                        <p className="text-muted">
-                            {isMahasiswa 
-                                ? "Anda belum memiliki pengajuan meninggal dunia. Klik tombol 'Ajukan Meninggal Dunia' untuk membuat pengajuan baru."
-                                : isProdi
-                                ? "Tidak ada pengajuan meninggal dunia. Anda dapat membuat pengajuan untuk mahasiswa dengan klik tombol 'Ajukan Meninggal Dunia untuk Mahasiswa'."
-                                : "Tidak ada pengajuan meninggal dunia yang perlu ditinjau saat ini."
-                            }
-                        </p>
                     </div>
-                )}
-            </div>
+
+                    {loadingPengajuan ? (
+                        <div className="text-center py-4">
+                            <div className="spinner-border" role="status">
+                                <span className="visually-hidden">Loading...</span>
+                            </div>
+                            <p className="mt-2">Memuat data pengajuan...</p>
+                        </div>
+                    ) : dataPengajuan.length > 0 ? (
+                        <>
+                            <Table
+                                data={dataPengajuan}
+                                onDetail={handleDetail}
+                                onEdit={handleEdit}
+                                onDelete={handleDelete}
+                                onAjukan={handleAjukan}
+                                onApprove={handleApprove}
+                                onReject={handleReject}
+                                onUploadSK={handleUploadSK}
+                                onDownloadSK={handleDownloadSK}
+                            />
+
+                            {pengajuanTotalData > 0 && (
+                                <Paging
+                                    pageSize={pengajuanPageSize}
+                                    pageCurrent={pengajuanPage}
+                                    totalData={pengajuanTotalData}
+                                    navigation={loadPengajuan}
+                                />
+                            )}
+                        </>
+                    ) : (
+                        <div className="text-center py-5">
+                            <div className="mb-3">
+                                <i className="fas fa-inbox fa-3x text-muted"></i>
+                            </div>
+                            <h5 className="text-muted">Tidak ada data pengajuan</h5>
+                            <p className="text-muted">
+                                {isMahasiswa 
+                                    ? "Anda belum memiliki pengajuan meninggal dunia. Klik tombol 'Ajukan Meninggal Dunia' untuk membuat pengajuan baru."
+                                    : isProdi
+                                    ? "Tidak ada pengajuan meninggal dunia. Anda dapat membuat pengajuan untuk mahasiswa dengan klik tombol 'Ajukan Meninggal Dunia untuk Mahasiswa'."
+                                    : "Tidak ada pengajuan meninggal dunia yang perlu ditinjau saat ini."
+                                }
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* ======================== TABEL RIWAYAT =========================== */}
             {(isProdi || isWadir1 || isFinance || isDAAK || isAdmin) && (
