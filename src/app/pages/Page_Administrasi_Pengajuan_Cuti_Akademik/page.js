@@ -1608,7 +1608,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         <h5>Daftar Pengajuan Cuti Akademik</h5>
         
         <div className="d-flex justify-content-between align-items-center mb-3">
-          <div></div>
           {(isMahasiswa || isProdi) && (
             <Button
               classType="primary"
@@ -1616,6 +1615,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               onClick={handleAdd}
             />
           )}
+          <div></div>
         </div>
 
         {loading ? (
