@@ -594,7 +594,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           const rowData = {
             No: startIndex + index + 1, 
             id: item.cak_id || item.id || item.idDisplay, 
-            "No Pengajuan": item.id || item.idDisplay || item.cak_id || "-", 
+            "No Pengajuan": isMahasiswa ? "Draft" : (item.id || item.idDisplay || item.cak_id || "-"), 
             "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
             "No SK": noSK || "-", 
             "Nama Mahasiswa": namaMahasiswa,
