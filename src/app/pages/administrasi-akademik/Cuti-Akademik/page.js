@@ -389,7 +389,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           let actions = ["Detail"];
           
           const currentStatus = item.status || item.cak_status || "";
-          const hasUploadedSK = item.srt_no || item.suratNo || item.cak_srt_no;
+          // Backend generates SK numbers dynamically for "Disetujui" status and puts them in SuratNo field
+          const hasUploadedSK = item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no;
           
           if (isMahasiswa) {
             // Check if this application was created by prodi using multiple detection methods
@@ -551,13 +552,16 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           }
 
           
+          // Backend now generates SK numbers dynamically for "Disetujui" status
+          // The generated SK number is in the SuratNo field from backend DTO
           const noSK = item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no || "";
           
           // Debug SK number reading
           if (index === 0) {
             console.log("=== SK DEBUG ===");
+            console.log("item.SuratNo (backend generated):", item.SuratNo);
+            console.log("item.suratNo (database field):", item.suratNo);
             console.log("item.srt_no:", item.srt_no);
-            console.log("item.suratNo:", item.suratNo);
             console.log("item.cak_srt_no:", item.cak_srt_no);
             console.log("Final noSK:", noSK);
           }
@@ -763,6 +767,23 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             console.log("=== RIWAYAT ITEM STRUCTURE DEBUG ===");
             console.log("Available fields:", Object.keys(item));
             console.log("Sample item:", item);
+            console.log("=== RIWAYAT SK FIELD DEBUG ===");
+            console.log("item.SuratNo (backend generated):", item.SuratNo);
+            console.log("item.suratNo (database field):", item.suratNo);
+            console.log("item.srt_no:", item.srt_no);
+            console.log("item.cak_srt_no:", item.cak_srt_no);
+            console.log("item.noSK:", item.noSK);
+            console.log("=== ALL ITEM FIELDS FOR SK DEBUGGING ===");
+            // Log all fields that might contain SK information
+            Object.keys(item).forEach(key => {
+              if (key.toLowerCase().includes('sk') || key.toLowerCase().includes('surat') || key.toLowerCase().includes('no')) {
+                console.log(`${key}:`, item[key]);
+              }
+            });
+            console.log("=== SK GENERATION DEBUG ===");
+            console.log("Item status:", item.status);
+            console.log("Item tanggal:", item.tanggal);
+            console.log("Item id:", item.id || item.cak_id);
           }
 
           // Use backend DTO field names (NamaMahasiswa and Prodi from your DTO)
@@ -836,12 +857,56 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           if (!namaMahasiswa || namaMahasiswa === "") namaMahasiswa = "-";
           if (!prodi || prodi === "") prodi = "-";
 
+          // Generate SK number for "Disetujui" status if not provided by backend
+          let nomorSK = item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no || "";
+          
+          // If no SK number and status is "Disetujui", generate it dynamically (frontend fallback)
+          if (!nomorSK && item.status === "Disetujui") {
+            try {
+              // Extract date from tanggal field (format: "05 Jan 2026")
+              const tanggalStr = item.tanggal || item.cak_created_date || "";
+              if (tanggalStr) {
+                // Parse date to get month and year
+                const dateMatch = tanggalStr.match(/(\d{2})\s+(\w+)\s+(\d{4})/);
+                if (dateMatch) {
+                  const [, day, monthName, year] = dateMatch;
+                  
+                  // Convert month name to number
+                  const monthMap = {
+                    'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+                    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+                  };
+                  const month = monthMap[monthName];
+                  
+                  if (month) {
+                    // Convert month to Roman numerals
+                    const romanMonths = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+                    const romanMonth = romanMonths[month];
+                    
+                    // Extract sequence from ID (e.g., "031/PMA/CA/I/2026" -> "031")
+                    const idStr = item.id || item.cak_id || "";
+                    const sequenceMatch = idStr.match(/^(\d{3})/);
+                    const sequence = sequenceMatch ? sequenceMatch[1] : "001";
+                    
+                    // Generate SK number: "031/PA-WADIR-I/SKC/I/2026"
+                    nomorSK = `${sequence}/PA-WADIR-I/SKC/${romanMonth}/${year}`;
+                    
+                    console.log(`Generated SK for ${idStr}: ${nomorSK}`);
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn("Error generating SK number:", error);
+            }
+          }
+
           return {
             No: index + 1, // Temporary number, will be updated after pagination
             id: item.cak_id || item.id,
             "No Cuti Akademik": item.id || item.cak_id || "-",
             "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
-            "Nomor SK": item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no || "-",
+            // Use generated SK number (includes backend SuratNo or frontend-generated fallback)
+            "Nomor SK": nomorSK || "-",
             NIM: item.mhsId || item.mhs_id || item.cak_mhs_id || "-",
             "Nama Mahasiswa": namaMahasiswa,
             Prodi: prodi,
