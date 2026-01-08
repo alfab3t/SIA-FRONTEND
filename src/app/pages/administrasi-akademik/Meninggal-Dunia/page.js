@@ -1010,14 +1010,14 @@ export default function Page_MeninggalDunia() {
     );
 
     const handleAdd = () => {
-        router.push("/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/add");
+        router.push("/pages/administrasi-akademik/Meninggal-Dunia/add");
     };
 
     const handleDetail = (id) => {
         // Double encode the ID to handle special characters like forward slashes
         const encodedId = encodeURIComponent(encryptIdUrl(id));
         router.push(
-            `/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/detail/${encodedId}`
+            `/pages/administrasi-akademik/Meninggal-Dunia/detail/${encodedId}`
         );
     };
 
@@ -1025,7 +1025,7 @@ export default function Page_MeninggalDunia() {
         // Double encode the ID to handle special characters like forward slashes
         const encodedId = encodeURIComponent(encryptIdUrl(id));
         router.push(
-            `/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia/edit/${encodedId}`
+            `/pages/administrasi-akademik/Meninggal-Dunia/edit/${encodedId}`
         );
     };
 

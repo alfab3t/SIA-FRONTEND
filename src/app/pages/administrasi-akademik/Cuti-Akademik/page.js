@@ -1185,19 +1185,19 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   );
 
   const handleAdd = () => {
-    router.push("/pages/Page_Administrasi_Pengajuan_Cuti_Akademik/add");
+    router.push("/pages/administrasi-akademik/Cuti-Akademik/add");
   };
 
   const handleDetail = (id) =>
     router.push(
-      `/pages/Page_Administrasi_Pengajuan_Cuti_Akademik/detail/${encryptIdUrl(
+      `/pages/administrasi-akademik/Cuti-Akademik/detail/${encryptIdUrl(
         id
       )}`
     );
 
   const handleEdit = (id) => {
     router.push(
-      `/pages/Page_Administrasi_Pengajuan_Cuti_Akademik/edit/${encryptIdUrl(id)}`
+      `/pages/administrasi-akademik/Cuti-Akademik/edit/${encryptIdUrl(id)}`
     );
   };
 
