@@ -645,7 +645,7 @@ export default function EditCutiAkademikPage() {
 
           <div className="col-lg-6">
             <label className="form-label">
-              {isProdi ? "Berkas Lampiran (Opsional)" : "Lampiran (Opsional)"}
+              {isProdi ? "Berkas Lampiran" : "Lampiran"}
             </label>
             <input
               type="file"
