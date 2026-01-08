@@ -837,24 +837,28 @@ export default function Page_MeninggalDunia() {
             return;
         }
 
+        if (!selectedSPKBFile) {
+            Toast.error("Pilih file SPKB terlebih dahulu.");
+            return;
+        }
+
         setUploadLoading(true);
 
         try {
             const formData = new FormData();
-            formData.append('SkFile', selectedSKFile);
-            if (selectedSPKBFile) {
-                formData.append('SpkbFile', selectedSPKBFile);
-            }
+            formData.append('MduId', selectedMeninggalId);
+            formData.append('SK', selectedSKFile);
+            formData.append('SKPB', selectedSPKBFile);
+            formData.append('ModifiedBy', userData?.nama || userData?.username || 'user_admin');
 
             console.log("=== SK UPLOAD MENINGGAL DUNIA ===");
-            console.log("ID:", selectedMeninggalId);
+            console.log("MduId:", selectedMeninggalId);
             console.log("SK File:", selectedSKFile.name);
-            console.log("SPKB File:", selectedSPKBFile?.name || "None");
+            console.log("SPKB File:", selectedSPKBFile.name);
+            console.log("ModifiedBy:", userData?.nama || userData?.username || 'user_admin');
 
-            // Encode the ID for the API call to handle special characters
-            const encodedId = encodeURIComponent(selectedMeninggalId);
-            const response = await fetch(`${API_LINK}MeninggalDunia/${encodedId}/upload-sk`, {
-                method: 'POST',
+            const response = await fetch(`${API_LINK}MeninggalDunia/upload-sk`, {
+                method: 'PUT',
                 body: formData
             });
 
@@ -869,7 +873,7 @@ export default function Page_MeninggalDunia() {
             const result = await response.json();
             console.log("Upload result:", result);
 
-            Toast.success("SK berhasil diupload!");
+            Toast.success(result.message || "SK berhasil diupload!");
             setShowUploadModal(false);
             setSelectedSKFile(null);
             setSelectedSPKBFile(null);
@@ -878,9 +882,9 @@ export default function Page_MeninggalDunia() {
             setSelectedMeninggalId(null);
             
             // Reload data to reflect changes
-            loadPengajuan(pengajuanPage);
+            await loadPengajuan(pengajuanPage);
             if (isProdi || isWadir1 || isFinance || isDAAK || isAdmin) {
-                loadRiwayat(riwayatPage);
+                await loadRiwayat(riwayatPage);
             }
 
         } catch (error) {
@@ -1517,7 +1521,7 @@ export default function Page_MeninggalDunia() {
                             </div>
                             <div className="modal-body">
                                 <div className="mb-3">
-                                    <label className="form-label">Pilih File SK *</label>
+                                    <label className="form-label">Berkas Surat keterangan Meninggal Dunia *</label>
                                     <input
                                         type="file"
                                         className="form-control"
@@ -1531,7 +1535,7 @@ export default function Page_MeninggalDunia() {
                                 </div>
 
                                 <div className="mb-3">
-                                    <label className="form-label">Pilih File SPKB (Opsional)</label>
+                                    <label className="form-label">Berkas Surat Keterangan Pernah Berkuliah *</label>
                                     <input
                                         type="file"
                                         className="form-control"
@@ -1609,7 +1613,7 @@ export default function Page_MeninggalDunia() {
                                             Mengupload...
                                         </>
                                     ) : (
-                                        'Upload SK'
+                                        'Simpan'
                                     )}
                                 </button>
                             </div>
