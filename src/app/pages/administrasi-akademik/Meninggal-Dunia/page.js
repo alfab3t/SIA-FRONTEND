@@ -1548,22 +1548,6 @@ export default function Page_MeninggalDunia() {
                                     </div>
                                 </div>
 
-                                {selectedSKFile && (
-                                    <div className="mb-3">
-                                        <div className="alert alert-info">
-                                            <strong>File SK dipilih:</strong> {selectedSKFile.name} ({(selectedSKFile.size / 1024 / 1024).toFixed(2)} MB)
-                                        </div>
-                                    </div>
-                                )}
-
-                                {selectedSPKBFile && (
-                                    <div className="mb-3">
-                                        <div className="alert alert-info">
-                                            <strong>File SPKB dipilih:</strong> {selectedSPKBFile.name} ({(selectedSPKBFile.size / 1024 / 1024).toFixed(2)} MB)
-                                        </div>
-                                    </div>
-                                )}
-
                                 {skFilePreview && (
                                     <div className="mb-3">
                                         <label className="form-label">Preview SK:</label>
