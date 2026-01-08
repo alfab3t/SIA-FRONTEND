@@ -445,7 +445,20 @@ export default function Page_MeninggalDunia() {
                         }
                     };
 
-                    return {
+                    // Determine SK Meninggal Dunia column content for Admin role
+                    let skMeninggalDuniaColumn = "-";
+                    if (isAdmin || isDAAK) {
+                        // Jika ada No SK, tampilkan button download
+                        if (hasUploadedSK) {
+                            skMeninggalDuniaColumn = "DownloadSK";
+                        } else {
+                            // Jika tidak ada No SK, tampilkan "-"
+                            skMeninggalDuniaColumn = "-";
+                        }
+                    }
+
+                    // Build table data with correct column order
+                    const tableData = {
                         No: startIndex + index + 1,
                         id: item.id || item.mdu_id || item.idDisplay,
                         "No Pengajuan": item.noPengajuan || item.id || item.idDisplay || item.mdu_id || "-",
@@ -453,9 +466,19 @@ export default function Page_MeninggalDunia() {
                         "No SK": item.nomorSK || item.srt_no || item.suratNo || item.mdu_srt_no || "-",
                         "Disetujui Wadir 1": getWadir1Icon(currentStatus),
                         Status: currentStatus || "-",
-                        Aksi: actions,
-                        Alignment: Array(8).fill("center"), // Updated to 8 columns
                     };
+
+                    // Add SK Meninggal Dunia column BEFORE Aksi for Admin role
+                    if (isAdmin || isDAAK) {
+                        tableData["SK Meninggal Dunia"] = skMeninggalDuniaColumn;
+                        tableData.Aksi = actions;
+                        tableData.Alignment = Array(9).fill("center"); // Updated to 9 columns for admin
+                    } else {
+                        tableData.Aksi = actions;
+                        tableData.Alignment = Array(8).fill("center"); // Updated to 8 columns for non-admin
+                    }
+
+                    return tableData;
                 });
 
                 console.log("Formatted data:", formattedData);

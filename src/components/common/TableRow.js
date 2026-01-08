@@ -21,6 +21,7 @@ export default function TableRow({
   onFinal,
   onPrint,
   onDownloadSK,
+  onUploadSK,
   onAjukan,   // <=== TAMBAHAN
 }) {
   const renderAction = useCallback(
@@ -134,6 +135,17 @@ export default function TableRow({
               />
             );
 
+          case "UploadSK":
+            return (
+              <Icon
+                key={`${id}-${action}`}
+                name="cloud-upload"
+                title="Upload SK"
+                cssClass="text-primary btn px-1 py-0"
+                onClick={() => onUploadSK(id)}
+              />
+            );
+
           case "DownloadSK":
             return (
               <Icon
@@ -229,6 +241,7 @@ export default function TableRow({
       onFinal,
       onPrint,
       onDownloadSK,
+      onUploadSK,
       onReject,
       onSent,
       onToggle,
@@ -246,6 +259,28 @@ export default function TableRow({
           cell = <Badge status={row[col]} />;
         } else if (col === "Aksi") {
           cell = renderAction(row[col], row.id, row.Status);
+        } else if (col === "SK Meninggal Dunia") {
+          // Handle SK Meninggal Dunia column specially (only exists for Admin role)
+          if (row[col] === "DownloadSK") {
+            // Show download button for Admin role
+            cell = (
+              <Icon
+                name="download"
+                title="Download SK"
+                cssClass="text-success btn px-1 py-0"
+                onClick={() => onDownloadSK(row.id)}
+              />
+            );
+          } else {
+            // Show dash or other content
+            cell = (
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(row[col] || "-"),
+                }}
+              ></div>
+            );
+          }
         } else if (col === "SK Cuti Akademik") {
           // Handle SK Cuti Akademik column specially (only exists for Admin role)
           if (row[col] === "DownloadSK") {
@@ -307,5 +342,6 @@ TableRow.propTypes = {
   onFinal: PropTypes.func,
   onPrint: PropTypes.func,
   onDownloadSK: PropTypes.func,
+  onUploadSK: PropTypes.func,
   onAjukan: PropTypes.func, // <=== TAMBAHAN
 };
