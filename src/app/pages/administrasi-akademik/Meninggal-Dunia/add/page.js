@@ -376,7 +376,7 @@ export default function AddMeninggalDunia() {
         } else {
           Toast.success("Pengajuan Meninggal Dunia berhasil dibuat.");
         }
-        router.push("/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia");
+        router.push("/pages/administrasi-akademik/Meninggal-Dunia");
       } else {
         Toast.error(result?.message || "Gagal membuat pengajuan.");
       }

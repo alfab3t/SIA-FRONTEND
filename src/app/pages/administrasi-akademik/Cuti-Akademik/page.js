@@ -1507,7 +1507,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
   const handleUpload = (id) => {
     router.push(
-      `/pages/Page_Administrasi_Pengajuan_Cuti_Akademik/upload/${encryptIdUrl(
+      `/pages/administrasi-akademik/Cuti-Akademik/upload/${encryptIdUrl(
         id
       )}`
     );

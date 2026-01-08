@@ -389,7 +389,7 @@ export default function AddCutiAkademik() {
         } else {
           Toast.success("Pengajuan Cuti berhasil dibuat.");
         }
-        router.push("/pages/Page_Administrasi_Pengajuan_Cuti_Akademik");
+        router.push("/pages/administrasi-akademik/Cuti-Akademik");
       } else {
         Toast.error(result?.message || "Gagal membuat pengajuan.");
       }

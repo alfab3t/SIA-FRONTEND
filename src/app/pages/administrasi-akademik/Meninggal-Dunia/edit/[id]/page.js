@@ -111,7 +111,7 @@ export default function EditMeninggalDunia() {
       } catch (error) {
         console.error("Error loading existing data:", error);
         Toast.error(`Gagal memuat data: ${error.message}`);
-        router.push("/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia");
+        router.push("/pages/administrasi-akademik/Meninggal-Dunia");
       } finally {
         setLoading(false);
       }
@@ -237,7 +237,7 @@ export default function EditMeninggalDunia() {
       } catch {
         if (res.ok) {
           Toast.success("Data berhasil diperbarui.");
-          router.push("/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia");
+          router.push("/pages/administrasi-akademik/Meninggal-Dunia");
           return;
         } else {
           Toast.error("Server mengirim response tidak valid:\n\n" + raw);
@@ -247,7 +247,7 @@ export default function EditMeninggalDunia() {
 
       if (res.ok) {
         Toast.success(result?.message || "Data berhasil diperbarui.");
-        router.push("/pages/Page_Administrasi_Pengajuan_Meninggal_Dunia");
+        router.push("/pages/administrasi-akademik/Meninggal-Dunia");
       } else {
         Toast.error(result?.message || "Gagal memperbarui data.");
       }
