@@ -1783,7 +1783,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           {(isMahasiswa || isProdi) && (
             <Button
               classType="primary"
-              label={isProdi ? "Ajukan Cuti untuk Mahasiswa" : "Ajukan Cuti Akademik"}
+              label={isProdi ? "+ Tambah" : "+ Tambah"}
               onClick={handleAdd}
             />
           )}

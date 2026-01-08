@@ -458,11 +458,7 @@ export default function AddCutiAkademik() {
                 isDisabled={!formData.konId || loadingStudents}
                 errorMessage={errors.mhsId}
               />
-              {loadingStudents && (
-                <small className="text-muted">Memuat daftar mahasiswa...</small>
-              )}
             </div>
-
             <div className="col-lg-4">
               <label className="form-label">Angkatan</label>
               <input
@@ -470,7 +466,7 @@ export default function AddCutiAkademik() {
                 className="form-control rounded-4 blue-element"
                 value={formData.angkatan}
                 disabled
-                placeholder="Otomatis terisi dari NIM"
+                placeholder=""
               />
             </div>
           </div>
@@ -482,7 +478,7 @@ export default function AddCutiAkademik() {
               <DropDown
                 ref={tahunAjaranRef}
                 forInput="tahunAjaran"
-                label="Tahun Akademik Mulai Cuti"
+                label="Tahun Akademik"
                 type="pilih"
                 arrData={tahunAjaranData}
                 value={formData.tahunAjaran}
@@ -515,7 +511,7 @@ export default function AddCutiAkademik() {
               <DropDown
                 ref={semesterRef}
                 forInput="semester"
-                label="Semester Mulai Cuti"
+                label="Semester"
                 type="pilih"
                 arrData={semesterData}
                 value={formData.semester}
@@ -564,7 +560,7 @@ export default function AddCutiAkademik() {
 
           <div className="col-lg-6">
             <label className="form-label">
-              {isProdi ? "Berkas Lampiran (Opsional)" : "Lampiran (Opsional)"}
+              {isProdi ? "Berkas Lampiran" : "Lampiran"}
             </label>
             <input
               type="file"

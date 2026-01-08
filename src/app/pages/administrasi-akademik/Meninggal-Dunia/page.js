@@ -1379,14 +1379,14 @@ export default function Page_MeninggalDunia() {
                     <h5>Daftar Pengajuan Meninggal Dunia</h5>
                     
                     <div className="d-flex justify-content-between align-items-center mb-3">
-                        <div></div>
                         {(isMahasiswa || isProdi) && (
                             <Button
                                 classType="primary"
-                                label={isProdi ? "Ajukan Meninggal Dunia untuk Mahasiswa" : "Ajukan Meninggal Dunia"}
+                                label={isProdi ? "+ Tambah" : "Ajukan Meninggal Dunia"}
                                 onClick={handleAdd}
                             />
                         )}
+                        <div></div>
                     </div>
 
                     {loadingPengajuan ? (

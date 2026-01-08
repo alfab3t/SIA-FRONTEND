@@ -456,12 +456,12 @@ export default function AddMeninggalDunia() {
               className="form-control"
               value={formData.prodi}
               disabled
-              placeholder="Otomatis terisi dari data mahasiswa"
+              placeholder=""
             />
             {errors.prodi && (
               <span className="fw-normal text-danger">{errors.prodi}</span>
             )}
-            <small className="text-muted">Program studi akan otomatis terisi setelah memilih mahasiswa.</small>
+            
           </div>
 
           <div className="col-lg-6">
@@ -472,12 +472,12 @@ export default function AddMeninggalDunia() {
               className="form-control"
               value={formData.tahunAngkatan}
               disabled
-              placeholder="Otomatis terisi dari data mahasiswa"
+              placeholder=""
             />
             {errors.tahunAngkatan && (
               <span className="fw-normal text-danger">{errors.tahunAngkatan}</span>
             )}
-            <small className="text-muted">Tahun angkatan akan otomatis terisi setelah memilih mahasiswa.</small>
+            
           </div>
         </div>
 
