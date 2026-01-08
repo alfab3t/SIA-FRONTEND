@@ -437,6 +437,7 @@ export default function AddMeninggalDunia() {
               isRequired={true}
               isDisabled={loadingStudents || (isMahasiswa && formData.mhsId)}
               errorMessage={errors.mhsId}
+              searchable={isProdi}
             />
             {loadingStudents && (
               <small className="text-muted">Memuat daftar mahasiswa...</small>
