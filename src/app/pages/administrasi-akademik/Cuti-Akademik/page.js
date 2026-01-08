@@ -465,11 +465,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             if (isReadyForSK) {
               // All approvals complete - admin can manage SK
               if (hasUploadedSK) {
-                // SK already uploaded, admin can only view (DownloadSK moved to SK column)
-                actions = ["Detail"];
+                // SK already uploaded, admin can download SK
+                actions = ["Detail", "DownloadSK"];
               } else {
                 // No SK yet, show upload option
-                actions = ["Detail", "Upload"];
+                actions = ["Detail", "UploadSK"];
               }
             } else {
               // Approvals still pending - admin can only view
@@ -1578,6 +1578,113 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     );
   };
 
+  // State for SK upload modal
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedCutiId, setSelectedCutiId] = useState(null);
+  const [selectedSKFile, setSelectedSKFile] = useState(null);
+  const [skFilePreview, setSKFilePreview] = useState(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+
+  // SK Upload handlers
+  const handleUploadSK = (id) => {
+    console.log("Opening upload modal for ID:", id);
+    setSelectedCutiId(id);
+    setShowUploadModal(true);
+    setSelectedSKFile(null);
+    setSKFilePreview(null);
+  };
+
+  const handleSKFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      Toast.error("Format file tidak didukung. Gunakan PDF, DOC, DOCX, JPG, JPEG, atau PNG.");
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      Toast.error("Ukuran file maksimal 10MB.");
+      return;
+    }
+
+    setSelectedSKFile(file);
+    
+    // Create preview for images
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => setSKFilePreview(e.target.result);
+      reader.readAsDataURL(file);
+    } else {
+      setSKFilePreview(null);
+    }
+  };
+
+  const handleUploadCancel = () => {
+    setShowUploadModal(false);
+    setSelectedSKFile(null);
+    setSKFilePreview(null);
+    setSelectedCutiId(null);
+  };
+
+  const handleUploadConfirm = async () => {
+    if (!selectedSKFile || !selectedCutiId) {
+      Toast.error("Pilih file SK terlebih dahulu.");
+      return;
+    }
+
+    setUploadLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('Id', selectedCutiId);
+      formData.append('FileSK', selectedSKFile);
+      formData.append('UploadBy', userData?.nama || userData?.username || 'user_admin');
+
+      console.log("=== SK UPLOAD CUTI AKADEMIK ===");
+      console.log("ID:", selectedCutiId);
+      console.log("SK File:", selectedSKFile.name);
+      console.log("UploadBy:", userData?.nama || userData?.username || 'user_admin');
+
+      const response = await fetch(`${API_LINK}CutiAkademik/upload-sk`, {
+        method: 'PUT',
+        body: formData
+      });
+
+      console.log("Upload response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Upload error:", errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log("Upload result:", result);
+
+      Toast.success(result.message || "SK berhasil diupload!");
+      setShowUploadModal(false);
+      setSelectedSKFile(null);
+      setSKFilePreview(null);
+      setSelectedCutiId(null);
+      
+      // Reload data to reflect changes
+      await loadData(currentPage);
+      if (showRiwayat) {
+        await loadDataRiwayat(currentPageRiwayat);
+      }
+
+    } catch (error) {
+      console.error("Upload error:", error);
+      Toast.error(`Gagal upload SK: ${error.message}`);
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
   const handlePrint = (id) => {
     
     window.open(`${API_LINK}CutiAkademik/file/${id}`, "_blank");
@@ -1701,6 +1808,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               onApprove={handleApprove}
               onReject={handleReject}
               onUpload={handleUpload}
+              onUploadSK={handleUploadSK}
               onPrint={handlePrint}
               onDownloadSK={handleDownloadSK}
             />
@@ -1798,6 +1906,87 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               <p className="text-muted">Belum ada riwayat cuti akademik yang tersedia.</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* SK Upload Modal */}
+      {showUploadModal && (
+        <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Upload SK Cuti Akademik</h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={handleUploadCancel}
+                  disabled={uploadLoading}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label">Pilih File SK *</label>
+                  <input
+                    type="file"
+                    className="form-control"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={handleSKFileSelect}
+                    disabled={uploadLoading}
+                  />
+                  <div className="form-text">
+                    Format yang didukung: PDF, DOC, DOCX, JPG, JPEG, PNG (Maksimal 10MB)
+                  </div>
+                </div>
+
+                {selectedSKFile && (
+                  <div className="mb-3">
+                    <div className="alert alert-info">
+                      <strong>File SK dipilih:</strong> {selectedSKFile.name} ({(selectedSKFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </div>
+                  </div>
+                )}
+
+                {skFilePreview && (
+                  <div className="mb-3">
+                    <label className="form-label">Preview SK:</label>
+                    <div className="text-center">
+                      <img 
+                        src={skFilePreview} 
+                        alt="Preview SK" 
+                        className="img-fluid" 
+                        style={{ maxHeight: '300px', border: '1px solid #ddd', borderRadius: '4px' }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={handleUploadCancel}
+                  disabled={uploadLoading}
+                >
+                  Batal
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  onClick={handleUploadConfirm}
+                  disabled={!selectedSKFile || uploadLoading}
+                >
+                  {uploadLoading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2"></span>
+                      Mengupload...
+                    </>
+                  ) : (
+                    'Upload SK'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </MainContent>
