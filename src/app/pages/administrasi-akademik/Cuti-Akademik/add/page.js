@@ -442,6 +442,7 @@ export default function AddCutiAkademik() {
                 isRequired={true}
                 isDisabled={loadingProdi}
                 errorMessage={errors.konId}
+                searchable={true}
               />
             </div>
 
@@ -457,6 +458,7 @@ export default function AddCutiAkademik() {
                 isRequired={true}
                 isDisabled={!formData.konId || loadingStudents}
                 errorMessage={errors.mhsId}
+                searchable={true}
               />
             </div>
             <div className="col-lg-4">
