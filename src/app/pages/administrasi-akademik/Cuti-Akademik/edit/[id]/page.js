@@ -521,6 +521,7 @@ export default function EditCutiAkademikPage() {
                 isRequired={true}
                 isDisabled={loadingProdi}
                 errorMessage={errors.konId}
+                searchable={true}
               />
             </div>
 
@@ -536,6 +537,7 @@ export default function EditCutiAkademikPage() {
                 isRequired={true}
                 isDisabled={!formData.konId || loadingStudents}
                 errorMessage={errors.mhsId}
+                searchable={true}
               />
               {loadingStudents && (
                 <small className="text-muted">Memuat daftar mahasiswa...</small>

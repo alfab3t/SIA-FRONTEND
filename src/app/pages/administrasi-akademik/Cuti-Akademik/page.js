@@ -594,11 +594,39 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             console.log("Available fields:", Object.keys(item));
           }
 
+          // Determine if this application was created by Prodi
+          const createdByProdi = item.cak_created_by && 
+            (item.cak_created_by.toLowerCase().includes('prodi') ||
+             item.cak_created_by === userData?.username ||
+             item.cak_created_by === userData?.nama);
+          
+          // Also check session storage for prodi-created applications
+          const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
+          const isProdiCreatedFromSession = prodiCreatedApps.includes(item.cak_id || item.id);
+          
+          // Check if application has prodi-specific fields (menimbang field presence)
+          const hasProdiFields = item.menimbang && item.menimbang.trim() !== "";
+          
+          const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession || hasProdiFields;
+
+          // Determine No Pengajuan display
+          let noPengajuan;
+          if (isDraft && isCreatedByProdi) {
+            // If it's a draft created by Prodi, show "Draft"
+            noPengajuan = "Draft";
+          } else if (isMahasiswa && isDraft) {
+            // If it's a draft created by Mahasiswa, show "Draft"
+            noPengajuan = "Draft";
+          } else {
+            // For submitted applications, show the actual ID
+            noPengajuan = item.id || item.idDisplay || item.cak_id || "-";
+          }
+
           // Base row data
           const rowData = {
             No: startIndex + index + 1, 
             id: item.cak_id || item.id || item.idDisplay, 
-            "No Pengajuan": isMahasiswa ? "Draft" : (item.id || item.idDisplay || item.cak_id || "-"), 
+            "No Pengajuan": noPengajuan, 
             "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
             "No SK": noSK || "-", 
             "Nama Mahasiswa": namaMahasiswa,
