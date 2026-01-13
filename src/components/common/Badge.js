@@ -15,6 +15,10 @@ export default function Badge({
     "Tidak Aktif": "bg-secondary-subtle text-secondary",
     Selesai: "bg-primary-subtle text-primary",
     Batal: "bg-danger-subtle text-danger",
+    "Belum Disetujui Prodi": "bg-warning-subtle text-warning",
+    "Belum Disetujui Wadir 1": "bg-warning-subtle text-warning",
+    "Belum Disetujui Finance": "bg-warning-subtle text-warning",
+    "Menunggu Upload SK": "bg-secondary-subtle text-secondary",
   };
 
   const styleMap = { ...defaultStyleMap, ...customMap };
