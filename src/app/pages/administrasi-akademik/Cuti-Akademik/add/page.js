@@ -6,6 +6,7 @@ import MainContent from "@/components/layout/MainContent";
 import Toast from "@/components/common/Toast";
 import Button from "@/components/common/Button";
 import DropDown from "@/components/common/Dropdown";
+import Label from "@/components/common/Label";
 import { useRouter } from "next/navigation";
 import { API_LINK } from "@/lib/constant";
 import { getUserData } from "@/context/user";
@@ -462,7 +463,11 @@ export default function AddCutiAkademik() {
               />
             </div>
             <div className="col-lg-4">
-              <label className="form-label">Angkatan</label>
+              <Label
+                text="Angkatan"
+                htmlFor="angkatan"
+                required={false}
+              />
               <input
                 type="text"
                 className="form-control rounded-4 blue-element"
@@ -490,10 +495,14 @@ export default function AddCutiAkademik() {
               />
             ) : (
               <>
-                <label className="form-label">Tahun Akademik *</label>
+                <Label
+                  text="Tahun Akademik"
+                  htmlFor="tahunAjaran"
+                  required={true}
+                />
                 <select
                   name="tahunAjaran"
-                  className="form-control"
+                  className="form-control rounded-4 blue-element"
                   onChange={handleChange}
                   value={formData.tahunAjaran}
                 >
@@ -523,10 +532,14 @@ export default function AddCutiAkademik() {
               />
             ) : (
               <>
-                <label className="form-label">Semester *</label>
+                <Label
+                  text="Semester"
+                  htmlFor="semester"
+                  required={true}
+                />
                 <select
                   name="semester"
-                  className="form-control"
+                  className="form-control rounded-4 blue-element"
                   onChange={handleChange}
                   value={formData.semester}
                 >
@@ -544,34 +557,38 @@ export default function AddCutiAkademik() {
 
         <div className="row mt-3">
           <div className="col-lg-6">
-            <label className="form-label">
-              {isProdi ? "Berkas Surat Pernyataan" : "Surat Pernyataan"} <span className="text-danger">*</span>
-            </label>
+            <Label
+              text={isProdi ? "Berkas Surat Pernyataan" : "Surat Pernyataan"}
+              htmlFor="suratPernyataan"
+              required={true}
+            />
             <input
               type="file"
               name="suratPernyataan"
-              className={isProdi ? "form-control rounded-4 blue-element" : "form-control"}
+              className="form-control rounded-4 blue-element"
               onChange={handleChange}
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
             />
             {errors.suratPernyataan && (
               <span className="fw-normal text-danger">{errors.suratPernyataan}</span>
             )}
-            {isProdi && <small className="text-muted">Format: PDF, DOC, DOCX, JPG, PNG (Max 10MB)</small>}
+            <small className="text-muted">Format: PDF, DOC, DOCX, JPG, PNG (Max 10MB)</small>
           </div>
 
           <div className="col-lg-6">
-            <label className="form-label">
-              {isProdi ? "Berkas Lampiran" : "Lampiran"}
-            </label>
+            <Label
+              text={isProdi ? "Berkas Lampiran" : "Lampiran"}
+              htmlFor="lampiran"
+              required={false}
+            />
             <input
               type="file"
               name="lampiran"
-              className={isProdi ? "form-control rounded-4 blue-element" : "form-control"}
+              className="form-control rounded-4 blue-element"
               onChange={handleChange}
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
             />
-            {isProdi && <small className="text-muted">Format: PDF, DOC, DOCX, JPG, PNG (Max 10MB)</small>}
+            <small className="text-muted">Format: PDF, DOC, DOCX, JPG, PNG (Max 10MB)</small>
           </div>
         </div>
 

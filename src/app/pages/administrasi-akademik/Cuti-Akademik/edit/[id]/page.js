@@ -6,6 +6,7 @@ import MainContent from "@/components/layout/MainContent";
 import Toast from "@/components/common/Toast";
 import Button from "@/components/common/Button";
 import DropDown from "@/components/common/Dropdown";
+import Label from "@/components/common/Label";
 import { useRouter, useParams } from "next/navigation";
 import { API_LINK } from "@/lib/constant";
 import { decryptIdUrl } from "@/lib/encryptor";
@@ -545,7 +546,11 @@ export default function EditCutiAkademikPage() {
             </div>
 
             <div className="col-lg-4">
-              <label className="form-label">Angkatan</label>
+              <Label
+                text="Angkatan"
+                htmlFor="angkatan"
+                required={false}
+              />
               <input
                 type="text"
                 className="form-control rounded-4 blue-element"
@@ -573,9 +578,13 @@ export default function EditCutiAkademikPage() {
               />
             ) : (
               <>
-                <label className="form-label">Tahun Akademik *</label>
+                <Label
+                  text="Tahun Akademik"
+                  htmlFor="tahunAjaran"
+                  required={true}
+                />
                 <select
-                  className="form-control"
+                  className="form-control rounded-4 blue-element"
                   name="tahunAjaran"
                   value={formData.tahunAjaran}
                   onChange={handleChange}
@@ -606,9 +615,13 @@ export default function EditCutiAkademikPage() {
               />
             ) : (
               <>
-                <label className="form-label">Semester *</label>
+                <Label
+                  text="Semester"
+                  htmlFor="semester"
+                  required={true}
+                />
                 <select
-                  className="form-control"
+                  className="form-control rounded-4 blue-element"
                   name="semester"
                   value={formData.semester}
                   onChange={handleChange}
@@ -627,41 +640,37 @@ export default function EditCutiAkademikPage() {
 
         <div className="row mt-4">
           <div className="col-lg-6">
-            <label className="form-label">
-              {isProdi ? "Berkas Surat Pernyataan" : "Surat Pernyataan"} *
-            </label>
+            <Label
+              text={isProdi ? "Berkas Surat Pernyataan" : "Surat Pernyataan"}
+              htmlFor="suratPernyataan"
+              required={true}
+            />
             <input
               type="file"
-              className={isProdi ? "form-control rounded-4 blue-element" : "form-control"}
+              className="form-control rounded-4 blue-element"
               name="suratPernyataan"
               onChange={handleChange}
             />
             <small className="text-muted">File sebelumnya: {formData.oldSurat || "-"}</small>
-            {isProdi && (
-              <>
-                <br />
-                <small className="text-muted">Format: PDF, DOC, DOCX, JPG, PNG (Max 10MB)</small>
-              </>
-            )}
+            <br />
+            <small className="text-muted">Format: PDF, DOC, DOCX, JPG, PNG (Max 10MB)</small>
           </div>
 
           <div className="col-lg-6">
-            <label className="form-label">
-              {isProdi ? "Berkas Lampiran" : "Lampiran"}
-            </label>
+            <Label
+              text={isProdi ? "Berkas Lampiran" : "Lampiran"}
+              htmlFor="lampiran"
+              required={false}
+            />
             <input
               type="file"
-              className={isProdi ? "form-control rounded-4 blue-element" : "form-control"}
+              className="form-control rounded-4 blue-element"
               name="lampiran"
               onChange={handleChange}
             />
             <small className="text-muted">File sebelumnya: {formData.oldLampiran || "-"}</small>
-            {isProdi && (
-              <>
-                <br />
-                <small className="text-muted">Format: PDF, DOC, DOCX, JPG, PNG (Max 10MB)</small>
-              </>
-            )}
+            <br />
+            <small className="text-muted">Format: PDF, DOC, DOCX, JPG, PNG (Max 10MB)</small>
           </div>
         </div>
 
