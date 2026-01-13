@@ -456,13 +456,69 @@ export default function AddCutiAkademik() {
 
   const handleCancel = () => router.back();
 
-  // Data for dropdowns
-  const tahunAjaranData = [
-    { Value: "2023/2024", Text: "2023/2024" },
-    { Value: "2024/2025", Text: "2024/2025" },
-    { Value: "2025/2026", Text: "2025/2026" },
-    { Value: "2026/2027", Text: "2026/2027" },
-  ];
+  // State for dynamic tahun akademik data
+  const [tahunAjaranData, setTahunAjaranData] = useState([]);
+
+  // Generate tahun akademik based on angkatan
+  const generateTahunAkademik = (angkatan) => {
+    if (!angkatan) {
+      console.log("[generateTahunAkademik] No angkatan provided, using default years");
+      // Default years if no angkatan
+      const currentYear = new Date().getFullYear();
+      return [
+        { Value: `${currentYear-1}/${currentYear}`, Text: `${currentYear-1}/${currentYear}` },
+        { Value: `${currentYear}/${currentYear+1}`, Text: `${currentYear}/${currentYear+1}` },
+        { Value: `${currentYear+1}/${currentYear+2}`, Text: `${currentYear+1}/${currentYear+2}` },
+      ];
+    }
+
+    const tahunSekarang = new Date().getFullYear() - 1;
+    const angkatanInt = parseInt(angkatan);
+    const tahunAkademikList = [];
+
+    console.log(`[generateTahunAkademik] Generating for angkatan: ${angkatanInt}, tahunSekarang: ${tahunSekarang}`);
+
+    // Logic: for (int i = tahunSekarang; i < angkatan + 3; i++)
+    for (let i = tahunSekarang; i < angkatanInt + 3; i++) {
+      const tahunAkademik = `${i}/${i + 1}`;
+      tahunAkademikList.push({
+        Value: tahunAkademik,
+        Text: tahunAkademik
+      });
+      console.log(`[generateTahunAkademik] Added: ${tahunAkademik}`);
+    }
+
+    console.log(`[generateTahunAkademik] Generated ${tahunAkademikList.length} tahun akademik:`, tahunAkademikList);
+    return tahunAkademikList;
+  };
+
+  // Update tahun akademik when angkatan changes
+  useEffect(() => {
+    if (isProdi && formData.angkatan) {
+      console.log(`[useEffect] Angkatan changed to: ${formData.angkatan}, regenerating tahun akademik`);
+      const newTahunAkademikData = generateTahunAkademik(formData.angkatan);
+      setTahunAjaranData(newTahunAkademikData);
+      
+      // Reset tahun ajaran selection when angkatan changes
+      setFormData(prev => ({
+        ...prev,
+        tahunAjaran: ""
+      }));
+    } else if (!isProdi) {
+      // For non-prodi users, use default years
+      const defaultTahunAkademik = generateTahunAkademik(null);
+      setTahunAjaranData(defaultTahunAkademik);
+    }
+  }, [formData.angkatan, isProdi]);
+
+  // Initialize tahun akademik data on component mount for non-prodi users
+  useEffect(() => {
+    if (!isProdi) {
+      console.log("[useEffect] Initializing tahun akademik for non-prodi user");
+      const defaultTahunAkademik = generateTahunAkademik(null);
+      setTahunAjaranData(defaultTahunAkademik);
+    }
+  }, [isProdi]);
 
   const semesterData = [
     { Value: "Ganjil", Text: "Ganjil" },
