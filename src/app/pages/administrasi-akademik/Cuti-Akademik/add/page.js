@@ -134,26 +134,40 @@ export default function AddCutiAkademik() {
 
     setLoadingStudents(true);
     try {
-      const response = await fetch(`${API_LINK}Mahasiswa/GetByProdi?konId=${konId}`, {
+      console.log(`[handleProdiChange] Loading students for konId: ${konId}`);
+      
+      const response = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${konId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         }
       });
       
+      console.log(`[handleProdiChange] Response status: ${response.status}`);
+      
       if (response.ok) {
         const data = await response.json();
-        setStudentList(data.map(item => ({
-          Value: item.mhsId,
-          Text: `${item.mhsId} - ${item.mhsNama}`,
-          Angkatan: item.angkatan
-        })));
+        console.log(`[handleProdiChange] Received ${data.length} students:`, data);
+        
+        const mappedStudents = data.map(item => {
+          console.log(`[handleProdiChange] Student: ${item.mhsNama}`, item);
+          
+          return {
+            Value: item.mhsId,
+            Text: item.mhsNama
+          };
+        });
+        
+        console.log(`[handleProdiChange] Mapped students:`, mappedStudents);
+        setStudentList(mappedStudents);
       } else {
+        const errorText = await response.text();
+        console.error(`[handleProdiChange] API Error: ${response.status} - ${errorText}`);
         Toast.error("Gagal memuat daftar mahasiswa.");
         setStudentList([]);
       }
     } catch (error) {
-      console.error("Error loading students:", error);
+      console.error("[handleProdiChange] Network error:", error);
       Toast.error("Terjadi kesalahan saat memuat daftar mahasiswa.");
       setStudentList([]);
     } finally {
@@ -162,15 +176,53 @@ export default function AddCutiAkademik() {
   };
 
   // Handle student selection - auto populate angkatan (for prodi users)
-  const handleStudentChange = (e) => {
+  const handleStudentChange = async (e) => {
     const mhsId = e.target.value;
-    const selectedStudent = studentList.find(s => s.Value === mhsId);
+    console.log(`[handleStudentChange] Selected mhsId: ${mhsId}`);
     
+    // Set mhsId first
     setFormData(prev => ({
       ...prev,
       mhsId: mhsId,
-      angkatan: selectedStudent ? selectedStudent.Angkatan : ""
+      angkatan: "" // Reset angkatan while loading
     }));
+
+    if (!mhsId) {
+      return;
+    }
+
+    try {
+      console.log(`[handleStudentChange] Fetching detail for mhsId: ${mhsId}`);
+      
+      const response = await fetch(`${API_LINK}Mahasiswa/GetDetail?mhsId=${mhsId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      console.log(`[handleStudentChange] Detail response status: ${response.status}`);
+      
+      if (response.ok) {
+        const detailData = await response.json();
+        console.log(`[handleStudentChange] Detail data received:`, detailData);
+        
+        const angkatan = detailData.mhsAngkatan || "";
+        console.log(`[handleStudentChange] Setting angkatan to: ${angkatan}`);
+        
+        setFormData(prev => ({
+          ...prev,
+          angkatan: angkatan.toString()
+        }));
+      } else {
+        const errorText = await response.text();
+        console.error(`[handleStudentChange] API Error: ${response.status} - ${errorText}`);
+        Toast.error("Gagal memuat detail mahasiswa.");
+      }
+    } catch (error) {
+      console.error("[handleStudentChange] Network error:", error);
+      Toast.error("Terjadi kesalahan saat memuat detail mahasiswa.");
+    }
   };
 
   // -------------------------------------------
