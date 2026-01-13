@@ -95,6 +95,7 @@ export default function EditCutiAkademikPage() {
     mhsId: "",
     angkatan: "",
     menimbang: "",
+    tahunAjaranOptions: [], // Dynamic options based on student's angkatan
   });
 
   const [errors, setErrors] = useState({});
@@ -140,7 +141,9 @@ export default function EditCutiAkademikPage() {
       ...prev,
       konId: konId,
       mhsId: "",
-      angkatan: ""
+      angkatan: "",
+      tahunAjaran: "", // Reset tahun ajaran when prodi changes
+      tahunAjaranOptions: [] // Reset options
     }));
 
     if (!konId) {
@@ -150,7 +153,7 @@ export default function EditCutiAkademikPage() {
 
     setLoadingStudents(true);
     try {
-      const response = await fetch(`${API_LINK}Mahasiswa/GetByProdi?konId=${konId}`, {
+      const response = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${konId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -209,16 +212,63 @@ export default function EditCutiAkademikPage() {
     }
   };
 
-  // Handle student selection - auto populate angkatan (for prodi users)
-  const handleStudentChange = (e) => {
+  // Handle student selection - auto populate angkatan and generate tahun akademik (for prodi users)
+  const handleStudentChange = async (e) => {
     const mhsId = e.target.value;
-    const selectedStudent = studentList.find(s => s.Value === mhsId);
     
     setFormData(prev => ({
       ...prev,
       mhsId: mhsId,
-      angkatan: selectedStudent ? selectedStudent.Angkatan : ""
+      angkatan: "",
+      tahunAjaran: "" // Reset tahun ajaran when student changes
     }));
+
+    if (!mhsId) {
+      return;
+    }
+
+    try {
+      // Fetch student detail to get mhsAngkatan
+      const response = await fetch(`${API_LINK}Mahasiswa/GetDetail?mhsId=${mhsId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[handleStudentChange] Student detail:`, data);
+        
+        const angkatan = data.mhsAngkatan;
+        if (angkatan) {
+          // Generate tahun akademik options based on angkatan
+          const tahunSekarang = new Date().getFullYear() - 1;
+          const tahunAjaranOptions = [];
+          
+          for (let i = tahunSekarang; i < angkatan + 3; i++) {
+            tahunAjaranOptions.push({
+              Value: `${i}/${i + 1}`,
+              Text: `${i}/${i + 1}`
+            });
+          }
+          
+          console.log(`[handleStudentChange] Generated tahun akademik options:`, tahunAjaranOptions);
+          
+          setFormData(prev => ({
+            ...prev,
+            angkatan: angkatan.toString(),
+            tahunAjaranOptions: tahunAjaranOptions
+          }));
+        }
+      } else {
+        console.error("Failed to fetch student detail");
+        Toast.error("Gagal memuat detail mahasiswa.");
+      }
+    } catch (error) {
+      console.error("Error fetching student detail:", error);
+      Toast.error("Terjadi kesalahan saat memuat detail mahasiswa.");
+    }
   };
 
   // ============================
@@ -355,12 +405,50 @@ export default function EditCutiAkademikPage() {
                 
                 const studentFound = activeStudents.find(s => s.mhsId === data.mhsId);
                 if (studentFound) {
-                  // Found the prodi for this student
-                  setFormData(prev => ({
-                    ...prev,
-                    konId: prodi.konId,
-                    angkatan: studentFound.angkatan
-                  }));
+                  // Fetch student detail to get mhsAngkatan and generate tahun akademik
+                  try {
+                    const detailResponse = await fetch(`${API_LINK}Mahasiswa/GetDetail?mhsId=${data.mhsId}`);
+                    if (detailResponse.ok) {
+                      const detailData = await detailResponse.json();
+                      const angkatan = detailData.mhsAngkatan;
+                      
+                      // Generate tahun akademik options based on angkatan
+                      const tahunSekarang = new Date().getFullYear() - 1;
+                      const tahunAjaranOptions = [];
+                      
+                      for (let i = tahunSekarang; i < angkatan + 3; i++) {
+                        tahunAjaranOptions.push({
+                          Value: `${i}/${i + 1}`,
+                          Text: `${i}/${i + 1}`
+                        });
+                      }
+                      
+                      // Found the prodi for this student
+                      setFormData(prev => ({
+                        ...prev,
+                        konId: prodi.konId,
+                        angkatan: angkatan.toString(),
+                        tahunAjaranOptions: tahunAjaranOptions
+                      }));
+                      
+                      console.log("Generated tahun akademik options for existing data:", tahunAjaranOptions);
+                    } else {
+                      // Fallback if GetDetail fails
+                      setFormData(prev => ({
+                        ...prev,
+                        konId: prodi.konId,
+                        angkatan: studentFound.angkatan || ""
+                      }));
+                    }
+                  } catch (detailError) {
+                    console.warn("Could not fetch student detail:", detailError);
+                    // Fallback if GetDetail fails
+                    setFormData(prev => ({
+                      ...prev,
+                      konId: prodi.konId,
+                      angkatan: studentFound.angkatan || ""
+                    }));
+                  }
                   
                   // Load students for this prodi
                   setStudentList(activeStudents.map(item => ({
@@ -368,7 +456,7 @@ export default function EditCutiAkademikPage() {
                     Text: item.mhsNama
                   })));
                   
-                  console.log("Found student's prodi:", prodi.konNama, "Angkatan:", studentFound.angkatan);
+                  console.log("Found student's prodi:", prodi.konNama);
                   break;
                 }
               }
@@ -623,11 +711,12 @@ export default function EditCutiAkademikPage() {
                 forInput="tahunAjaran"
                 label="Tahun Akademik Mulai Cuti"
                 type="pilih"
-                arrData={tahunAjaranData}
+                arrData={formData.tahunAjaranOptions.length > 0 ? formData.tahunAjaranOptions : tahunAjaranData}
                 value={formData.tahunAjaran}
                 onChange={handleChange}
                 isRequired={true}
                 errorMessage={errors.tahunAjaran}
+                isDisabled={!formData.mhsId}
               />
             ) : (
               <>
