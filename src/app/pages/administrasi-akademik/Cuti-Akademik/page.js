@@ -1339,7 +1339,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     const confirm = await SweetAlert({
       title: "Setujui Pengajuan Cuti Akademik",
       text: "Yakin ingin menyetujui pengajuan cuti akademik ini?",
-      icon: "question",
+      icon: "warning",
       showCancelButton: true,
       confirmText: "Ya, Setujui!",
       cancelText: "Batal",
