@@ -56,6 +56,7 @@ export default function AddCutiAkademik() {
   }
   
   const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI";
+  const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
 
   const [saving, setSaving] = useState(false);
   const [prodiList, setProdiList] = useState([]);
@@ -116,6 +117,57 @@ export default function AddCutiAkademik() {
 
     loadProdi();
   }, [isProdi]);
+
+  // Load mahasiswa data using GetDetail for mahasiswa users
+  useEffect(() => {
+    if (!isMahasiswa || !userData) return;
+    
+    const loadMahasiswaData = async () => {
+      try {
+        const mhsId = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
+        console.log(`[loadMahasiswaData] Loading data for mhsId: ${mhsId}`);
+        console.log(`[loadMahasiswaData] userData:`, userData);
+        
+        if (!mhsId) {
+          console.warn("[loadMahasiswaData] No mhsId found in userData");
+          return;
+        }
+
+        const response = await fetch(`${API_LINK}Mahasiswa/GetDetail?mhsId=${mhsId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        console.log(`[loadMahasiswaData] Response status: ${response.status}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`[loadMahasiswaData] Data received:`, data);
+          console.log(`[loadMahasiswaData] mhsAngkatan: ${data.mhsAngkatan}`);
+          
+          // Auto-populate form data for mahasiswa (only angkatan for internal use)
+          setFormData(prev => ({
+            ...prev,
+            mhsId: mhsId,
+            angkatan: data.mhsAngkatan?.toString() || ""
+          }));
+          
+          console.log(`[loadMahasiswaData] Auto-populated angkatan: ${data.mhsAngkatan} for mahasiswa`);
+        } else {
+          const errorText = await response.text();
+          console.error(`[loadMahasiswaData] API Error: ${response.status} - ${errorText}`);
+          Toast.error("Gagal memuat data mahasiswa. Pastikan Anda login dengan akun yang benar.");
+        }
+      } catch (error) {
+        console.error("[loadMahasiswaData] Network error:", error);
+        Toast.error("Terjadi kesalahan saat memuat data mahasiswa.");
+      }
+    };
+
+    loadMahasiswaData();
+  }, [isMahasiswa, userData]);
 
   // Load students when prodi is selected (for prodi users)
   const handleProdiChange = async (e) => {
@@ -494,8 +546,8 @@ export default function AddCutiAkademik() {
 
   // Update tahun akademik when angkatan changes
   useEffect(() => {
-    if (isProdi && formData.angkatan) {
-      console.log(`[useEffect] Angkatan changed to: ${formData.angkatan}, regenerating tahun akademik`);
+    if ((isProdi || isMahasiswa) && formData.angkatan) {
+      console.log(`[useEffect] Angkatan changed to: ${formData.angkatan}, regenerating tahun akademik for ${isProdi ? 'Prodi' : 'Mahasiswa'}`);
       const newTahunAkademikData = generateTahunAkademik(formData.angkatan);
       setTahunAjaranData(newTahunAkademikData);
       
@@ -504,21 +556,21 @@ export default function AddCutiAkademik() {
         ...prev,
         tahunAjaran: ""
       }));
-    } else if (!isProdi) {
-      // For non-prodi users, use default years
+    } else if (!isProdi && !isMahasiswa) {
+      // For other users, use default years
       const defaultTahunAkademik = generateTahunAkademik(null);
       setTahunAjaranData(defaultTahunAkademik);
     }
-  }, [formData.angkatan, isProdi]);
+  }, [formData.angkatan, isProdi, isMahasiswa]);
 
-  // Initialize tahun akademik data on component mount for non-prodi users
+  // Initialize tahun akademik data on component mount for non-prodi and non-mahasiswa users
   useEffect(() => {
-    if (!isProdi) {
-      console.log("[useEffect] Initializing tahun akademik for non-prodi user");
+    if (!isProdi && !isMahasiswa) {
+      console.log("[useEffect] Initializing tahun akademik for other user");
       const defaultTahunAkademik = generateTahunAkademik(null);
       setTahunAjaranData(defaultTahunAkademik);
     }
-  }, [isProdi]);
+  }, [isProdi, isMahasiswa]);
 
   const semesterData = [
     { Value: "Ganjil", Text: "Ganjil" },
@@ -527,7 +579,7 @@ export default function AddCutiAkademik() {
 
   return (
     <MainContent
-      title={isProdi ? "Tambah Pengajuan Cuti Akademik (Prodi)" : "Tambah Pengajuan Cuti Akademik"}
+      title={isProdi ? "Tambah Pengajuan Cuti Akademik (Prodi)" : isMahasiswa ? "Tambah Pengajuan Cuti Akademik (Mahasiswa)" : "Tambah Pengajuan Cuti Akademik"}
       layout="Admin"
       breadcrumb={[
         { label: "Sistem Informasi Akademik" },
@@ -589,17 +641,18 @@ export default function AddCutiAkademik() {
 
         <div className="row mt-3">
           <div className="col-lg-6">
-            {isProdi ? (
+            {(isProdi || isMahasiswa) ? (
               <DropDown
                 ref={tahunAjaranRef}
                 forInput="tahunAjaran"
-                label="Tahun Akademik"
+                label="Tahun Akademik Mulai Cuti"
                 type="pilih"
                 arrData={tahunAjaranData}
                 value={formData.tahunAjaran}
                 onChange={handleChange}
                 isRequired={true}
                 errorMessage={errors.tahunAjaran}
+                isDisabled={isMahasiswa && !formData.angkatan}
               />
             ) : (
               <>
@@ -623,14 +676,17 @@ export default function AddCutiAkademik() {
                 )}
               </>
             )}
+            {isMahasiswa && !formData.angkatan && (
+              <small className="text-muted">Memuat opsi tahun akademik...</small>
+            )}
           </div>
 
           <div className="col-lg-6">
-            {isProdi ? (
+            {(isProdi || isMahasiswa) ? (
               <DropDown
                 ref={semesterRef}
                 forInput="semester"
-                label="Semester"
+                label="Semester Mulai Cuti"
                 type="pilih"
                 arrData={semesterData}
                 value={formData.semester}
