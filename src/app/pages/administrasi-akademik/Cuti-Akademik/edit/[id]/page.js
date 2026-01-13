@@ -159,10 +159,42 @@ export default function EditCutiAkademikPage() {
       
       if (response.ok) {
         const data = await response.json();
-        setStudentList(data.map(item => ({
+        console.log(`[handleProdiChange] Received ${data.length} students:`, data);
+        
+        // Filter only active students (exclude inactive/graduated/dropped out students)
+        const activeStudents = data.filter(item => {
+          // Try multiple possible field names for status
+          const status = (item.mhsStatusKuliah || 
+                         item.statusKuliah || 
+                         item.status || 
+                         item.mhsStatus || 
+                         "").toLowerCase().trim();
+          
+          // List of inactive status keywords
+          const inactiveKeywords = [
+            'lulus', 'graduated', 'drop', 'keluar', 'meninggal', 'died',
+            'tidak aktif', 'nonaktif', 'inactive', 'cuti', 'leave',
+            'putus studi', 'mengundurkan diri', 'resign'
+          ];
+          
+          // Check if status contains any inactive keywords
+          const isInactive = inactiveKeywords.some(keyword => 
+            status.includes(keyword)
+          );
+          
+          // Consider active if status doesn't contain inactive keywords
+          // Allow empty status as it might mean active
+          const isActive = !isInactive;
+          
+          console.log(`[handleProdiChange] Student: ${item.mhsNama}, Status: "${status}", Active: ${isActive}`);
+          return isActive;
+        });
+        
+        console.log(`[handleProdiChange] Filtered to ${activeStudents.length} active students from ${data.length} total`);
+        
+        setStudentList(activeStudents.map(item => ({
           Value: item.mhsId,
-          Text: `${item.mhsId} - ${item.mhsNama}`,
-          Angkatan: item.angkatan
+          Text: item.mhsNama
         })));
       } else {
         Toast.error("Gagal memuat daftar mahasiswa.");
@@ -296,10 +328,32 @@ export default function EditCutiAkademikPage() {
             
             // For each prodi, check if this student belongs to it
             for (const prodi of prodiData) {
-              const studentsResponse = await fetch(`${API_LINK}Mahasiswa/GetByProdi?konId=${prodi.konId}`);
+              const studentsResponse = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${prodi.konId}`);
               if (studentsResponse.ok) {
                 const students = await studentsResponse.json();
-                const studentFound = students.find(s => s.mhsId === data.mhsId);
+                
+                // Filter only active students
+                const activeStudents = students.filter(item => {
+                  const status = (item.mhsStatusKuliah || 
+                                 item.statusKuliah || 
+                                 item.status || 
+                                 item.mhsStatus || 
+                                 "").toLowerCase().trim();
+                  
+                  const inactiveKeywords = [
+                    'lulus', 'graduated', 'drop', 'keluar', 'meninggal', 'died',
+                    'tidak aktif', 'nonaktif', 'inactive', 'cuti', 'leave',
+                    'putus studi', 'mengundurkan diri', 'resign'
+                  ];
+                  
+                  const isInactive = inactiveKeywords.some(keyword => 
+                    status.includes(keyword)
+                  );
+                  
+                  return !isInactive;
+                });
+                
+                const studentFound = activeStudents.find(s => s.mhsId === data.mhsId);
                 if (studentFound) {
                   // Found the prodi for this student
                   setFormData(prev => ({
@@ -309,10 +363,9 @@ export default function EditCutiAkademikPage() {
                   }));
                   
                   // Load students for this prodi
-                  setStudentList(students.map(item => ({
+                  setStudentList(activeStudents.map(item => ({
                     Value: item.mhsId,
-                    Text: `${item.mhsId} - ${item.mhsNama}`,
-                    Angkatan: item.angkatan
+                    Text: item.mhsNama
                   })));
                   
                   console.log("Found student's prodi:", prodi.konNama, "Angkatan:", studentFound.angkatan);
