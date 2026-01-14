@@ -124,6 +124,50 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const [sortStatus, setSortStatus] = useState(dataFilterStatus[0].Value);
   const [filterProdi, setFilterProdi] = useState(dataFilterProdi[0].Value);
   
+  // State for bebas tanggungan check
+  const [bebasTanggunganStatus, setBebasTanggunganStatus] = useState(null);
+  const [checkingBebasTanggungan, setCheckingBebasTanggungan] = useState(false);
+
+  // Check bebas tanggungan for mahasiswa
+  useEffect(() => {
+    if (!isMahasiswa || !userData) return;
+    
+    const checkBebasTanggungan = async () => {
+      try {
+        setCheckingBebasTanggungan(true);
+        const userId = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
+        
+        console.log(`[checkBebasTanggungan] Checking for userId: ${userId}`);
+        
+        if (!userId) {
+          console.warn("[checkBebasTanggungan] No userId found");
+          return;
+        }
+
+        const response = await fetch(`${API_LINK}Mahasiswa/CheckBebasTanggungan?userId=${userId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`[checkBebasTanggungan] Status:`, data);
+          setBebasTanggunganStatus(data.status);
+        } else {
+          console.error(`[checkBebasTanggungan] API Error: ${response.status}`);
+        }
+      } catch (error) {
+        console.error("[checkBebasTanggungan] Network error:", error);
+      } finally {
+        setCheckingBebasTanggungan(false);
+      }
+    };
+
+    checkBebasTanggungan();
+  }, [isMahasiswa, userData]);
+  
   const loadData = useCallback(
     async (page = 1) => {
       try {
@@ -1807,13 +1851,45 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       <div className="mb-4">
         <h5>Daftar Pengajuan Cuti Akademik</h5>
         
+        {/* Notifikasi Bebas Tanggungan untuk Mahasiswa */}
+        {isMahasiswa && bebasTanggunganStatus === "NOK" && (
+          <div className="alert alert-warning d-flex align-items-center justify-content-between mb-3" role="alert">
+            <div>
+              <i className="fas fa-exclamation-triangle me-2"></i>
+              <strong>Anda belum menyelesaikan administrasi bebas tanggungan</strong>
+            </div>
+            <button 
+              className="btn btn-sm btn-outline-warning"
+              onClick={() => router.push('/pages/administrasi-akademik/bebas-tanggungan')}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              <i className="fas fa-eye me-1"></i>
+              Lihat Administrasi Bebas Tanggungan
+            </button>
+          </div>
+        )}
+        
         <div className="d-flex justify-content-between align-items-center mb-3">
           {(isMahasiswa || isProdi) && (
-            <Button
-              classType="primary"
-              label={isProdi ? "+ Tambah" : "+ Tambah"}
-              onClick={handleAdd}
-            />
+            <>
+              {isMahasiswa ? (
+                // Mahasiswa: hide button if has tanggungan
+                bebasTanggunganStatus === "OK" && (
+                  <Button
+                    classType="primary"
+                    label="+ Tambah"
+                    onClick={handleAdd}
+                  />
+                )
+              ) : (
+                // Prodi: always show button
+                <Button
+                  classType="primary"
+                  label="+ Tambah"
+                  onClick={handleAdd}
+                />
+              )}
+            </>
           )}
           <div></div>
         </div>

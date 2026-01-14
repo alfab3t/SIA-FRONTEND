@@ -84,6 +84,10 @@ export default function AddCutiAkademik() {
 
   const [errors, setErrors] = useState({});
 
+  // State for bebas tanggungan check (for Prodi)
+  const [bebasTanggunganStatus, setBebasTanggunganStatus] = useState(null);
+  const [checkingBebasTanggungan, setCheckingBebasTanggungan] = useState(false);
+
   // Helper function to load students for a given konId
   const loadStudentsForKonId = useCallback(async (konId) => {
     if (!konId) {
@@ -279,11 +283,32 @@ export default function AddCutiAkademik() {
       angkatan: "" // Reset angkatan while loading
     }));
 
+    // Reset bebas tanggungan status
+    setBebasTanggunganStatus(null);
+
     if (!mhsId) {
       return;
     }
 
     try {
+      // Check bebas tanggungan for selected student (Prodi only)
+      if (isProdi) {
+        setCheckingBebasTanggungan(true);
+        const btResponse = await fetch(`${API_LINK}Mahasiswa/CheckBebasTanggungan?userId=${mhsId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (btResponse.ok) {
+          const btData = await btResponse.json();
+          console.log(`[handleStudentChange] Bebas Tanggungan Status:`, btData);
+          setBebasTanggunganStatus(btData.status);
+        }
+        setCheckingBebasTanggungan(false);
+      }
+
       console.log(`[handleStudentChange] Fetching detail for mhsId: ${mhsId}`);
       
       const response = await fetch(`${API_LINK}Mahasiswa/GetDetail?mhsId=${mhsId}`, {
@@ -314,6 +339,7 @@ export default function AddCutiAkademik() {
     } catch (error) {
       console.error("[handleStudentChange] Network error:", error);
       Toast.error("Terjadi kesalahan saat memuat detail mahasiswa.");
+      setCheckingBebasTanggungan(false);
     }
   };
 
@@ -630,53 +656,74 @@ export default function AddCutiAkademik() {
     >
       <form onSubmit={handleSubmit}>
         {isProdi && (
-          <div className="row mt-3">
-            <div className="col-lg-4">
-              <DropDown
-                ref={prodiRef}
-                forInput="konId"
-                label="Program Studi"
-                type="pilih"
-                arrData={prodiList}
-                value={formData.konId}
-                onChange={handleProdiChange}
-                isRequired={true}
-                isDisabled={loadingProdi}
-                errorMessage={errors.konId}
-                searchable={true}
-              />
+          <>
+            <div className="row mt-3">
+              <div className="col-lg-4">
+                <DropDown
+                  ref={prodiRef}
+                  forInput="konId"
+                  label="Program Studi"
+                  type="pilih"
+                  arrData={prodiList}
+                  value={formData.konId}
+                  onChange={handleProdiChange}
+                  isRequired={true}
+                  isDisabled={loadingProdi}
+                  errorMessage={errors.konId}
+                  searchable={true}
+                />
+              </div>
+
+              <div className="col-lg-4">
+                <DropDown
+                  ref={mahasiswaRef}
+                  forInput="mhsId"
+                  label="Mahasiswa"
+                  type="pilih"
+                  arrData={studentList}
+                  value={formData.mhsId}
+                  onChange={handleStudentChange}
+                  isRequired={true}
+                  isDisabled={!formData.konId || loadingStudents}
+                  errorMessage={errors.mhsId}
+                  searchable={true}
+                />
+              </div>
+              <div className="col-lg-4">
+                <Label
+                  text="Angkatan"
+                  htmlFor="angkatan"
+                  required={false}
+                />
+                <input
+                  type="text"
+                  className="form-control rounded-4 blue-element"
+                  value={formData.angkatan}
+                  disabled
+                  placeholder=""
+                />
+              </div>
             </div>
 
-            <div className="col-lg-4">
-              <DropDown
-                ref={mahasiswaRef}
-                forInput="mhsId"
-                label="Mahasiswa"
-                type="pilih"
-                arrData={studentList}
-                value={formData.mhsId}
-                onChange={handleStudentChange}
-                isRequired={true}
-                isDisabled={!formData.konId || loadingStudents}
-                errorMessage={errors.mhsId}
-                searchable={true}
-              />
-            </div>
-            <div className="col-lg-4">
-              <Label
-                text="Angkatan"
-                htmlFor="angkatan"
-                required={false}
-              />
-              <input
-                type="text"
-                className="form-control rounded-4 blue-element"
-                value={formData.angkatan}
-                disabled
-                placeholder=""
-              />
-            </div>
-          </div>
+            {/* Notifikasi Bebas Tanggungan untuk Prodi */}
+            {formData.mhsId && bebasTanggunganStatus === "NOK" && (
+              <div className="alert alert-warning d-flex align-items-center justify-content-between mt-3" role="alert">
+                <div>
+                  <i className="fas fa-exclamation-triangle me-2"></i>
+                  <strong>Mahasiswa belum menyelesaikan administrasi bebas tanggungan</strong>
+                </div>
+                <button 
+                  type="button"
+                  className="btn btn-sm btn-outline-warning"
+                  onClick={() => router.push('/pages/administrasi-akademik/bebas-tanggungan')}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  <i className="fas fa-eye me-1"></i>
+                  Lihat Administrasi Bebas Tanggungan
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         <div className="row mt-3">
@@ -821,12 +868,15 @@ export default function AddCutiAkademik() {
             onClick={handleCancel}
             isDisabled={saving}
           />
-          <Button
-            classType="primary"
-            label={saving ? "Menyimpan..." : "Simpan"}
-            type="submit"
-            isDisabled={saving}
-          />
+          {/* Hide Simpan button if Prodi selected student with tanggungan */}
+          {!(isProdi && formData.mhsId && bebasTanggunganStatus === "NOK") && (
+            <Button
+              classType="primary"
+              label={saving ? "Menyimpan..." : "Simpan"}
+              type="submit"
+              isDisabled={saving}
+            />
+          )}
         </div>
       </form>
     </MainContent>
