@@ -53,6 +53,7 @@ export default function AddMeninggalDunia() {
   const [saving, setSaving] = useState(false);
   const [studentList, setStudentList] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [konId, setKonId] = useState("");
 
   const mahasiswaRef = useRef();
 
@@ -71,18 +72,82 @@ export default function AddMeninggalDunia() {
     setMounted(true);
   }, []);
 
-  // Load all students for dropdown
+  // Load konsentrasi for Prodi user to get their konId
   useEffect(() => {
-    const loadStudents = async () => {
-      setLoadingStudents(true);
+    if (!isProdi || !userData) return;
+    
+    const loadKonsentrasi = async () => {
       try {
-        console.log("=== LOADING STUDENTS ===");
-        const response = await fetch(`${API_LINK}MeninggalDunia/mahasiswa`, {
+        const username = userData?.username || userData?.nama;
+        console.log(`[loadKonsentrasi] Loading for username: ${username}`);
+        
+        if (!username) {
+          console.warn("[loadKonsentrasi] No username found");
+          return;
+        }
+
+        const response = await fetch(`${API_LINK}Mahasiswa/GetKonsentrasiList?username=${username}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           }
         });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`[loadKonsentrasi] Received data:`, data);
+          
+          if (data && data.length > 0) {
+            const userKonId = data[0].id;
+            console.log(`[loadKonsentrasi] Setting konId: ${userKonId}`);
+            setKonId(userKonId);
+          }
+        } else {
+          console.error(`[loadKonsentrasi] API Error: ${response.status}`);
+        }
+      } catch (error) {
+        console.error("[loadKonsentrasi] Network error:", error);
+      }
+    };
+
+    loadKonsentrasi();
+  }, [isProdi, userData]);
+
+  // Load students based on konId for Prodi, or all students for others
+  useEffect(() => {
+    const loadStudents = async () => {
+      setLoadingStudents(true);
+      try {
+        console.log("=== LOADING STUDENTS ===");
+        console.log("isProdi:", isProdi);
+        console.log("konId:", konId);
+        
+        let response;
+        
+        if (isProdi && konId) {
+          // For Prodi: use GetByKonsentrasi
+          console.log(`Loading students for konId: ${konId}`);
+          response = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${konId}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+        } else if (!isProdi) {
+          // For non-Prodi: use old endpoint
+          console.log("Loading all students (non-Prodi)");
+          response = await fetch(`${API_LINK}MeninggalDunia/mahasiswa`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+        } else {
+          // Prodi but konId not loaded yet
+          console.log("Waiting for konId to load...");
+          setLoadingStudents(false);
+          return;
+        }
         
         console.log("Students response status:", response.status);
         
@@ -116,9 +181,11 @@ export default function AddMeninggalDunia() {
       }
     };
 
-    // Load students for both prodi and mahasiswa users
-    loadStudents();
-  }, []);
+    // Load students when konId is available for Prodi, or immediately for non-Prodi
+    if ((isProdi && konId) || !isProdi) {
+      loadStudents();
+    }
+  }, [isProdi, konId]);
 
   // Handle student selection - auto populate prodi and angkatan
   const handleStudentChange = async (e) => {
