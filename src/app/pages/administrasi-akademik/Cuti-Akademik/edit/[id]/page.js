@@ -58,6 +58,7 @@ export default function EditCutiAkademikPage() {
   }
   
   const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI";
+  const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
 
   // ============================
   // REAL ID (cak_id)
@@ -246,7 +247,7 @@ export default function EditCutiAkademikPage() {
           const tahunSekarang = new Date().getFullYear() - 1;
           const tahunAjaranOptions = [];
           
-          for (let i = tahunSekarang; i < angkatan + 3; i++) {
+          for (let i = tahunSekarang; i <= angkatan + 3; i++) {
             tahunAjaranOptions.push({
               Value: `${i}/${i + 1}`,
               Text: `${i}/${i + 1}`
@@ -416,7 +417,7 @@ export default function EditCutiAkademikPage() {
                       const tahunSekarang = new Date().getFullYear() - 1;
                       const tahunAjaranOptions = [];
                       
-                      for (let i = tahunSekarang; i < angkatan + 3; i++) {
+                      for (let i = tahunSekarang; i <= angkatan + 3; i++) {
                         tahunAjaranOptions.push({
                           Value: `${i}/${i + 1}`,
                           Text: `${i}/${i + 1}`
@@ -471,6 +472,116 @@ export default function EditCutiAkademikPage() {
       setLoading(false);
     }
   }, [realId, isProdi]);
+
+  // Load mahasiswa data using GetDetail for mahasiswa users in edit mode
+  useEffect(() => {
+    if (!isMahasiswa || !userData || !realId) return;
+    
+    const loadMahasiswaDataForEdit = async () => {
+      try {
+        const mhsId = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
+        console.log(`[loadMahasiswaDataForEdit] Loading data for mhsId: ${mhsId}`);
+        
+        if (!mhsId) {
+          console.warn("[loadMahasiswaDataForEdit] No mhsId found in userData");
+          return;
+        }
+
+        const response = await fetch(`${API_LINK}Mahasiswa/GetDetail?mhsId=${mhsId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        console.log(`[loadMahasiswaDataForEdit] Response status: ${response.status}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`[loadMahasiswaDataForEdit] Data received:`, data);
+          console.log(`[loadMahasiswaDataForEdit] mhsAngkatan: ${data.mhsAngkatan}`);
+          
+          // Auto-populate angkatan for mahasiswa (internal use for tahun akademik generation)
+          setFormData(prev => {
+            const newFormData = {
+              ...prev,
+              angkatan: data.mhsAngkatan?.toString() || ""
+            };
+            console.log(`[loadMahasiswaDataForEdit] Setting formData.angkatan to: ${newFormData.angkatan}`);
+            return newFormData;
+          });
+          
+          console.log(`[loadMahasiswaDataForEdit] Auto-populated angkatan: ${data.mhsAngkatan} for mahasiswa edit`);
+        } else {
+          const errorText = await response.text();
+          console.error(`[loadMahasiswaDataForEdit] API Error: ${response.status} - ${errorText}`);
+        }
+      } catch (error) {
+        console.error("[loadMahasiswaDataForEdit] Network error:", error);
+      }
+    };
+
+    loadMahasiswaDataForEdit();
+  }, [isMahasiswa, userData, realId]);
+
+  // Generate tahun akademik based on angkatan
+  const generateTahunAkademik = (angkatan) => {
+    if (!angkatan) {
+      console.log("[generateTahunAkademik] No angkatan provided, using default years");
+      // Default years if no angkatan
+      const currentYear = new Date().getFullYear();
+      return [
+        { Value: `${currentYear-1}/${currentYear}`, Text: `${currentYear-1}/${currentYear}` },
+        { Value: `${currentYear}/${currentYear+1}`, Text: `${currentYear}/${currentYear+1}` },
+        { Value: `${currentYear+1}/${currentYear+2}`, Text: `${currentYear+1}/${currentYear+2}` },
+      ];
+    }
+
+    const tahunSekarang = new Date().getFullYear() - 1;
+    const angkatanInt = parseInt(angkatan);
+    const tahunAkademikList = [];
+
+    console.log(`[generateTahunAkademik] Generating for angkatan: ${angkatanInt}, tahunSekarang: ${tahunSekarang}`);
+    console.log(`[generateTahunAkademik] Loop will run from ${tahunSekarang} to ${angkatanInt + 3} (inclusive)`);
+
+    // Logic: for (int i = tahunSekarang; i <= angkatan + 3; i++) - matching old code
+    for (let i = tahunSekarang; i <= angkatanInt + 3; i++) {
+      const tahunAkademik = `${i}/${i + 1}`;
+      tahunAkademikList.push({
+        Value: tahunAkademik,
+        Text: tahunAkademik
+      });
+      console.log(`[generateTahunAkademik] Added: ${tahunAkademik}`);
+    }
+
+    console.log(`[generateTahunAkademik] Generated ${tahunAkademikList.length} tahun akademik:`, tahunAkademikList);
+    return tahunAkademikList;
+  };
+
+  // State for dynamic tahun akademik data
+  const [tahunAjaranData, setTahunAjaranData] = useState([]);
+
+  // Update tahun akademik when angkatan changes
+  useEffect(() => {
+    if ((isProdi || isMahasiswa) && formData.angkatan) {
+      console.log(`[useEffect] Angkatan changed to: ${formData.angkatan}, regenerating tahun akademik for ${isProdi ? 'Prodi' : 'Mahasiswa'} edit`);
+      const newTahunAkademikData = generateTahunAkademik(formData.angkatan);
+      setTahunAjaranData(newTahunAkademikData);
+    } else if (!isProdi && !isMahasiswa) {
+      // For other users, use default years
+      const defaultTahunAkademik = generateTahunAkademik(null);
+      setTahunAjaranData(defaultTahunAkademik);
+    }
+  }, [formData.angkatan, isProdi, isMahasiswa]);
+
+  // Initialize tahun akademik data on component mount for non-prodi and non-mahasiswa users
+  useEffect(() => {
+    if (!isProdi && !isMahasiswa) {
+      console.log("[useEffect] Initializing tahun akademik for other user in edit");
+      const defaultTahunAkademik = generateTahunAkademik(null);
+      setTahunAjaranData(defaultTahunAkademik);
+    }
+  }, [isProdi, isMahasiswa]);
 
   // ============================
   // INIT LOAD (SESSION FIRST)
@@ -620,14 +731,6 @@ export default function EditCutiAkademikPage() {
 
   const handleCancel = () => router.back();
 
-  // Data for dropdowns
-  const tahunAjaranData = [
-    { Value: "2023/2024", Text: "2023/2024" },
-    { Value: "2024/2025", Text: "2024/2025" },
-    { Value: "2025/2026", Text: "2025/2026" },
-    { Value: "2026/2027", Text: "2026/2027" },
-  ];
-
   const semesterData = [
     { Value: "Ganjil", Text: "Ganjil" },
     { Value: "Genap", Text: "Genap" },
@@ -640,12 +743,12 @@ export default function EditCutiAkademikPage() {
     <MainContent
       layout="Admin"
       loading={loading}
-      title={isProdi ? "Edit Pengajuan Cuti Akademik (Prodi)" : "Edit Pengajuan Cuti Akademik"}
+      title={isProdi ? "Edit Pengajuan Cuti Akademik (Prodi)" : isMahasiswa ? "Edit Pengajuan Cuti Akademik (Mahasiswa)" : "Edit Pengajuan Cuti Akademik"}
       breadcrumb={[
         { label: "Sistem Informasi Akademik" },
         { label: "Administrasi Akademik" },
         { label: "Cuti Akademik" },
-        { label: isProdi ? "Edit Pengajuan (Prodi)" : "Edit Pengajuan" },
+        { label: isProdi ? "Edit Pengajuan (Prodi)" : isMahasiswa ? "Edit Pengajuan (Mahasiswa)" : "Edit Pengajuan" },
       ]}
     >
       <form onSubmit={handleSubmit}>
@@ -705,18 +808,18 @@ export default function EditCutiAkademikPage() {
 
         <div className="row mt-3">
           <div className="col-lg-6">
-            {isProdi ? (
+            {(isProdi || isMahasiswa) ? (
               <DropDown
                 ref={tahunAjaranRef}
                 forInput="tahunAjaran"
                 label="Tahun Akademik Mulai Cuti"
                 type="pilih"
-                arrData={formData.tahunAjaranOptions.length > 0 ? formData.tahunAjaranOptions : tahunAjaranData}
+                arrData={tahunAjaranData}
                 value={formData.tahunAjaran}
                 onChange={handleChange}
                 isRequired={true}
                 errorMessage={errors.tahunAjaran}
-                isDisabled={!formData.mhsId}
+                isDisabled={(isProdi && !formData.mhsId) || (isMahasiswa && !formData.angkatan)}
               />
             ) : (
               <>
@@ -740,10 +843,13 @@ export default function EditCutiAkademikPage() {
                 )}
               </>
             )}
+            {isMahasiswa && !formData.angkatan && (
+              <small className="text-muted">Memuat opsi tahun akademik...</small>
+            )}
           </div>
 
           <div className="col-lg-6">
-            {isProdi ? (
+            {(isProdi || isMahasiswa) ? (
               <DropDown
                 ref={semesterRef}
                 forInput="semester"

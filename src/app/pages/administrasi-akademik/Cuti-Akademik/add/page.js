@@ -530,8 +530,8 @@ export default function AddCutiAkademik() {
 
     console.log(`[generateTahunAkademik] Generating for angkatan: ${angkatanInt}, tahunSekarang: ${tahunSekarang}`);
 
-    // Logic: for (int i = tahunSekarang; i < angkatan + 3; i++)
-    for (let i = tahunSekarang; i < angkatanInt + 3; i++) {
+    // Logic: for (int i = tahunSekarang; i <= angkatan + 3; i++) - matching old code
+    for (let i = tahunSekarang; i <= angkatanInt + 3; i++) {
       const tahunAkademik = `${i}/${i + 1}`;
       tahunAkademikList.push({
         Value: tahunAkademik,
