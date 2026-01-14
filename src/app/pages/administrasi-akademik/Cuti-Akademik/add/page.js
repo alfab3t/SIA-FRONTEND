@@ -84,31 +84,116 @@ export default function AddCutiAkademik() {
 
   const [errors, setErrors] = useState({});
 
-  // Load prodi list for prodi users
+  // Helper function to load students for a given konId
+  const loadStudentsForKonId = useCallback(async (konId) => {
+    if (!konId) {
+      setStudentList([]);
+      return;
+    }
+
+    setLoadingStudents(true);
+    try {
+      console.log(`[loadStudentsForKonId] Loading students for konId: ${konId}`);
+      
+      const response = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${konId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      console.log(`[loadStudentsForKonId] Response status: ${response.status}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[loadStudentsForKonId] Received ${data.length} students:`, data);
+        
+        const mappedStudents = data.map(item => {
+          console.log(`[loadStudentsForKonId] Student: ${item.mhsNama}`, item);
+          
+          return {
+            Value: item.mhsId,
+            Text: item.mhsNama
+          };
+        });
+        
+        console.log(`[loadStudentsForKonId] Mapped students:`, mappedStudents);
+        setStudentList(mappedStudents);
+      } else {
+        const errorText = await response.text();
+        console.error(`[loadStudentsForKonId] API Error: ${response.status} - ${errorText}`);
+        Toast.error("Gagal memuat daftar mahasiswa.");
+        setStudentList([]);
+      }
+    } catch (error) {
+      console.error("[loadStudentsForKonId] Network error:", error);
+      Toast.error("Terjadi kesalahan saat memuat daftar mahasiswa.");
+      setStudentList([]);
+    } finally {
+      setLoadingStudents(false);
+    }
+  }, []);
+
+  // Load prodi list for prodi users based on their username
   useEffect(() => {
-    if (!isProdi) return;
+    // Use userData.nama as username since that's where the username is stored
+    const username = userData?.username || userData?.nama;
+    
+    console.log("[loadProdi useEffect] isProdi:", isProdi);
+    console.log("[loadProdi useEffect] userData:", userData);
+    console.log("[loadProdi useEffect] userData.username:", userData?.username);
+    console.log("[loadProdi useEffect] userData.nama:", userData?.nama);
+    console.log("[loadProdi useEffect] Final username to use:", username);
+    
+    if (!isProdi || !username) {
+      console.log("[loadProdi useEffect] Skipping - isProdi:", isProdi, "username:", username);
+      return;
+    }
     
     const loadProdi = async () => {
       setLoadingProdi(true);
       try {
-        const response = await fetch(`${API_LINK}Mahasiswa/GetProdiList`, {
+        console.log(`[loadProdi] Loading konsentrasi for username: ${username}`);
+        
+        const response = await fetch(`${API_LINK}Mahasiswa/GetKonsentrasiList?username=${username}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           }
         });
         
+        console.log(`[loadProdi] Response status: ${response.status}`);
+        
         if (response.ok) {
           const data = await response.json();
-          setProdiList(data.map(item => ({
-            Value: item.konId,
-            Text: item.konNama
-          })));
+          console.log(`[loadProdi] Received konsentrasi data:`, data);
+          
+          const mappedProdi = data.map(item => ({
+            Value: item.id,
+            Text: item.nama
+          }));
+          
+          console.log(`[loadProdi] Mapped prodi list:`, mappedProdi);
+          setProdiList(mappedProdi);
+          
+          // Auto-select if only one prodi available
+          if (mappedProdi.length === 1) {
+            console.log(`[loadProdi] Auto-selecting single prodi: ${mappedProdi[0].Text}`);
+            setFormData(prev => ({
+              ...prev,
+              konId: mappedProdi[0].Value
+            }));
+            
+            // Auto-load students for this prodi
+            loadStudentsForKonId(mappedProdi[0].Value);
+          }
         } else {
+          const errorText = await response.text();
+          console.error(`[loadProdi] API Error: ${response.status} - ${errorText}`);
           Toast.error("Gagal memuat daftar program studi.");
         }
       } catch (error) {
-        console.error("Error loading prodi:", error);
+        console.error("[loadProdi] Network error:", error);
         Toast.error("Terjadi kesalahan saat memuat daftar program studi.");
       } finally {
         setLoadingProdi(false);
@@ -116,7 +201,7 @@ export default function AddCutiAkademik() {
     };
 
     loadProdi();
-  }, [isProdi]);
+  }, [isProdi, userData?.username, userData?.nama, loadStudentsForKonId]);
 
   // Load mahasiswa data using GetDetail for mahasiswa users
   useEffect(() => {
@@ -179,52 +264,7 @@ export default function AddCutiAkademik() {
       angkatan: ""
     }));
 
-    if (!konId) {
-      setStudentList([]);
-      return;
-    }
-
-    setLoadingStudents(true);
-    try {
-      console.log(`[handleProdiChange] Loading students for konId: ${konId}`);
-      
-      const response = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${konId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      console.log(`[handleProdiChange] Response status: ${response.status}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`[handleProdiChange] Received ${data.length} students:`, data);
-        
-        const mappedStudents = data.map(item => {
-          console.log(`[handleProdiChange] Student: ${item.mhsNama}`, item);
-          
-          return {
-            Value: item.mhsId,
-            Text: item.mhsNama
-          };
-        });
-        
-        console.log(`[handleProdiChange] Mapped students:`, mappedStudents);
-        setStudentList(mappedStudents);
-      } else {
-        const errorText = await response.text();
-        console.error(`[handleProdiChange] API Error: ${response.status} - ${errorText}`);
-        Toast.error("Gagal memuat daftar mahasiswa.");
-        setStudentList([]);
-      }
-    } catch (error) {
-      console.error("[handleProdiChange] Network error:", error);
-      Toast.error("Terjadi kesalahan saat memuat daftar mahasiswa.");
-      setStudentList([]);
-    } finally {
-      setLoadingStudents(false);
-    }
+    await loadStudentsForKonId(konId);
   };
 
   // Handle student selection - auto populate angkatan (for prodi users)

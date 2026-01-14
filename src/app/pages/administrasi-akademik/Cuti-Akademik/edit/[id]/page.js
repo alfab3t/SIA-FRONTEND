@@ -101,31 +101,54 @@ export default function EditCutiAkademikPage() {
 
   const [errors, setErrors] = useState({});
 
-  // Load prodi list for prodi users
+  // Load prodi list for prodi users based on their username
   useEffect(() => {
-    if (!isProdi) return;
+    // Use userData.nama as username since that's where the username is stored
+    const username = userData?.username || userData?.nama;
+    
+    console.log("[loadProdi useEffect] isProdi:", isProdi);
+    console.log("[loadProdi useEffect] userData:", userData);
+    console.log("[loadProdi useEffect] userData.username:", userData?.username);
+    console.log("[loadProdi useEffect] userData.nama:", userData?.nama);
+    console.log("[loadProdi useEffect] Final username to use:", username);
+    
+    if (!isProdi || !username) {
+      console.log("[loadProdi useEffect] Skipping - isProdi:", isProdi, "username:", username);
+      return;
+    }
     
     const loadProdi = async () => {
       setLoadingProdi(true);
       try {
-        const response = await fetch(`${API_LINK}Mahasiswa/GetProdiList`, {
+        console.log(`[loadProdi] Loading konsentrasi for username: ${username}`);
+        
+        const response = await fetch(`${API_LINK}Mahasiswa/GetKonsentrasiList?username=${username}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           }
         });
         
+        console.log(`[loadProdi] Response status: ${response.status}`);
+        
         if (response.ok) {
           const data = await response.json();
-          setProdiList(data.map(item => ({
-            Value: item.konId,
-            Text: item.konNama
-          })));
+          console.log(`[loadProdi] Received konsentrasi data:`, data);
+          
+          const mappedProdi = data.map(item => ({
+            Value: item.id,
+            Text: item.nama
+          }));
+          
+          console.log(`[loadProdi] Mapped prodi list:`, mappedProdi);
+          setProdiList(mappedProdi);
         } else {
+          const errorText = await response.text();
+          console.error(`[loadProdi] API Error: ${response.status} - ${errorText}`);
           Toast.error("Gagal memuat daftar program studi.");
         }
       } catch (error) {
-        console.error("Error loading prodi:", error);
+        console.error("[loadProdi] Network error:", error);
         Toast.error("Terjadi kesalahan saat memuat daftar program studi.");
       } finally {
         setLoadingProdi(false);
@@ -133,20 +156,10 @@ export default function EditCutiAkademikPage() {
     };
 
     loadProdi();
-  }, [isProdi]);
+  }, [isProdi, userData?.username, userData?.nama]);
 
-  // Load students when prodi is selected (for prodi users)
-  const handleProdiChange = async (e) => {
-    const konId = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      konId: konId,
-      mhsId: "",
-      angkatan: "",
-      tahunAjaran: "", // Reset tahun ajaran when prodi changes
-      tahunAjaranOptions: [] // Reset options
-    }));
-
+  // Helper function to load students for a given konId
+  const loadStudentsForKonId = async (konId) => {
     if (!konId) {
       setStudentList([]);
       return;
@@ -163,7 +176,7 @@ export default function EditCutiAkademikPage() {
       
       if (response.ok) {
         const data = await response.json();
-        console.log(`[handleProdiChange] Received ${data.length} students:`, data);
+        console.log(`[loadStudentsForKonId] Received ${data.length} students:`, data);
         
         // Filter only active students (exclude inactive/graduated/dropped out students)
         const activeStudents = data.filter(item => {
@@ -190,11 +203,11 @@ export default function EditCutiAkademikPage() {
           // Allow empty status as it might mean active
           const isActive = !isInactive;
           
-          console.log(`[handleProdiChange] Student: ${item.mhsNama}, Status: "${status}", Active: ${isActive}`);
+          console.log(`[loadStudentsForKonId] Student: ${item.mhsNama}, Status: "${status}", Active: ${isActive}`);
           return isActive;
         });
         
-        console.log(`[handleProdiChange] Filtered to ${activeStudents.length} active students from ${data.length} total`);
+        console.log(`[loadStudentsForKonId] Filtered to ${activeStudents.length} active students from ${data.length} total`);
         
         setStudentList(activeStudents.map(item => ({
           Value: item.mhsId,
@@ -211,6 +224,21 @@ export default function EditCutiAkademikPage() {
     } finally {
       setLoadingStudents(false);
     }
+  };
+
+  // Load students when prodi is selected (for prodi users)
+  const handleProdiChange = async (e) => {
+    const konId = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      konId: konId,
+      mhsId: "",
+      angkatan: "",
+      tahunAjaran: "", // Reset tahun ajaran when prodi changes
+      tahunAjaranOptions: [] // Reset options
+    }));
+
+    await loadStudentsForKonId(konId);
   };
 
   // Handle student selection - auto populate angkatan and generate tahun akademik (for prodi users)
@@ -370,108 +398,115 @@ export default function EditCutiAkademikPage() {
 
       // If we have mhsId and this is a prodi user, try to determine the prodi
       if (data.mhsId && isProdi) {
-        console.log("Loading prodi data for student:", data.mhsId);
-        // Try to find the prodi for this student
-        try {
-          const prodiResponse = await fetch(`${API_LINK}Mahasiswa/GetProdiList`);
-          if (prodiResponse.ok) {
-            const prodiData = await prodiResponse.json();
-            
-            // For each prodi, check if this student belongs to it
-            for (const prodi of prodiData) {
-              const studentsResponse = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${prodi.konId}`);
-              if (studentsResponse.ok) {
-                const students = await studentsResponse.json();
-                
-                // Filter only active students
-                const activeStudents = students.filter(item => {
-                  const status = (item.mhsStatusKuliah || 
-                                 item.statusKuliah || 
-                                 item.status || 
-                                 item.mhsStatus || 
-                                 "").toLowerCase().trim();
+        const username = userData?.username || userData?.nama;
+        console.log("Loading prodi data for student:", data.mhsId, "using username:", username);
+        
+        if (username) {
+          // Get the user's konsentrasi list
+          try {
+            const konsentrasiResponse = await fetch(`${API_LINK}Mahasiswa/GetKonsentrasiList?username=${username}`);
+            if (konsentrasiResponse.ok) {
+              const konsentrasiData = await konsentrasiResponse.json();
+              console.log("User's konsentrasi list:", konsentrasiData);
+              
+              // For each konsentrasi, check if this student belongs to it
+              for (const konsentrasi of konsentrasiData) {
+                const studentsResponse = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${konsentrasi.id}`);
+                if (studentsResponse.ok) {
+                  const students = await studentsResponse.json();
                   
-                  const inactiveKeywords = [
-                    'lulus', 'graduated', 'drop', 'keluar', 'meninggal', 'died',
-                    'tidak aktif', 'nonaktif', 'inactive', 'cuti', 'leave',
-                    'putus studi', 'mengundurkan diri', 'resign'
-                  ];
+                  // Filter only active students
+                  const activeStudents = students.filter(item => {
+                    const status = (item.mhsStatusKuliah || 
+                                   item.statusKuliah || 
+                                   item.status || 
+                                   item.mhsStatus || 
+                                   "").toLowerCase().trim();
+                    
+                    const inactiveKeywords = [
+                      'lulus', 'graduated', 'drop', 'keluar', 'meninggal', 'died',
+                      'tidak aktif', 'nonaktif', 'inactive', 'cuti', 'leave',
+                      'putus studi', 'mengundurkan diri', 'resign'
+                    ];
+                    
+                    const isInactive = inactiveKeywords.some(keyword => 
+                      status.includes(keyword)
+                    );
+                    
+                    return !isInactive;
+                  });
                   
-                  const isInactive = inactiveKeywords.some(keyword => 
-                    status.includes(keyword)
-                  );
-                  
-                  return !isInactive;
-                });
-                
-                const studentFound = activeStudents.find(s => s.mhsId === data.mhsId);
-                if (studentFound) {
-                  // Fetch student detail to get mhsAngkatan and generate tahun akademik
-                  try {
-                    const detailResponse = await fetch(`${API_LINK}Mahasiswa/GetDetail?mhsId=${data.mhsId}`);
-                    if (detailResponse.ok) {
-                      const detailData = await detailResponse.json();
-                      const angkatan = detailData.mhsAngkatan;
-                      
-                      // Generate tahun akademik options based on angkatan
-                      const tahunSekarang = new Date().getFullYear() - 1;
-                      const tahunAjaranOptions = [];
-                      
-                      for (let i = tahunSekarang; i <= angkatan + 3; i++) {
-                        tahunAjaranOptions.push({
-                          Value: `${i}/${i + 1}`,
-                          Text: `${i}/${i + 1}`
-                        });
+                  const studentFound = activeStudents.find(s => s.mhsId === data.mhsId);
+                  if (studentFound) {
+                    // Fetch student detail to get mhsAngkatan and generate tahun akademik
+                    try {
+                      const detailResponse = await fetch(`${API_LINK}Mahasiswa/GetDetail?mhsId=${data.mhsId}`);
+                      if (detailResponse.ok) {
+                        const detailData = await detailResponse.json();
+                        const angkatan = detailData.mhsAngkatan;
+                        
+                        // Generate tahun akademik options based on angkatan
+                        const tahunSekarang = new Date().getFullYear() - 1;
+                        const tahunAjaranOptions = [];
+                        
+                        for (let i = tahunSekarang; i <= angkatan + 3; i++) {
+                          tahunAjaranOptions.push({
+                            Value: `${i}/${i + 1}`,
+                            Text: `${i}/${i + 1}`
+                          });
+                        }
+                        
+                        // Found the konsentrasi for this student
+                        setFormData(prev => ({
+                          ...prev,
+                          konId: konsentrasi.id,
+                          angkatan: angkatan.toString(),
+                          tahunAjaranOptions: tahunAjaranOptions
+                        }));
+                        
+                        console.log("Generated tahun akademik options for existing data:", tahunAjaranOptions);
+                      } else {
+                        // Fallback if GetDetail fails
+                        setFormData(prev => ({
+                          ...prev,
+                          konId: konsentrasi.id,
+                          angkatan: studentFound.angkatan || ""
+                        }));
                       }
-                      
-                      // Found the prodi for this student
-                      setFormData(prev => ({
-                        ...prev,
-                        konId: prodi.konId,
-                        angkatan: angkatan.toString(),
-                        tahunAjaranOptions: tahunAjaranOptions
-                      }));
-                      
-                      console.log("Generated tahun akademik options for existing data:", tahunAjaranOptions);
-                    } else {
+                    } catch (detailError) {
+                      console.warn("Could not fetch student detail:", detailError);
                       // Fallback if GetDetail fails
                       setFormData(prev => ({
                         ...prev,
-                        konId: prodi.konId,
+                        konId: konsentrasi.id,
                         angkatan: studentFound.angkatan || ""
                       }));
                     }
-                  } catch (detailError) {
-                    console.warn("Could not fetch student detail:", detailError);
-                    // Fallback if GetDetail fails
-                    setFormData(prev => ({
-                      ...prev,
-                      konId: prodi.konId,
-                      angkatan: studentFound.angkatan || ""
-                    }));
+                    
+                    // Load students for this konsentrasi
+                    setStudentList(activeStudents.map(item => ({
+                      Value: item.mhsId,
+                      Text: item.mhsNama
+                    })));
+                    
+                    console.log("Found student's konsentrasi:", konsentrasi.nama);
+                    break;
                   }
-                  
-                  // Load students for this prodi
-                  setStudentList(activeStudents.map(item => ({
-                    Value: item.mhsId,
-                    Text: item.mhsNama
-                  })));
-                  
-                  console.log("Found student's prodi:", prodi.konNama);
-                  break;
                 }
               }
             }
+          } catch (error) {
+            console.warn("Could not determine student's konsentrasi:", error);
           }
-        } catch (error) {
-          console.warn("Could not determine student's prodi:", error);
+        } else {
+          console.warn("No username found for prodi user");
         }
       }
 
     } finally {
       setLoading(false);
     }
-  }, [realId, isProdi]);
+  }, [realId, isProdi, userData]);
 
   // Load mahasiswa data using GetDetail for mahasiswa users in edit mode
   useEffect(() => {
