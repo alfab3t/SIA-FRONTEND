@@ -1853,19 +1853,19 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         
         {/* Notifikasi Bebas Tanggungan untuk Mahasiswa */}
         {isMahasiswa && bebasTanggunganStatus === "NOK" && (
-          <div className="alert alert-warning d-flex align-items-center justify-content-between mb-3" role="alert">
-            <div>
+          <div className="mb-3">
+            <div className="alert alert-warning mb-2" role="alert">
               <i className="fas fa-exclamation-triangle me-2"></i>
               <strong>Anda belum menyelesaikan administrasi bebas tanggungan</strong>
             </div>
-            <button 
-              className="btn btn-sm btn-outline-warning"
+            <span 
+              className="text-primary text-decoration-underline" 
+              style={{ cursor: 'pointer' }}
               onClick={() => router.push('/pages/administrasi-akademik/bebas-tanggungan')}
-              style={{ whiteSpace: 'nowrap' }}
             >
               <i className="fas fa-eye me-1"></i>
               Lihat Administrasi Bebas Tanggungan
-            </button>
+            </span>
           </div>
         )}
         

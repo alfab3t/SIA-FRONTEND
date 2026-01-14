@@ -654,6 +654,24 @@ export default function AddCutiAkademik() {
         { label: isProdi ? "Tambah Pengajuan (Prodi)" : "Tambah Pengajuan" },
       ]}
     >
+      {/* Notifikasi Bebas Tanggungan untuk Prodi - di bawah breadcrumb */}
+      {isProdi && formData.mhsId && bebasTanggunganStatus === "NOK" && (
+        <div className="mb-3">
+          <div className="alert alert-warning mb-2" role="alert">
+            <i className="fas fa-exclamation-triangle me-2"></i>
+            <strong>Mahasiswa belum menyelesaikan administrasi bebas tanggungan</strong>
+          </div>
+          <span 
+            className="text-primary text-decoration-underline" 
+            style={{ cursor: 'pointer' }}
+            onClick={() => router.push('/pages/administrasi-akademik/bebas-tanggungan')}
+          >
+            <i className="fas fa-eye me-1"></i>
+            Lihat Administrasi Bebas Tanggungan
+          </span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         {isProdi && (
           <>
@@ -704,25 +722,6 @@ export default function AddCutiAkademik() {
                 />
               </div>
             </div>
-
-            {/* Notifikasi Bebas Tanggungan untuk Prodi */}
-            {formData.mhsId && bebasTanggunganStatus === "NOK" && (
-              <div className="alert alert-warning d-flex align-items-center justify-content-between mt-3" role="alert">
-                <div>
-                  <i className="fas fa-exclamation-triangle me-2"></i>
-                  <strong>Mahasiswa belum menyelesaikan administrasi bebas tanggungan</strong>
-                </div>
-                <button 
-                  type="button"
-                  className="btn btn-sm btn-outline-warning"
-                  onClick={() => router.push('/pages/administrasi-akademik/bebas-tanggungan')}
-                  style={{ whiteSpace: 'nowrap' }}
-                >
-                  <i className="fas fa-eye me-1"></i>
-                  Lihat Administrasi Bebas Tanggungan
-                </button>
-              </div>
-            )}
           </>
         )}
 
