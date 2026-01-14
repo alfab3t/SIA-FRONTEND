@@ -93,8 +93,8 @@ export default function AddMeninggalDunia() {
           const formattedStudents = data.map(item => {
             const studentData = {
               Value: item.mhsId || item.id || item.nim,
-              Text: `${item.mhsId || item.id || item.nim} - ${item.nama || item.mhsNama || item.name}`,
-              Prodi: item.prodi || item.programStudi || item.konNama || item.programStudi || "",
+              Text: item.mhsNama || item.nama || item.name || "",
+              Prodi: item.programStudi || item.prodi || item.konNama || item.konsentrasi || "",
               Angkatan: item.mhsAngkatan || item.angkatan || item.tahunAngkatan || item.year || ""
             };
             console.log("Formatted student:", studentData);
