@@ -41,7 +41,8 @@ export default function ProfilMahasiswaPage() {
         return;
       }
 
-      const url = `${API_LINK}Mahasiswa/GetDetail?mhsId=${encodeURIComponent(realMhsId)}`;
+      // Use GetProfil endpoint with nim parameter
+      const url = `${API_LINK}Mahasiswa/GetProfil?nim=${encodeURIComponent(realMhsId)}`;
       console.log("PROFILE URL =", url);
 
       // Add minimum loading time for better UX (300ms)
@@ -165,7 +166,7 @@ export default function ProfilMahasiswaPage() {
           </div>
           <div>
             <h4 className="fw-bold mb-1">{profile.mhsNama}</h4>
-            <p className="text-muted mb-0">NIM: {realMhsId}</p>
+            <p className="text-muted mb-0">NIM: {profile.mhsId || realMhsId}</p>
           </div>
         </div>
 
@@ -174,38 +175,23 @@ export default function ProfilMahasiswaPage() {
 
         <div className="row">
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">No. Pendaftaran</label>
-            <p>{profile.dulNoPendaftaran || "-"}</p>
-          </div>
-
-          <div className="col-lg-6 mb-3">
             <label className="form-label fw-semibold">Nama Lengkap</label>
             <p>{profile.mhsNama || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
             <label className="form-label fw-semibold">Program Studi</label>
-            <p>{profile.konNama || "-"}</p>
+            <p>{profile.prodi || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Jenis Mahasiswa</label>
-            <p>{profile.mhsJenis || "-"}</p>
-          </div>
-
-          <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Tempat Lahir</label>
-            <p>{profile.mhsTempatLahir || "-"}</p>
-          </div>
-
-          <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Tanggal Lahir</label>
-            <p>{formatDate(profile.mhsTglLahir)}</p>
+            <label className="form-label fw-semibold">Tempat, Tanggal Lahir</label>
+            <p>{profile.ttl || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
             <label className="form-label fw-semibold">Jenis Kelamin</label>
-            <p>{formatGender(profile.mhsJenisKelamin)}</p>
+            <p>{profile.mhsJenisKelamin || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
@@ -219,23 +205,63 @@ export default function ProfilMahasiswaPage() {
           </div>
 
           <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Agama</label>
+            <p>{profile.dulAgama || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Kewarganegaraan</label>
+            <p>{profile.dulKewarganegaraan || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Golongan Darah</label>
+            <p>{profile.dulGolonganDarah || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
             <label className="form-label fw-semibold">No. HP</label>
-            <p>{profile.mhsHp || "-"}</p>
+            <p>{profile.dulHp || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
             <label className="form-label fw-semibold">Email</label>
-            <p>{profile.mhsEmail || "-"}</p>
+            <p>{profile.dulEmail || "-"}</p>
           </div>
 
           <div className="col-lg-12 mb-3">
             <label className="form-label fw-semibold">Alamat</label>
-            <p>{profile.mhsAlamat || "-"}</p>
+            <p>{profile.dulAlamat || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
             <label className="form-label fw-semibold">Kode Pos</label>
-            <p>{profile.mhsKodepos || "-"}</p>
+            <p>{profile.dulKodepos || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Status Kawin</label>
+            <p>{profile.dulStatusKawin || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Tinggi Badan</label>
+            <p>{profile.dulTinggiBadan ? `${profile.dulTinggiBadan} cm` : "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Berat Badan</label>
+            <p>{profile.dulBeratBadan ? `${profile.dulBeratBadan} kg` : "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Ukuran Sepatu</label>
+            <p>{profile.dulUkuranSepatu || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Ukuran Kemeja</label>
+            <p>{profile.dulUkuranKemeja || "-"}</p>
           </div>
         </div>
 
@@ -250,8 +276,8 @@ export default function ProfilMahasiswaPage() {
 
         <div className="row">
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Angkatan</label>
-            <p>{profile.mhsAngkatan || "-"}</p>
+            <label className="form-label fw-semibold">Periode Awal</label>
+            <p>{profile.awal || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
@@ -269,13 +295,104 @@ export default function ProfilMahasiswaPage() {
           </div>
 
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Tanggal Masuk</label>
-            <p>{formatDate(profile.mhsTglMasuk)}</p>
+            <label className="form-label fw-semibold">Status Beasiswa</label>
+            <p>{profile.statusBeasiswa || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Tanggal Lulus</label>
-            <p>{formatDate(profile.mhsTglLulus) || "Belum Lulus"}</p>
+            <label className="form-label fw-semibold">Dosen Akademik</label>
+            <p>{profile.mhsDosenAkademik || "-"}</p>
+          </div>
+        </div>
+
+        <br />
+
+        {/* ============================== */}
+        {/* INFORMASI PENDIDIKAN           */}
+        {/* ============================== */}
+
+        <h5 className="fw-bold">Riwayat Pendidikan</h5>
+        <hr />
+
+        <div className="row">
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">SD</label>
+            <p>{profile.dulSd || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Tahun Lulus SD</label>
+            <p>{profile.dulSdTahunLulus || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">SMP</label>
+            <p>{profile.dulSmp || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Tahun Lulus SMP</label>
+            <p>{profile.dulSmpTahunLulus || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">SMA/SMK</label>
+            <p>{profile.dulSma || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Tahun Lulus SMA/SMK</label>
+            <p>{profile.dulSmaTahunLulus || "-"}</p>
+          </div>
+
+          {profile.dulPt && profile.dulPt !== "-" && (
+            <>
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Perguruan Tinggi</label>
+                <p>{profile.dulPt}</p>
+              </div>
+
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Tahun Lulus PT</label>
+                <p>{profile.dulPtTahunLulus || "-"}</p>
+              </div>
+            </>
+          )}
+        </div>
+
+        <br />
+
+        {/* ============================== */}
+        {/* INFORMASI KELUARGA             */}
+        {/* ============================== */}
+
+        <h5 className="fw-bold">Informasi Keluarga</h5>
+        <hr />
+
+        <div className="row">
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Jumlah Saudara</label>
+            <p>{profile.dulJumlahSaudara || "0"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Jumlah Kakak</label>
+            <p>{profile.dulJumlahKakak || "0"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Jumlah Adik</label>
+            <p>{profile.dulJumlahAdik || "0"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Saudara yang Sekolah</label>
+            <p>{profile.dulSaudaraSekolah || "0"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Saudara yang Bekerja</label>
+            <p>{profile.dulSaudaraBekerja || "0"}</p>
           </div>
         </div>
 
@@ -300,8 +417,23 @@ export default function ProfilMahasiswaPage() {
           </div>
 
           <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">NIK Ayah</label>
+            <p>{profile.dulNikAyah?.trim() || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
             <label className="form-label fw-semibold">Status Ayah</label>
             <p>{profile.dulStatusAyah || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Kewarganegaraan Ayah</label>
+            <p>{profile.dulKewarganegaraanAyah || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Agama Ayah</label>
+            <p>{profile.dulAgamaAyah || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
@@ -310,13 +442,38 @@ export default function ProfilMahasiswaPage() {
           </div>
 
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Kode Pos Ayah</label>
-            <p>{profile.dulKodeposAyah || "-"}</p>
+            <label className="form-label fw-semibold">Pendidikan Ayah</label>
+            <p>{profile.dulPendidikanAyah || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Pekerjaan Ayah</label>
+            <p>{profile.dulPekerjaanAyah || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Perusahaan Ayah</label>
+            <p>{profile.dulPerusahaanAyah || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Penghasilan Ayah</label>
+            <p>{profile.dulPenghasilanAyah || "-"}</p>
           </div>
 
           <div className="col-lg-12 mb-3">
             <label className="form-label fw-semibold">Alamat Ayah</label>
             <p>{profile.dulAlamatAyah || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Kode Pos Ayah</label>
+            <p>{profile.dulKodeposAyah || "-"}</p>
+          </div>
+
+          <div className="col-lg-12 mb-3">
+            <label className="form-label fw-semibold">Alamat Perusahaan Ayah</label>
+            <p>{profile.dulAlamatPerusahaanAyah || "-"}</p>
           </div>
 
           {/* Data Ibu */}
@@ -330,8 +487,23 @@ export default function ProfilMahasiswaPage() {
           </div>
 
           <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">NIK Ibu</label>
+            <p>{profile.dulNikIbu?.trim() || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
             <label className="form-label fw-semibold">Status Ibu</label>
             <p>{profile.dulStatusIbu || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Kewarganegaraan Ibu</label>
+            <p>{profile.dulKewarganegaraanIbu || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Agama Ibu</label>
+            <p>{profile.dulAgamaIbu || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
@@ -340,13 +512,38 @@ export default function ProfilMahasiswaPage() {
           </div>
 
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Kode Pos Ibu</label>
-            <p>{profile.dulKodeposIbu || "-"}</p>
+            <label className="form-label fw-semibold">Pendidikan Ibu</label>
+            <p>{profile.dulPendidikanIbu || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Pekerjaan Ibu</label>
+            <p>{profile.dulPekerjaanIbu || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Perusahaan Ibu</label>
+            <p>{profile.dulPerusahaanIbu || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Penghasilan Ibu</label>
+            <p>{profile.dulPenghasilanIbu || "-"}</p>
           </div>
 
           <div className="col-lg-12 mb-3">
             <label className="form-label fw-semibold">Alamat Ibu</label>
             <p>{profile.dulAlamatIbu || "-"}</p>
+          </div>
+
+          <div className="col-lg-6 mb-3">
+            <label className="form-label fw-semibold">Kode Pos Ibu</label>
+            <p>{profile.dulKodeposIbu || "-"}</p>
+          </div>
+
+          <div className="col-lg-12 mb-3">
+            <label className="form-label fw-semibold">Alamat Perusahaan Ibu</label>
+            <p>{profile.dulAlamatPerusahaanIbu || "-"}</p>
           </div>
 
           {/* Data Wali */}
@@ -362,8 +559,23 @@ export default function ProfilMahasiswaPage() {
               </div>
 
               <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">NIK Wali</label>
+                <p>{profile.dulNikWali?.trim() || "-"}</p>
+              </div>
+
+              <div className="col-lg-6 mb-3">
                 <label className="form-label fw-semibold">Status Wali</label>
                 <p>{profile.dulStatusWali?.trim() || "-"}</p>
+              </div>
+
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Kewarganegaraan Wali</label>
+                <p>{profile.dulKewarganegaraanWali || "-"}</p>
+              </div>
+
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Agama Wali</label>
+                <p>{profile.dulAgamaWali || "-"}</p>
               </div>
 
               <div className="col-lg-6 mb-3">
@@ -372,13 +584,38 @@ export default function ProfilMahasiswaPage() {
               </div>
 
               <div className="col-lg-6 mb-3">
-                <label className="form-label fw-semibold">Kode Pos Wali</label>
-                <p>{profile.dulKodeposWali || "-"}</p>
+                <label className="form-label fw-semibold">Pendidikan Wali</label>
+                <p>{profile.dulPendidikanWali || "-"}</p>
+              </div>
+
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Pekerjaan Wali</label>
+                <p>{profile.dulPekerjaanWali || "-"}</p>
+              </div>
+
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Perusahaan Wali</label>
+                <p>{profile.dulPerusahaanWali || "-"}</p>
+              </div>
+
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Penghasilan Wali</label>
+                <p>{profile.dulPenghasilanWali || "-"}</p>
               </div>
 
               <div className="col-lg-12 mb-3">
                 <label className="form-label fw-semibold">Alamat Wali</label>
                 <p>{profile.dulAlamatWali || "-"}</p>
+              </div>
+
+              <div className="col-lg-6 mb-3">
+                <label className="form-label fw-semibold">Kode Pos Wali</label>
+                <p>{profile.dulKodeposWali || "-"}</p>
+              </div>
+
+              <div className="col-lg-12 mb-3">
+                <label className="form-label fw-semibold">Alamat Perusahaan Wali</label>
+                <p>{profile.dulAlamatPerusahaanWali || "-"}</p>
               </div>
             </>
           )}
