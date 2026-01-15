@@ -892,7 +892,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         const completedData = actualData.filter(item => {
           const currentStatus = item.status || item.cak_status || "";
           
-          // For all roles (Prodi, Wadir1, Finance, DAAK, Admin), show only "Disetujui" status in Riwayat
+          // For all roles, show only "Disetujui" status in Riwayat
+          // Note: Prodi filtering will be done AFTER fetching detail data (because prodi field is empty in riwayat API)
           return currentStatus === "Disetujui";
         });
 
@@ -1060,6 +1061,31 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
         console.log("All formatted data ready:", allFormattedData.length);
 
+        // PRODI KONSENTRASI FILTERING - Filter by Prodi's konsentrasi AFTER data is fetched
+        if (isProdi && prodiKonsentrasi) {
+          console.log("=== RIWAYAT PRODI KONSENTRASI FILTERING (AFTER FETCH) ===");
+          console.log("Prodi Konsentrasi:", prodiKonsentrasi);
+          console.log("Total data before prodi filter:", allFormattedData.length);
+          
+          allFormattedData = allFormattedData.filter(item => {
+            const itemProdi = String(item.Prodi || "").trim();
+            const isMatch = itemProdi === prodiKonsentrasi;
+            
+            if (!isMatch) {
+              console.log("→ FILTERED OUT:", {
+                id: item["No Cuti Akademik"],
+                nama: item["Nama Mahasiswa"],
+                prodi: itemProdi,
+                expected: prodiKonsentrasi
+              });
+            }
+            
+            return isMatch;
+          });
+          
+          console.log("Total data after prodi filter:", allFormattedData.length);
+        }
+
         // FRONTEND SEARCH FILTERING - Search in ALL fields
         if (searchRiwayat && searchRiwayat.trim() !== "") {
           const searchTerm = searchRiwayat.toLowerCase().trim();
@@ -1204,7 +1230,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         setLoadingRiwayat(false);
       }
     },
-    [userData, searchRiwayat, sortBy, filterProdi, isProdi, isWadir1, isFinance, isDAAK, isAdmin, isMahasiswa, pageSize]
+    [userData, searchRiwayat, sortBy, filterProdi, isProdi, isWadir1, isFinance, isDAAK, isAdmin, isMahasiswa, pageSize, prodiKonsentrasi]
   );
   
   const handleAjukan = async (id) => {
