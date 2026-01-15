@@ -377,9 +377,9 @@ export default function EditMeninggalDunia() {
               <span className="fw-normal text-danger">{errors.lampiranMeninggal}</span>
             )}
             <small className="text-muted d-block mt-1">
-              Format yang didukung: PDF, DOC, DOCX, JPG, JPEG, PNG (Maksimal 10MB)
+              Format yang didukung: PDF, JPG, JPEG, PNG (Maksimal 10MB)
               {formData.existingLampiran && <br />}
-              {formData.existingLampiran && "Kosongkan jika tidak ingin mengubah file yang sudah ada."}
+              {formData.existingLampiran && ""}
             </small>
           </div>
         </div>
