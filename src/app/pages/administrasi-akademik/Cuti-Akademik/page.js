@@ -6,6 +6,7 @@ import Table from "@/components/common/Table";
 import Toast from "@/components/common/Toast";
 import Button from "@/components/common/Button";
 import DropDown from "@/components/common/Dropdown";
+import Label from "@/components/common/Label";
 import MainContent from "@/components/layout/MainContent";
 import Formsearch from "@/components/common/Formsearch";
 import { useRouter } from "next/navigation";
@@ -2029,9 +2030,14 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               </div>
               <div className="modal-body">
                 <div className="mb-3">
-                  <label className="form-label">Pilih File SK *</label>
+                  <Label
+                    text="File Surat Keterangan"
+                    htmlFor="skFile"
+                    required={true}
+                  />
                   <input
                     type="file"
+                    id="skFile"
                     className="form-control"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                     onChange={handleSKFileSelect}
