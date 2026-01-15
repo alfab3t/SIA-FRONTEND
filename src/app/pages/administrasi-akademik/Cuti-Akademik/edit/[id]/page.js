@@ -7,6 +7,7 @@ import Toast from "@/components/common/Toast";
 import Button from "@/components/common/Button";
 import DropDown from "@/components/common/Dropdown";
 import Label from "@/components/common/Label";
+import Input from "@/components/common/Input";
 import { useRouter, useParams } from "next/navigation";
 import { API_LINK } from "@/lib/constant";
 import { decryptIdUrl } from "@/lib/encryptor";
@@ -790,52 +791,38 @@ export default function EditCutiAkademikPage() {
         {isProdi && (
           <div className="row mt-3">
             <div className="col-lg-4">
-              <DropDown
-                ref={prodiRef}
-                forInput="konId"
+              <Input
                 label="Program Studi"
-                type="pilih"
-                arrData={prodiList}
-                value={formData.konId}
-                onChange={handleProdiChange}
-                isRequired={true}
-                isDisabled={loadingProdi}
-                errorMessage={errors.konId}
-                searchable={true}
+                name="konId"
+                id="konId"
+                value={prodiList.find(p => p.Value === formData.konId)?.Text || ""}
+                onChange={() => {}}
+                disabled={true}
+                required={true}
               />
             </div>
 
             <div className="col-lg-4">
-              <DropDown
-                ref={mahasiswaRef}
-                forInput="mhsId"
+              <Input
                 label="Mahasiswa"
-                type="pilih"
-                arrData={studentList}
-                value={formData.mhsId}
-                onChange={handleStudentChange}
-                isRequired={true}
-                isDisabled={!formData.konId || loadingStudents}
-                errorMessage={errors.mhsId}
-                searchable={true}
+                name="mhsId"
+                id="mhsId"
+                value={studentList.find(s => s.Value === formData.mhsId)?.Text || ""}
+                onChange={() => {}}
+                disabled={true}
+                required={true}
               />
-              {loadingStudents && (
-                <small className="text-muted">Memuat daftar mahasiswa...</small>
-              )}
             </div>
 
             <div className="col-lg-4">
-              <Label
-                text="Angkatan"
-                htmlFor="angkatan"
-                required={false}
-              />
-              <input
-                type="text"
-                className="form-control rounded-4 blue-element"
+              <Input
+                label="Angkatan"
+                name="angkatan"
+                id="angkatan"
                 value={formData.angkatan}
-                disabled
-                placeholder="Otomatis terisi dari NIM"
+                onChange={() => {}}
+                disabled={true}
+                required={false}
               />
             </div>
           </div>

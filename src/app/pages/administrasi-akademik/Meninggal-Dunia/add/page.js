@@ -6,6 +6,7 @@ import Toast from "@/components/common/Toast";
 import Button from "@/components/common/Button";
 import DropDown from "@/components/common/Dropdown";
 import Label from "@/components/common/Label";
+import Input from "@/components/common/Input";
 import { useRouter } from "next/navigation";
 import { API_LINK } from "@/lib/constant";
 import { getUserData } from "@/context/user";
@@ -518,45 +519,29 @@ export default function AddMeninggalDunia() {
 
         <div className="row mt-3">
           <div className="col-lg-6">
-            <Label
-              text="Program Studi"
-              htmlFor="prodi"
-              required={true}
-            />
-            <input
-              type="text"
-              id="prodi"
+            <Input
+              label="Program Studi"
               name="prodi"
-              className="form-control"
+              id="prodi"
               value={formData.prodi}
-              disabled
-              placeholder=""
+              onChange={() => {}}
+              disabled={true}
+              required={true}
+              error={errors.prodi}
             />
-            {errors.prodi && (
-              <span className="fw-normal text-danger">{errors.prodi}</span>
-            )}
-            
           </div>
 
           <div className="col-lg-6">
-            <Label
-              text="Tahun Angkatan"
-              htmlFor="tahunAngkatan"
-              required={true}
-            />
-            <input
-              type="text"
-              id="tahunAngkatan"
+            <Input
+              label="Tahun Angkatan"
               name="tahunAngkatan"
-              className="form-control"
+              id="tahunAngkatan"
               value={formData.tahunAngkatan}
-              disabled
-              placeholder=""
+              onChange={() => {}}
+              disabled={true}
+              required={true}
+              error={errors.tahunAngkatan}
             />
-            {errors.tahunAngkatan && (
-              <span className="fw-normal text-danger">{errors.tahunAngkatan}</span>
-            )}
-            
           </div>
         </div>
 
