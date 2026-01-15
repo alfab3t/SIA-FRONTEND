@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import MainContent from "@/components/layout/MainContent";
 import Toast from "@/components/common/Toast";
 import Button from "@/components/common/Button";
+import Label from "@/components/common/Label";
 import { useRouter, useParams } from "next/navigation";
 import { API_LINK } from "@/lib/constant";
 import { getUserData } from "@/context/user";
@@ -349,31 +350,33 @@ export default function EditMeninggalDunia() {
       <form onSubmit={handleSubmit}>
         <div className="row mt-3">
           <div className="col-lg-12">
-            <label className="form-label">
-              Lampiran File Meninggal Dunia <span className="text-danger">*</span>
-            </label>
-            
-            {/* Show existing file info */}
-            {formData.existingLampiran && (
-              <div className="mb-2 p-2 bg-light rounded">
-                <div>
-                  <small className="text-muted">File saat ini:</small>
-                  <div className="fw-bold">{formData.existingLampiran}</div>
-                </div>
-              </div>
-            )}
+            <Label
+              text="Lampiran File Meninggal Dunia"
+              htmlFor="lampiranMeninggal"
+              required={true}
+            />
             
             <input
               type="file"
+              id="lampiranMeninggal"
               name="lampiranMeninggal"
               className="form-control"
               onChange={handleChange}
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
             />
+            
+            {/* Show existing file info below the input */}
+            {formData.existingLampiran && (
+              <div className="mt-2">
+                <small className="text-muted">File saat ini: </small>
+                <span className="text-dark">{formData.existingLampiran}</span>
+              </div>
+            )}
+            
             {errors.lampiranMeninggal && (
               <span className="fw-normal text-danger">{errors.lampiranMeninggal}</span>
             )}
-            <small className="text-muted">
+            <small className="text-muted d-block mt-1">
               Format yang didukung: PDF, DOC, DOCX, JPG, JPEG, PNG (Maksimal 10MB)
               {formData.existingLampiran && <br />}
               {formData.existingLampiran && "Kosongkan jika tidak ingin mengubah file yang sudah ada."}

@@ -5,6 +5,7 @@ import MainContent from "@/components/layout/MainContent";
 import Toast from "@/components/common/Toast";
 import Button from "@/components/common/Button";
 import DropDown from "@/components/common/Dropdown";
+import Label from "@/components/common/Label";
 import { useRouter } from "next/navigation";
 import { API_LINK } from "@/lib/constant";
 import { getUserData } from "@/context/user";
@@ -517,9 +518,14 @@ export default function AddMeninggalDunia() {
 
         <div className="row mt-3">
           <div className="col-lg-6">
-            <label className="form-label">Program Studi <span className="text-danger">*</span></label>
+            <Label
+              text="Program Studi"
+              htmlFor="prodi"
+              required={true}
+            />
             <input
               type="text"
+              id="prodi"
               name="prodi"
               className="form-control"
               value={formData.prodi}
@@ -533,9 +539,14 @@ export default function AddMeninggalDunia() {
           </div>
 
           <div className="col-lg-6">
-            <label className="form-label">Tahun Angkatan <span className="text-danger">*</span></label>
+            <Label
+              text="Tahun Angkatan"
+              htmlFor="tahunAngkatan"
+              required={true}
+            />
             <input
               type="text"
+              id="tahunAngkatan"
               name="tahunAngkatan"
               className="form-control"
               value={formData.tahunAngkatan}
@@ -551,11 +562,14 @@ export default function AddMeninggalDunia() {
 
         <div className="row mt-3">
           <div className="col-lg-12">
-            <label className="form-label">
-              Lampiran File Meninggal Dunia <span className="text-danger">*</span>
-            </label>
+            <Label
+              text="Lampiran File Meninggal Dunia"
+              htmlFor="lampiranMeninggal"
+              required={true}
+            />
             <input
               type="file"
+              id="lampiranMeninggal"
               name="lampiranMeninggal"
               className="form-control"
               onChange={handleChange}
