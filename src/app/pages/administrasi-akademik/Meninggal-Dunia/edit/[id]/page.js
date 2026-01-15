@@ -360,7 +360,7 @@ export default function EditMeninggalDunia() {
               type="file"
               id="lampiranMeninggal"
               name="lampiranMeninggal"
-              className="form-control"
+              className="form-control rounded-4 blue-element"
               onChange={handleChange}
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
             />
