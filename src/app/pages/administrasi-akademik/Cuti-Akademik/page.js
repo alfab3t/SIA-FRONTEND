@@ -439,26 +439,43 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           
           if (isMahasiswa) {
             // Check if this application was created by prodi using multiple detection methods
-            const createdByProdi = item.cak_created_by && 
-              (item.cak_created_by.toLowerCase().includes('prodi') ||
-               item.cak_created_by === userData?.username ||
-               item.cak_created_by === userData?.nama);
             
-            // Also check session storage for prodi-created applications
+            // Method 1: Check cak_created_by field
+            const createdByField = item.cak_created_by || item.createdBy || item.created_by || "";
+            const createdByProdiFromField = createdByField && 
+              (createdByField.toLowerCase().includes('prodi') ||
+               createdByField !== userData?.nama); // If created by someone other than current mahasiswa
+            
+            // Method 2: Check session storage for prodi-created applications
             const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
             const isProdiCreatedFromSession = prodiCreatedApps.includes(item.cak_id || item.id);
             
-            // Check if application has prodi-specific fields (menimbang field presence)
+            // Method 3: Check if application has prodi-specific fields (menimbang field presence)
             const hasProdiFields = item.menimbang && item.menimbang.trim() !== "";
             
-            const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession || hasProdiFields;
+            // Method 4: Check approveProdi field (if it has value, it was created by prodi)
+            // Use the exact field name from API response
+            const hasProdiApproval = item.approveProdi && item.approveProdi.trim() !== "";
             
-            if (isDraft && !isCreatedByProdi) {
-              // Mahasiswa can only edit/delete/submit their own applications
+            const isCreatedByProdi = createdByProdiFromField || isProdiCreatedFromSession || hasProdiFields || hasProdiApproval;
+            
+            console.log("=== MAHASISWA ACTION DEBUG ===");
+            console.log("Item ID:", item.cak_id || item.id);
+            console.log("Created By Field:", createdByField);
+            console.log("Current Mahasiswa:", userData?.nama);
+            console.log("Has Prodi Fields (menimbang):", hasProdiFields);
+            console.log("approveProdi value:", item.approveProdi);
+            console.log("Has Prodi Approval:", hasProdiApproval);
+            console.log("Is Created By Prodi:", isCreatedByProdi);
+            
+            // If created by Prodi, Mahasiswa can ONLY view for ALL statuses
+            if (isCreatedByProdi) {
+              actions = ["Detail"];
+            } else if (isDraft) {
+              // Mahasiswa can edit/delete/submit their own draft applications
               actions = ["Detail", "Edit", "Delete", "Ajukan"];
             } else {
-              // Mahasiswa can only view submitted applications or prodi-created applications
-              // They CANNOT perform "Ajukan" on prodi-created drafts
+              // Mahasiswa can only view their own submitted applications
               actions = ["Detail"];
             }
           } else if (isProdi) {
