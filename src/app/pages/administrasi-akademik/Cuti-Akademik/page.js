@@ -1061,30 +1061,10 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
         console.log("All formatted data ready:", allFormattedData.length);
 
-        // PRODI KONSENTRASI FILTERING - Filter by Prodi's konsentrasi AFTER data is fetched
-        if (isProdi && prodiKonsentrasi) {
-          console.log("=== RIWAYAT PRODI KONSENTRASI FILTERING (AFTER FETCH) ===");
-          console.log("Prodi Konsentrasi:", prodiKonsentrasi);
-          console.log("Total data before prodi filter:", allFormattedData.length);
-          
-          allFormattedData = allFormattedData.filter(item => {
-            const itemProdi = String(item.Prodi || "").trim();
-            const isMatch = itemProdi === prodiKonsentrasi;
-            
-            if (!isMatch) {
-              console.log("→ FILTERED OUT:", {
-                id: item["No Cuti Akademik"],
-                nama: item["Nama Mahasiswa"],
-                prodi: itemProdi,
-                expected: prodiKonsentrasi
-              });
-            }
-            
-            return isMatch;
-          });
-          
-          console.log("Total data after prodi filter:", allFormattedData.length);
-        }
+        // PRODI KONSENTRASI FILTERING - REMOVED for Riwayat
+        // Prodi can see all prodi in Riwayat tab
+        console.log("=== RIWAYAT - NO PRODI FILTERING ===");
+        console.log("Prodi can see all prodi in Riwayat tab");
 
         // FRONTEND SEARCH FILTERING - Search in ALL fields
         if (searchRiwayat && searchRiwayat.trim() !== "") {
@@ -1230,7 +1210,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         setLoadingRiwayat(false);
       }
     },
-    [userData, searchRiwayat, sortBy, filterProdi, isProdi, isWadir1, isFinance, isDAAK, isAdmin, isMahasiswa, pageSize, prodiKonsentrasi]
+    [userData, searchRiwayat, sortBy, filterProdi, isProdi, isWadir1, isFinance, isDAAK, isAdmin, isMahasiswa, pageSize]
   );
   
   const handleAjukan = async (id) => {
@@ -1879,6 +1859,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     if (isProdi || isWadir1 || isFinance || isDAAK || isAdmin) {
       setShowRiwayat(true);
       // Load Riwayat data in parallel for faster performance
+      // Note: Prodi can see all prodi in Riwayat tab (no konsentrasi filtering)
       setTimeout(() => loadDataRiwayat(1), 50); // Small delay to prevent blocking main data
     }
   }, [ssoData, userData, loadData, loadDataRiwayat, isProdi, isWadir1, isFinance, isDAAK, isAdmin, router]);
