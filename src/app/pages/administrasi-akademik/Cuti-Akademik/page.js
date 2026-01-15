@@ -1850,19 +1850,33 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
     if (!userData) return;
 
-
-
-    
-    loadData(1);
-    
-    // Load Riwayat data immediately for eligible roles (optimized for faster loading)
-    if (isProdi || isWadir1 || isFinance || isDAAK || isAdmin) {
-      setShowRiwayat(true);
-      // Load Riwayat data in parallel for faster performance
-      // Note: Prodi can see all prodi in Riwayat tab (no konsentrasi filtering)
-      setTimeout(() => loadDataRiwayat(1), 50); // Small delay to prevent blocking main data
+    // For Prodi users, wait for prodiKonsentrasi to load first before loading data
+    if (isProdi) {
+      // Only load data after prodiKonsentrasi is ready
+      if (prodiKonsentrasi !== null && !loadingProdiKonsentrasi) {
+        console.log("[useEffect] Prodi konsentrasi ready, loading main data with filter:", prodiKonsentrasi);
+        loadData(1);
+        
+        // Load Riwayat data
+        setShowRiwayat(true);
+        setTimeout(() => loadDataRiwayat(1), 50);
+      } else {
+        console.log("[useEffect] Waiting for prodiKonsentrasi to load before loading main data...", {
+          prodiKonsentrasi,
+          loadingProdiKonsentrasi
+        });
+      }
+    } else {
+      // For other roles, load immediately
+      loadData(1);
+      
+      // Load Riwayat data immediately for eligible roles
+      if (isWadir1 || isFinance || isDAAK || isAdmin) {
+        setShowRiwayat(true);
+        setTimeout(() => loadDataRiwayat(1), 50);
+      }
     }
-  }, [ssoData, userData, loadData, loadDataRiwayat, isProdi, isWadir1, isFinance, isDAAK, isAdmin, router]);
+  }, [ssoData, userData, loadData, loadDataRiwayat, isProdi, isWadir1, isFinance, isDAAK, isAdmin, router, prodiKonsentrasi, loadingProdiKonsentrasi]);
 
   const filterContent = (
     <>
