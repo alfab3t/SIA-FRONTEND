@@ -871,7 +871,8 @@ export default function AddCutiAkademik() {
           {!(isProdi && formData.mhsId && bebasTanggunganStatus === "NOK") && (
             <Button
               classType="primary"
-              label={saving ? "Menyimpan..." : "Simpan"}
+              iconName="save"
+              label={saving ? "Menyimpan..." : "Simpan Editor"}
               type="submit"
               isDisabled={saving}
             />

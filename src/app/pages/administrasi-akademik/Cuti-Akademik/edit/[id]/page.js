@@ -984,7 +984,8 @@ export default function EditCutiAkademikPage() {
           />
           <Button
             classType="primary"
-            label={saving ? "Menyimpan..." : "Simpan Perubahan"}
+            iconName="save"
+            label={saving ? "Menyimpan..." : "Simpan Editor"}
             type="submit"
             isDisabled={saving}
           />
