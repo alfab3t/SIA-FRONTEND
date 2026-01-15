@@ -2038,14 +2038,14 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
                   <input
                     type="file"
                     id="skFile"
-                    className="form-control"
+                    className="form-control rounded-4 blue-element"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                     onChange={handleSKFileSelect}
                     disabled={uploadLoading}
                   />
-                  <div className="form-text">
+                  <small className="text-muted">
                     Format yang didukung: PDF, DOC, DOCX, JPG, JPEG, PNG (Maksimal 10MB)
-                  </div>
+                  </small>
                 </div>
 
                 {skFilePreview && (

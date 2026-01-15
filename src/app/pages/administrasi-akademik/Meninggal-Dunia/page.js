@@ -6,6 +6,7 @@ import Formsearch from "@/components/common/Formsearch";
 import Table from "@/components/common/Table";
 import Paging from "@/components/common/Paging";
 import DropDown from "@/components/common/Dropdown";
+import Label from "@/components/common/Label";
 import Toast from "@/components/common/Toast";
 import Button from "@/components/common/Button";
 import { getUserData, getSSOData } from "@/context/user";
@@ -1521,31 +1522,41 @@ export default function Page_MeninggalDunia() {
                             </div>
                             <div className="modal-body">
                                 <div className="mb-3">
-                                    <label className="form-label">Berkas Surat keterangan Meninggal Dunia *</label>
+                                    <Label
+                                        text="Berkas Surat Keterangan Meninggal Dunia"
+                                        htmlFor="skMeninggalFile"
+                                        required={true}
+                                    />
                                     <input
                                         type="file"
-                                        className="form-control"
+                                        id="skMeninggalFile"
+                                        className="form-control rounded-4 blue-element"
                                         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                                         onChange={handleSKFileSelect}
                                         disabled={uploadLoading}
                                     />
-                                    <div className="form-text">
+                                    <small className="text-muted">
                                         Format yang didukung: PDF, DOC, DOCX, JPG, JPEG, PNG (Maksimal 10MB)
-                                    </div>
+                                    </small>
                                 </div>
 
                                 <div className="mb-3">
-                                    <label className="form-label">Berkas Surat Keterangan Pernah Berkuliah *</label>
+                                    <Label
+                                        text="Berkas Surat Keterangan Pernah Berkuliah"
+                                        htmlFor="spkbFile"
+                                        required={true}
+                                    />
                                     <input
                                         type="file"
-                                        className="form-control"
+                                        id="spkbFile"
+                                        className="form-control rounded-4 blue-element"
                                         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                                         onChange={handleSPKBFileSelect}
                                         disabled={uploadLoading}
                                     />
-                                    <div className="form-text">
+                                    <small className="text-muted">
                                         Format yang didukung: PDF, DOC, DOCX, JPG, JPEG, PNG (Maksimal 10MB)
-                                    </div>
+                                    </small>
                                 </div>
 
                                 {skFilePreview && (
