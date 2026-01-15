@@ -967,9 +967,7 @@ export default function EditCutiAkademikPage() {
                 onChange={handleEditorChange}
                 error={errors.menimbang}
               />
-              <small className="text-muted">
-                Masukkan pertimbangan/alasan untuk pengajuan cuti akademik mahasiswa.
-              </small>
+              
             </div>
           </div>
         )}
