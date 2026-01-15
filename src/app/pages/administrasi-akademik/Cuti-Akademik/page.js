@@ -128,6 +128,10 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   // State for bebas tanggungan check
   const [bebasTanggunganStatus, setBebasTanggunganStatus] = useState(null);
   const [checkingBebasTanggungan, setCheckingBebasTanggungan] = useState(false);
+  
+  // State for Prodi's konsentrasi
+  const [prodiKonsentrasi, setProdiKonsentrasi] = useState(null);
+  const [loadingProdiKonsentrasi, setLoadingProdiKonsentrasi] = useState(false);
 
   // Check bebas tanggungan for mahasiswa
   useEffect(() => {
@@ -168,6 +172,54 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
     checkBebasTanggungan();
   }, [isMahasiswa, userData]);
+  
+  // Load Prodi's konsentrasi for filtering
+  useEffect(() => {
+    if (!isProdi || !userData) return;
+    
+    const loadProdiKonsentrasi = async () => {
+      try {
+        setLoadingProdiKonsentrasi(true);
+        const username = userData?.nama || userData?.username || "";
+        
+        console.log(`[loadProdiKonsentrasi] Loading konsentrasi for username: ${username}`);
+        
+        if (!username) {
+          console.warn("[loadProdiKonsentrasi] No username found");
+          return;
+        }
+
+        const response = await fetch(`${API_LINK}Mahasiswa/GetKonsentrasiList?username=${username}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`[loadProdiKonsentrasi] Konsentrasi data:`, data);
+          
+          // Extract konsentrasi name (e.g., "Manajemen Informatika (MI)" -> "Manajemen Informatika")
+          if (data && data.length > 0) {
+            const konsentrasiName = data[0].nama || "";
+            // Remove the abbreviation in parentheses if present
+            const cleanName = konsentrasiName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+            setProdiKonsentrasi(cleanName);
+            console.log(`[loadProdiKonsentrasi] Set konsentrasi to: ${cleanName}`);
+          }
+        } else {
+          console.error(`[loadProdiKonsentrasi] API Error: ${response.status}`);
+        }
+      } catch (error) {
+        console.error("[loadProdiKonsentrasi] Network error:", error);
+      } finally {
+        setLoadingProdiKonsentrasi(false);
+      }
+    };
+
+    loadProdiKonsentrasi();
+  }, [isProdi, userData]);
   
   const loadData = useCallback(
     async (page = 1) => {
@@ -355,6 +407,22 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             }
             return false; 
           } else if (isProdi) {
+            // For Prodi users, first filter by konsentrasi
+            const itemProdi = item.prodi || item.kon_nama || item.konsentrasi || "";
+            
+            console.log("=== PRODI KONSENTRASI FILTERING DEBUG ===");
+            console.log("Item ID:", item.cak_id || item.id);
+            console.log("Item Prodi:", itemProdi);
+            console.log("Prodi Konsentrasi:", prodiKonsentrasi);
+            console.log("Match:", itemProdi === prodiKonsentrasi);
+            
+            // If Prodi's konsentrasi is loaded, filter by it
+            if (prodiKonsentrasi && itemProdi !== prodiKonsentrasi) {
+              console.log("→ FILTERED OUT: Not in Prodi's konsentrasi");
+              return false;
+            }
+            
+            // Then apply status-based filtering
             // For Prodi users, show only:
             // 1. Draft applications created by Prodi (not by Mahasiswa)
             // 2. Applications waiting for Prodi approval ("Belum Disetujui Prodi")
@@ -709,7 +777,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         setLoading(false);
       }
     },
-    [fixedRole, isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData, search]
+    [fixedRole, isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData, search, prodiKonsentrasi]
   );
 
   const loadDataRiwayat = useCallback(
