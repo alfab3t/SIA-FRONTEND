@@ -594,13 +594,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             
             if (isReadyForSK) {
               // All approvals complete - admin can manage SK
-              if (hasUploadedSK) {
-                // SK already uploaded, admin can download SK
-                actions = ["Detail", "DownloadSK"];
-              } else {
-                // No SK yet, show upload option
-                actions = ["Detail", "UploadSK"];
-              }
+              // Always show UploadSK in Aksi column (not DownloadSK)
+              actions = ["Detail", "UploadSK"];
             } else {
               // Approvals still pending - admin can only view
               actions = ["Detail"];
