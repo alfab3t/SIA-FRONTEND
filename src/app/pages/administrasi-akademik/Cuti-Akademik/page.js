@@ -410,14 +410,24 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             // For Prodi users, first filter by konsentrasi
             const itemProdi = item.prodi || item.kon_nama || item.konsentrasi || "";
             
+            // Normalize both values by removing abbreviation in parentheses for comparison
+            const normalizeProdiName = (name) => {
+              if (!name) return "";
+              return name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+            };
+            
+            const normalizedItemProdi = normalizeProdiName(itemProdi);
+            const normalizedProdiKonsentrasi = normalizeProdiName(prodiKonsentrasi);
+            
             console.log("=== PRODI KONSENTRASI FILTERING DEBUG ===");
             console.log("Item ID:", item.cak_id || item.id);
-            console.log("Item Prodi:", itemProdi);
-            console.log("Prodi Konsentrasi:", prodiKonsentrasi);
-            console.log("Match:", itemProdi === prodiKonsentrasi);
+            console.log("Item Prodi (raw):", itemProdi);
+            console.log("Item Prodi (normalized):", normalizedItemProdi);
+            console.log("Prodi Konsentrasi (normalized):", normalizedProdiKonsentrasi);
+            console.log("Match:", normalizedItemProdi === normalizedProdiKonsentrasi);
             
-            // If Prodi's konsentrasi is loaded, filter by it
-            if (prodiKonsentrasi && itemProdi !== prodiKonsentrasi) {
+            // If Prodi's konsentrasi is loaded, filter by it (using normalized names)
+            if (prodiKonsentrasi && normalizedItemProdi !== normalizedProdiKonsentrasi) {
               console.log("→ FILTERED OUT: Not in Prodi's konsentrasi");
               return false;
             }
