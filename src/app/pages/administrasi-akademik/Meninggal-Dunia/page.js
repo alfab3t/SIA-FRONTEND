@@ -516,8 +516,11 @@ export default function Page_MeninggalDunia() {
                     // Determine SK Meninggal Dunia column content for Admin role
                     let skMeninggalDuniaColumn = "-";
                     if (isAdmin || isDAAK) {
+                        // Check if No SK has data - use the same field that's displayed in "No SK" column
+                        const noSK = item.nomorSK || item.srt_no || item.suratNo || item.mdu_srt_no || "";
+                        
                         // Jika ada No SK, tampilkan button download
-                        if (hasUploadedSK) {
+                        if (noSK && noSK !== "-" && noSK.trim() !== "") {
                             skMeninggalDuniaColumn = "DownloadSK";
                         } else {
                             // Jika tidak ada No SK, tampilkan "-"
