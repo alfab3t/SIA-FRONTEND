@@ -539,14 +539,12 @@ export default function Page_MeninggalDunia() {
                 // Use GetAll endpoint with Status filter for "Disetujui" only
                 const params = new URLSearchParams();
                 
-                // Always filter for "Disetujui" status in Riwayat
-                params.append('Status', 'Disetujui');
-                
+                // Parameters for Riwayat endpoint
                 if (keyword && keyword.trim() !== "") {
                     params.append('SearchKeyword', keyword.trim());
                 }
                 
-                // Map sort parameter to GetAll endpoint format
+                // Map sort parameter to Riwayat endpoint format
                 let sortParam = sort;
                 if (sort === "tanggal asc") {
                     sortParam = "tanggal asc";
@@ -570,7 +568,7 @@ export default function Page_MeninggalDunia() {
                 params.append('PageNumber', page);
                 params.append('PageSize', riwayatPageSize);
 
-                const url = `${API_LINK}MeninggalDunia/GetAll?${params}`;
+                const url = `${API_LINK}MeninggalDunia/Riwayat?${params}`;
                 console.log("Riwayat API URL:", url);
 
                 const response = await fetch(url, {
@@ -627,118 +625,35 @@ export default function Page_MeninggalDunia() {
 
                 console.log("Processing riwayat array data:", actualData);
 
-                // Since we're filtering by "Disetujui" status at API level, all data should be completed
-                // But let's double-check to ensure only "Disetujui" status is shown
-                const completedData = actualData.filter(item => {
-                    const currentStatus = item.status || item.mdu_status || "";
-                    return currentStatus === "Disetujui";
-                });
+                // Backend Riwayat endpoint returns all riwayat data (including non-approved)
+                // No need to filter by status since this is riwayat data
+                const riwayatData = actualData;
 
-                console.log("Filtered completed data for riwayat:", completedData);
+                console.log("Riwayat data from backend:", riwayatData);
 
-                // Process ALL data first (no pagination yet) - Apply frontend prodi filtering like Cuti Akademik
-                let filteredData = completedData;
-
-                // FRONTEND PRODI FILTERING - Filter by selected prodi (same as Cuti Akademik)
-                if (prodi && prodi.trim() !== "") {
-                    console.log("=== FRONTEND PRODI FILTERING (MENINGGAL DUNIA) ===");
-                    console.log("Filter prodi:", prodi);
-                    console.log("Total data before prodi filter:", filteredData.length);
-                    
-                    filteredData = filteredData.filter(item => {
-                        // Get the formatted prodi display (full name with abbreviation)
-                        const formatProdiDisplay = (prodiValue) => {
-                            if (!prodiValue || prodiValue === "-") return "-";
-                            
-                            // Clean input first
-                            let cleanValue = prodiValue;
-                            if (prodiValue.includes('(') && prodiValue.includes(')')) {
-                                const match = prodiValue.match(/^([A-Z]+)\([A-Z]+\)$/);
-                                if (match) {
-                                    cleanValue = match[1];
-                                }
-                            }
-                            
-                            // Map abbreviations to full names with proper format
-                            const prodiMap = {
-                                "MI": "Manajemen Informatika (MI)",
-                                "MK": "Mekatronika (MK)",
-                                "TAB": "Teknik Alat Berat (TAB)",
-                                "TO": "Teknik Otomotif (TO)",
-                                "MO": "Teknik Otomotif (TO)",
-                                "TPHP": "Teknik Pengolahan Hasil Perkebunan (TPHP)",
-                                "TPM": "Teknik Produksi dan Proses Manufaktur (TPM)",
-                                "TPPM": "Teknik Produksi dan Proses Manufaktur (TPM)",
-                                "TKBG": "Teknologi Konstruksi Bangunan Gedung (TKBG)",
-                                "TRL": "Teknologi Rekayasa Logistik (TRL)",
-                                "TRPAB": "Teknologi Rekayasa Pemeliharaan Alat Berat (TRPAB)",
-                                "TRPL": "Teknologi Rekayasa Perangkat Lunak (TRPL)"
-                            };
-                            
-                            return prodiMap[cleanValue] || cleanValue;
-                        };
-
-                        // Extract just the program name (without abbreviation) for filtering
-                        const extractProgramName = (fullProdiDisplay) => {
-                            if (!fullProdiDisplay || fullProdiDisplay === "-") return "";
-                            
-                            // Remove the abbreviation part like "(MI)", "(TPM)", etc.
-                            const match = fullProdiDisplay.match(/^(.+?)\s*\([A-Z]+\)$/);
-                            if (match) {
-                                return match[1].trim();
-                            }
-                            
-                            return fullProdiDisplay;
-                        };
-
-                        const itemProdiFormatted = formatProdiDisplay(item.prodi || item.konsentrasi || "");
-                        const itemProdiName = extractProgramName(itemProdiFormatted);
-                        
-                        // Compare with the selected filter value (which is just the program name)
-                        const isMatch = itemProdiName === prodi;
-                        
-                        if (isMatch) {
-                            console.log("Prodi match found:", {
-                                noPengajuan: item.noPengajuan || item.id,
-                                nama: item.namaMahasiswa || item.mhs_nama,
-                                originalProdi: item.prodi || item.konsentrasi,
-                                formattedProdi: itemProdiFormatted,
-                                extractedName: itemProdiName,
-                                filterValue: prodi
-                            });
-                        }
-                        
-                        return isMatch;
-                    });
-                    
-                    console.log(`Prodi filter results: ${filteredData.length} items found`);
-                }
-
-                // Apply pagination to filtered data
-                const totalFilteredItems = filteredData.length;
-                const startIndex = (page - 1) * riwayatPageSize;
-                const endIndex = startIndex + riwayatPageSize;
-                const paginatedData = filteredData.slice(startIndex, endIndex);
-
-                const formattedData = paginatedData.map((item, index) => ({
-                    No: startIndex + index + 1,
-                    id: item.id || item.mdu_id,
-                    "No Pengajuan": item.noPengajuan || item.id || item.mdu_id || "-",
-                    "Tanggal Pengajuan": item.tanggalPengajuan || item.tanggal || item.mdu_created_date || "-",
-                    "Nomor SK": item.nomorSK || item.srt_no || item.mdu_srt_no || "-",
-                    "NIM": item.nim || item.mhs_nim || item.mahasiswaNim || "-",
-                    "Nama Mahasiswa": item.namaMahasiswa || item.mhs_nama || "-",
-                    Prodi: item.prodi || item.konsentrasi || "-",
-                    Status: item.status || item.mdu_status || "Disetujui",
+                // Process ALL data first (no pagination yet) - Backend handles pagination
+                // Since backend Riwayat endpoint handles pagination, we just format the data
+                const formattedData = riwayatData.map((item, index) => ({
+                    No: ((page - 1) * riwayatPageSize) + index + 1,
+                    id: item.id,
+                    "No Pengajuan": item.noPengajuan || item.id || "-",
+                    "Tanggal Pengajuan": item.tanggalPengajuan || "-",
+                    "Nomor SK": item.nomorSK || "-",
+                    "NIM": item.nim || "-",
+                    "Nama Mahasiswa": item.namaMahasiswa || "-",
+                    Prodi: item.prodi || "-",
+                    Status: item.status || "-",
                     Aksi: ["Detail"],
                     Alignment: Array(9).fill("center"),
                 }));
 
                 console.log("Final riwayat data:", formattedData);
-                console.log(`Showing ${formattedData.length} items of ${totalFilteredItems} total (page ${page})`);
+                console.log(`Showing ${formattedData.length} items from backend (page ${page})`);
 
                 setDataRiwayat(formattedData);
-                setRiwayatTotal(totalFilteredItems);
+                // Use totalData from backend response
+                const backendTotalData = data.totalData || 0;
+                setRiwayatTotal(backendTotalData);
                 setRiwayatPage(page);
 
             } catch (err) {
@@ -1450,16 +1365,13 @@ export default function Page_MeninggalDunia() {
                         onExport={() => {
                             const params = new URLSearchParams();
                             if (riwayatSearch && riwayatSearch.trim() !== "") {
-                                params.append('search', riwayatSearch.trim());
+                                params.append('SearchKeyword', riwayatSearch.trim());
                             }
-                            if (!isAdmin && userData?.username) {
-                                const userIdentifier = isMahasiswa ? 
-                                    (userData?.mhsId || userData?.nama || userData?.username) : 
-                                    userData?.username;
-                                params.append('userId', userIdentifier);
+                            if (filterSort && filterSort !== "") {
+                                params.append('Sort', filterSort);
                             }
                             
-                            const exportUrl = `${API_LINK}MeninggalDunia/riwayat/excel${params.toString() ? '?' + params.toString() : ''}`;
+                            const exportUrl = `${API_LINK}MeninggalDunia/Riwayat/excel${params.toString() ? '?' + params.toString() : ''}`;
                             console.log("Export URL:", exportUrl);
                             window.open(exportUrl, "_blank");
                         }}
