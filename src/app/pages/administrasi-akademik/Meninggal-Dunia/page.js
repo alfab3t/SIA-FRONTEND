@@ -141,6 +141,54 @@ export default function Page_MeninggalDunia() {
 
     console.log("Is Admin:", isAdmin);
 
+    // Load Prodi's konsentrasi for filtering
+    useEffect(() => {
+        if (!isProdi || !userData) return;
+        
+        const loadProdiKonsentrasi = async () => {
+            try {
+                setLoadingProdiKonsentrasi(true);
+                const username = userData?.nama || userData?.username || "";
+                
+                console.log(`[loadProdiKonsentrasi] Loading konsentrasi for username: ${username}`);
+                
+                if (!username) {
+                    console.warn("[loadProdiKonsentrasi] No username found");
+                    return;
+                }
+
+                const response = await fetch(`${API_LINK}Mahasiswa/GetKonsentrasiList?username=${username}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(`[loadProdiKonsentrasi] Konsentrasi data:`, data);
+                    
+                    // Extract konsentrasi name (e.g., "Teknologi Rekayasa Pemeliharaan Alat Berat (TAB)" -> "Teknologi Rekayasa Pemeliharaan Alat Berat")
+                    if (data && data.length > 0) {
+                        const konsentrasiName = data[0].nama || "";
+                        // Remove the abbreviation in parentheses if present
+                        const cleanName = konsentrasiName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                        setProdiKonsentrasi(cleanName);
+                        console.log(`[loadProdiKonsentrasi] Set konsentrasi to: ${cleanName}`);
+                    }
+                } else {
+                    console.error(`[loadProdiKonsentrasi] API Error: ${response.status}`);
+                }
+            } catch (error) {
+                console.error("[loadProdiKonsentrasi] Network error:", error);
+            } finally {
+                setLoadingProdiKonsentrasi(false);
+            }
+        };
+
+        loadProdiKonsentrasi();
+    }, [isProdi, userData]);
+
 
     // ============================================================
     // ================      TABLE 1 : PENGAJUAN      =============
@@ -152,6 +200,10 @@ export default function Page_MeninggalDunia() {
     const [pengajuanTotalData, setPengajuanTotalData] = useState(0);
     const pengajuanPageSize = 10;
     const [search, setSearch] = useState("");
+    
+    // State for Prodi's konsentrasi filtering
+    const [prodiKonsentrasi, setProdiKonsentrasi] = useState(null);
+    const [loadingProdiKonsentrasi, setLoadingProdiKonsentrasi] = useState(false);
 
     const loadPengajuan = useCallback(
         async (page = 1) => {
@@ -327,12 +379,27 @@ export default function Page_MeninggalDunia() {
                         }
                         return false; 
                     } else if (isProdi) {
+                        // For Prodi users, first filter by konsentrasi
+                        const itemProdi = item.prodi || item.kon_nama || item.konsentrasi || "";
+                        
+                        console.log("=== PRODI KONSENTRASI FILTERING DEBUG ===");
+                        console.log("Item ID:", item.id);
+                        console.log("Item Prodi:", itemProdi);
+                        console.log("Prodi Konsentrasi:", prodiKonsentrasi);
+                        console.log("Match:", itemProdi === prodiKonsentrasi);
+                        
+                        // If Prodi's konsentrasi is loaded, filter by it
+                        if (prodiKonsentrasi && itemProdi !== prodiKonsentrasi) {
+                            console.log("→ FILTERED OUT: Not in Prodi's konsentrasi");
+                            return false;
+                        }
+                        
+                        // Then apply status-based filtering
                         // For Prodi users, show ONLY:
                         // 1. Draft status
                         // 2. Belum Disetujui Wadir 1 status
-                        // Simple filtering based on status only
                         
-                        console.log("=== PRODI FILTERING DEBUG ===");
+                        console.log("=== PRODI STATUS FILTERING DEBUG ===");
                         console.log("Current status:", currentStatus);
                         console.log("Item:", item);
                         
@@ -497,7 +564,7 @@ export default function Page_MeninggalDunia() {
                 setLoadingPengajuan(false);
             }
         },
-        [fixedRole, isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData, search]
+        [fixedRole, isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData, search, prodiKonsentrasi]
     );
 
     // ============================================================
@@ -1270,12 +1337,25 @@ export default function Page_MeninggalDunia() {
 
         if (!userData) return;
 
+        // For Prodi users, wait for prodiKonsentrasi to load before calling loadPengajuan
+        if (isProdi) {
+            if (loadingProdiKonsentrasi) {
+                console.log("Waiting for prodiKonsentrasi to load...");
+                return;
+            }
+            if (!prodiKonsentrasi) {
+                console.log("ProdiKonsentrasi not loaded yet, skipping loadPengajuan...");
+                return;
+            }
+            console.log("ProdiKonsentrasi loaded:", prodiKonsentrasi, "- proceeding with loadPengajuan");
+        }
+
         loadPengajuan(1);
         
         if (isProdi || isWadir1 || isFinance || isDAAK || isAdmin) {
             loadRiwayat(1);
         }
-    }, [ssoData, userData, loadPengajuan, loadRiwayat, isProdi, isWadir1, isFinance, isDAAK, isAdmin, router]);
+    }, [ssoData, userData, loadPengajuan, loadRiwayat, isProdi, isWadir1, isFinance, isDAAK, isAdmin, router, prodiKonsentrasi, loadingProdiKonsentrasi]);
 
     return (
         <MainContent
