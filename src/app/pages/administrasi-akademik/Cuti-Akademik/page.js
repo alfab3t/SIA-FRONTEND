@@ -401,8 +401,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           const currentStatus = item.status || item.cak_status || "";
           
           if (isMahasiswa) {
-            
-            if (currentStatus === "Draft") {
+            // Mahasiswa can see their Draft applications and approved applications
+            if (currentStatus === "Draft" || currentStatus === "Disetujui") {
               return true; 
             }
             return false; 
@@ -535,15 +535,15 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             console.log("Has value (created by Prodi):", approveProdiValue !== "");
             
             // If approveProdi has value, this was created by Prodi
-            // Mahasiswa can ONLY view for ALL statuses
-            if (approveProdiValue && approveProdiValue !== "") {
+            // Mahasiswa can ONLY view for ALL statuses EXCEPT "Disetujui"
+            if (approveProdiValue && approveProdiValue !== "" && currentStatus !== "Disetujui") {
               console.log("→ Created by Prodi: Mahasiswa can only view");
               actions = ["Detail"];
             } else if (isDraft) {
               // Mahasiswa can edit/delete/submit their own draft applications
               actions = ["Detail", "Edit", "Delete", "Ajukan"];
             } else if (currentStatus === "Disetujui") {
-              // Mahasiswa can view and download SK for approved applications
+              // Mahasiswa can view and download SK for approved applications (regardless of who created them)
               actions = ["Detail", "DownloadSK"];
             } else {
               // Mahasiswa can only view their own submitted applications
