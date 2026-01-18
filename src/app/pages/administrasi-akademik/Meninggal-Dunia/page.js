@@ -516,14 +516,11 @@ export default function Page_MeninggalDunia() {
                     // Determine SK Meninggal Dunia column content for Admin role
                     let skMeninggalDuniaColumn = "-";
                     if (isAdmin || isDAAK) {
-                        // Check if No SK has data - use the same field that's displayed in "No SK" column
-                        const noSK = item.nomorSK || item.srt_no || item.suratNo || item.mdu_srt_no || "";
-                        
-                        // Jika ada No SK, tampilkan button download
-                        if (noSK && noSK !== "-" && noSK.trim() !== "") {
+                        // Admin can download SK when status is "Menunggu Upload SK"
+                        if (currentStatus === "Menunggu Upload SK") {
                             skMeninggalDuniaColumn = "DownloadSK";
                         } else {
-                            // Jika tidak ada No SK, tampilkan "-"
+                            // For other statuses, return dash
                             skMeninggalDuniaColumn = "-";
                         }
                     }
@@ -703,19 +700,28 @@ export default function Page_MeninggalDunia() {
 
                 // Process ALL data first (no pagination yet) - Backend handles pagination
                 // Since backend Riwayat endpoint handles pagination, we just format the data
-                const formattedData = riwayatData.map((item, index) => ({
-                    No: ((page - 1) * riwayatPageSize) + index + 1,
-                    id: item.id,
-                    "No Pengajuan": item.noPengajuan || item.id || "-",
-                    "Tanggal Pengajuan": item.tanggalPengajuan || "-",
-                    "Nomor SK": item.nomorSK || "-",
-                    "NIM": item.nim || "-",
-                    "Nama Mahasiswa": item.namaMahasiswa || "-",
-                    Prodi: item.prodi || "-",
-                    Status: item.status || "-",
-                    Aksi: ["Detail"],
-                    Alignment: Array(9).fill("center"),
-                }));
+                const formattedData = riwayatData.map((item, index) => {
+                    // Determine actions based on status
+                    let actions = ["Detail"];
+                    if (item.status === "Disetujui") {
+                        // All roles can download SK for approved applications
+                        actions = ["Detail", "DownloadSK"];
+                    }
+
+                    return {
+                        No: ((page - 1) * riwayatPageSize) + index + 1,
+                        id: item.id,
+                        "No Pengajuan": item.noPengajuan || item.id || "-",
+                        "Tanggal Pengajuan": item.tanggalPengajuan || "-",
+                        "Nomor SK": item.nomorSK || "-",
+                        "NIM": item.nim || "-",
+                        "Nama Mahasiswa": item.namaMahasiswa || "-",
+                        Prodi: item.prodi || "-",
+                        Status: item.status || "-",
+                        Aksi: actions,
+                        Alignment: Array(9).fill("center"),
+                    };
+                });
 
                 console.log("Final riwayat data:", formattedData);
                 console.log(`Showing ${formattedData.length} items from backend (page ${page})`);
@@ -892,12 +898,38 @@ export default function Page_MeninggalDunia() {
 
     const handleDownloadSK = async (id) => {
         try {
-            console.log("=== DOWNLOAD SK FROM MAIN PAGE ===");
-            console.log("Record ID:", id);
+            console.log("=== DOWNLOAD SK MENINGGAL DUNIA ===");
+            console.log("ID:", id);
+            console.log("User Data:", userData);
+
+            // Get username for the API call
+            const username = userData?.nama || userData?.username || "";
             
-            // First, get the detail to obtain the SK filename
-            const encodedId = encodeURIComponent(id);
-            const detailResponse = await fetch(`${API_LINK}MeninggalDunia/${encodedId}`, {
+            if (!username) {
+                Toast.error("Data user tidak lengkap. Silakan login ulang.");
+                return;
+            }
+
+            console.log("Download SK params:", { id, username });
+
+            // Build the download URL with query parameters
+            const params = new URLSearchParams({
+                username: username,
+                format: "pdf"
+            });
+
+            const downloadUrl = `${API_LINK}MeninggalDunia/cetak-sk/${encodeURIComponent(id)}?${params.toString()}`;
+            console.log("Download URL:", downloadUrl);
+
+            // First, check if user has permission by calling the JSON endpoint
+            const checkParams = new URLSearchParams({
+                username: username,
+                format: "json"
+            });
+            
+            const checkUrl = `${API_LINK}MeninggalDunia/cetak-sk/${encodeURIComponent(id)}?${checkParams.toString()}`;
+            
+            const checkResponse = await fetch(checkUrl, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -905,27 +937,32 @@ export default function Page_MeninggalDunia() {
                 }
             });
 
-            if (!detailResponse.ok) {
-                throw new Error(`HTTP ${detailResponse.status}: ${detailResponse.statusText}`);
-            }
-
-            const detailData = await detailResponse.json();
-            console.log("Detail data for SK download:", detailData);
-
-            if (!detailData.sk) {
-                Toast.error("File SK tidak tersedia untuk didownload.");
+            if (!checkResponse.ok) {
+                const errorText = await checkResponse.text();
+                console.error("Permission check failed:", errorText);
+                
+                if (checkResponse.status === 403) {
+                    Toast.error("Anda tidak memiliki akses untuk download SK ini.");
+                } else {
+                    Toast.error(`Gagal mengakses SK: HTTP ${checkResponse.status}`);
+                }
                 return;
             }
 
-            // Now download the SK file using the filename
-            const filename = detailData.sk;
-            const downloadUrl = `${API_LINK}MeninggalDunia/file/${filename}`;
-            console.log("Download SK URL:", downloadUrl);
-            console.log("Original SK filename:", filename);
+            const checkResult = await checkResponse.json();
+            console.log("Permission check result:", checkResult);
+
+            if (!checkResult.canPrint) {
+                Toast.error(checkResult.reason || "Tidak dapat download SK saat ini.");
+                return;
+            }
+
+            // If permission check passed, proceed with PDF download
             window.open(downloadUrl, "_blank");
+            Toast.success("SK berhasil didownload!");
 
         } catch (error) {
-            console.error("Error downloading SK:", error);
+            console.error("Download SK error:", error);
             Toast.error(`Gagal download SK: ${error.message}`);
         }
     };
@@ -1478,6 +1515,7 @@ export default function Page_MeninggalDunia() {
                             <Table
                                 data={dataRiwayat}
                                 onDetail={handleDetail}
+                                onDownloadSK={handleDownloadSK}
                             />
 
                             {riwayatTotal > 0 && (
