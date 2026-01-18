@@ -542,6 +542,9 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             } else if (isDraft) {
               // Mahasiswa can edit/delete/submit their own draft applications
               actions = ["Detail", "Edit", "Delete", "Ajukan"];
+            } else if (currentStatus === "Disetujui") {
+              // Mahasiswa can view and download SK for approved applications
+              actions = ["Detail", "DownloadSK"];
             } else {
               // Mahasiswa can only view their own submitted applications
               actions = ["Detail"];
@@ -611,12 +614,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           // Function to format SK Cuti Akademik column (only for Admin role)
           const formatSKCutiAkademikColumn = (skNo, itemId) => {
             if (isAdmin || isDAAK) {
-              // Only Admin can see and download SK
-              if (skNo && skNo !== "" && skNo !== "-") {
-                // If SK exists, return DownloadSK action
+              // Admin can download SK when status is "Menunggu Upload SK"
+              if (currentStatus === "Menunggu Upload SK") {
                 return "DownloadSK";
               } else {
-                // If no SK, return dash
+                // For other statuses, return dash
                 return "-";
               }
             } else {
@@ -1840,9 +1842,90 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     window.open(`${API_LINK}CutiAkademik/file/${id}`, "_blank");
   };
 
-  const handleDownloadSK = (id) => {
-    // Download SK file using the file endpoint
-    window.open(`${API_LINK}CutiAkademik/file/${id}`, "_blank");
+  const handleDownloadSK = async (id) => {
+    try {
+      console.log("=== DOWNLOAD SK CUTI AKADEMIK ===");
+      console.log("ID:", id);
+      console.log("User Data:", userData);
+      console.log("Is Admin:", isAdmin);
+      console.log("Is Mahasiswa:", isMahasiswa);
+
+      // Get username and role for the API call
+      const username = userData?.nama || userData?.username || "";
+      let role = "";
+      
+      // Determine role based on current user
+      if (isAdmin || isDAAK) {
+        role = "ROL21"; // Admin Akademik
+      } else if (isMahasiswa) {
+        role = "ROL23"; // Mahasiswa
+      } else {
+        Toast.error("Role tidak dikenali untuk download SK.");
+        return;
+      }
+
+      if (!username) {
+        Toast.error("Data user tidak lengkap. Silakan login ulang.");
+        return;
+      }
+
+      console.log("Download SK params:", { id, username, role });
+
+      // Build the download URL with query parameters
+      const params = new URLSearchParams({
+        username: username,
+        role: role,
+        format: "pdf"
+      });
+
+      const downloadUrl = `${API_LINK}CutiAkademik/cetak-sk/${encodeURIComponent(id)}?${params.toString()}`;
+      console.log("Download URL:", downloadUrl);
+
+      // First, check if user has permission by calling the JSON endpoint
+      const checkParams = new URLSearchParams({
+        username: username,
+        role: role,
+        format: "json"
+      });
+      
+      const checkUrl = `${API_LINK}CutiAkademik/cetak-sk/${encodeURIComponent(id)}?${checkParams.toString()}`;
+      
+      const checkResponse = await fetch(checkUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!checkResponse.ok) {
+        const errorText = await checkResponse.text();
+        console.error("Permission check failed:", errorText);
+        
+        if (checkResponse.status === 403) {
+          Toast.error("Anda tidak memiliki akses untuk download SK ini.");
+        } else {
+          Toast.error(`Gagal mengakses SK: HTTP ${checkResponse.status}`);
+        }
+        return;
+      }
+
+      const checkResult = await checkResponse.json();
+      console.log("Permission check result:", checkResult);
+
+      if (!checkResult.canPrint) {
+        Toast.error(checkResult.reason || "Tidak dapat download SK saat ini.");
+        return;
+      }
+
+      // If permission check passed, proceed with PDF download
+      window.open(downloadUrl, "_blank");
+      Toast.success("SK berhasil didownload!");
+
+    } catch (error) {
+      console.error("Download SK error:", error);
+      Toast.error(`Gagal download SK: ${error.message}`);
+    }
   };
 
   
