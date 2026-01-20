@@ -86,7 +86,6 @@ export default function AddCutiAkademik() {
 
   // State for bebas tanggungan check (for Prodi)
   const [bebasTanggunganStatus, setBebasTanggunganStatus] = useState(null);
-  const [checkingBebasTanggungan, setCheckingBebasTanggungan] = useState(false);
 
   // Helper function to load students for a given konId
   const loadStudentsForKonId = useCallback(async (konId) => {
@@ -293,7 +292,6 @@ export default function AddCutiAkademik() {
     try {
       // Check bebas tanggungan for selected student (Prodi only)
       if (isProdi) {
-        setCheckingBebasTanggungan(true);
         const btResponse = await fetch(`${API_LINK}Mahasiswa/CheckBebasTanggungan?userId=${mhsId}`, {
           method: 'GET',
           headers: {
@@ -306,7 +304,6 @@ export default function AddCutiAkademik() {
           console.log(`[handleStudentChange] Bebas Tanggungan Status:`, btData);
           setBebasTanggunganStatus(btData.status);
         }
-        setCheckingBebasTanggungan(false);
       }
 
       console.log(`[handleStudentChange] Fetching detail for mhsId: ${mhsId}`);
@@ -339,7 +336,6 @@ export default function AddCutiAkademik() {
     } catch (error) {
       console.error("[handleStudentChange] Network error:", error);
       Toast.error("Terjadi kesalahan saat memuat detail mahasiswa.");
-      setCheckingBebasTanggungan(false);
     }
   };
 
@@ -349,7 +345,7 @@ export default function AddCutiAkademik() {
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     
-    if (files && files[0]) {
+    if (files?.[0]) {
       const file = files[0];
       const maxSize = 10 * 1024 * 1024; // 10MB
       const allowedTypes = [
@@ -591,7 +587,7 @@ export default function AddCutiAkademik() {
     }
 
     const tahunSekarang = new Date().getFullYear() - 1;
-    const angkatanInt = parseInt(angkatan);
+    const angkatanInt = Number.parseInt(angkatan, 10);
     const tahunAkademikList = [];
 
     console.log(`[generateTahunAkademik] Generating for angkatan: ${angkatanInt}, tahunSekarang: ${tahunSekarang}`);
@@ -643,9 +639,16 @@ export default function AddCutiAkademik() {
     { Value: "Genap", Text: "Genap" },
   ];
 
+  // Helper function to get page title
+  const getPageTitle = () => {
+    if (isProdi) return "Tambah Pengajuan Cuti Akademik (Prodi)";
+    if (isMahasiswa) return "Tambah Pengajuan Cuti Akademik (Mahasiswa)";
+    return "Tambah Pengajuan Cuti Akademik";
+  };
+
   return (
     <MainContent
-      title={isProdi ? "Tambah Pengajuan Cuti Akademik (Prodi)" : isMahasiswa ? "Tambah Pengajuan Cuti Akademik (Mahasiswa)" : "Tambah Pengajuan Cuti Akademik"}
+      title={getPageTitle()}
       layout="Admin"
       breadcrumb={[
         { label: "Sistem Informasi Akademik" },
@@ -661,14 +664,15 @@ export default function AddCutiAkademik() {
             <i className="fas fa-exclamation-triangle me-2"></i>
             <strong>Mahasiswa belum menyelesaikan administrasi bebas tanggungan</strong>
           </div>
-          <span 
-            className="text-primary text-decoration-underline" 
+          <button 
+            type="button"
+            className="btn btn-link p-0 text-primary text-decoration-underline" 
             style={{ cursor: 'pointer' }}
             onClick={() => router.push('/pages/administrasi-akademik/bebas-tanggungan')}
           >
             <i className="fas fa-eye me-1"></i>
-            Lihat Administrasi Bebas Tanggungan
-          </span>
+            {" "}Lihat Administrasi Bebas Tanggungan
+          </button>
         </div>
       )}
 
