@@ -96,8 +96,8 @@ export default function DetailMeninggalDunia() {
           try {
             const errorData = JSON.parse(errorText);
             errorMessage = errorData.message || errorMessage;
-          } catch (parseError) {
-            console.log("Could not parse error response as JSON");
+          } catch {
+            // Could not parse error response as JSON, use default message
           }
           
           throw new Error(errorMessage);
@@ -258,7 +258,7 @@ export default function DetailMeninggalDunia() {
         ]}
       >
         <div className="text-center py-4">
-          <div className="spinner-border" role="status">
+          <div className="spinner-border" aria-live="polite">
             <span className="visually-hidden">Loading...</span>
           </div>
           <p className="mt-2">Memuat halaman...</p>
@@ -280,7 +280,7 @@ export default function DetailMeninggalDunia() {
         ]}
       >
         <div className="text-center py-4">
-          <div className="spinner-border" role="status">
+          <div className="spinner-border" aria-live="polite">
             <span className="visually-hidden">Loading...</span>
           </div>
           <p className="mt-2">Memuat data pengajuan...</p>
@@ -341,7 +341,7 @@ export default function DetailMeninggalDunia() {
         <div className="card-header">
           <h5 className="card-title mb-0">
             <i className="fas fa-info-circle me-2"></i>
-            Informasi Pengajuan Meninggal Dunia
+            <span>Informasi Pengajuan Meninggal Dunia</span>
           </h5>
         </div>
         <div className="card-body">
@@ -353,33 +353,33 @@ export default function DetailMeninggalDunia() {
               </h6>
             </div>
             <div className="col-md-6 mb-3">
-              <label className="form-label fw-bold">ID Mahasiswa:</label>
+              <h6 className="fw-bold">ID Mahasiswa:</h6>
               <p className="form-control-plaintext">{detailData.mhsId || '-'}</p>
             </div>
             <div className="col-md-6 mb-3">
-              <label className="form-label fw-bold">Nama Mahasiswa:</label>
+              <h6 className="fw-bold">Nama Mahasiswa:</h6>
               <p className="form-control-plaintext">{detailData.mhsNama || '-'}</p>
             </div>
             <div className="col-md-6 mb-3">
-              <label className="form-label fw-bold">Program Studi:</label>
+              <h6 className="fw-bold">Program Studi:</h6>
               <p className="form-control-plaintext">{detailData.konNama || '-'}</p>
             </div>
             <div className="col-md-6 mb-3">
-              <label className="form-label fw-bold">Singkatan Prodi:</label>
+              <h6 className="fw-bold">Singkatan Prodi:</h6>
               <p className="form-control-plaintext">{detailData.konSingkatan || '-'}</p>
             </div>
             <div className="col-md-6 mb-3">
-              <label className="form-label fw-bold">Tahun Angkatan:</label>
+              <h6 className="fw-bold">Tahun Angkatan:</h6>
               <p className="form-control-plaintext">{detailData.mhsAngkatan || '-'}</p>
             </div>
             <div className="col-md-12 mb-3">
-              <span 
-                className="text-primary text-decoration-underline" 
-                style={{ cursor: 'pointer' }}
+              <button 
+                type="button"
+                className="btn btn-link p-0 text-primary text-decoration-underline" 
                 onClick={handleViewProfile}
               >
                 Lihat Profil Mahasiswa
-              </span>
+              </button>
             </div>
           </div>
 
@@ -391,7 +391,7 @@ export default function DetailMeninggalDunia() {
               </h6>
             </div>
             <div className="col-md-6 mb-3">
-              <label className="form-label fw-bold">Status:</label>
+              <h6 className="fw-bold">Status:</h6>
               <p className="form-control-plaintext">
                 <span className={getStatusBadgeClass(detailData.status)}>
                   {detailData.status || 'Status tidak diketahui'}
@@ -399,7 +399,7 @@ export default function DetailMeninggalDunia() {
               </p>
             </div>
             <div className="col-md-6 mb-3">
-              <label className="form-label fw-bold">Dibuat Oleh:</label>
+              <h6 className="fw-bold">Dibuat Oleh:</h6>
               <p className="form-control-plaintext">
                 {(() => {
                   const createdBy = detailData.createdBy || '';
@@ -432,7 +432,7 @@ export default function DetailMeninggalDunia() {
               </p>
             </div>
             <div className="col-md-12 mb-3">
-              <label className="form-label fw-bold">Lampiran File:</label>
+              <h6 className="fw-bold">Lampiran File:</h6>
               <p className="form-control-plaintext mb-2">
                 {detailData.lampiran || 'Tidak ada file'}
               </p>
@@ -456,11 +456,11 @@ export default function DetailMeninggalDunia() {
                 </h6>
               </div>
               <div className="col-md-6 mb-3">
-                <label className="form-label fw-bold">Tanggal Persetujuan Wadir 1:</label>
+                <h6 className="fw-bold">Tanggal Persetujuan Wadir 1:</h6>
                 <p className="form-control-plaintext">{detailData.approveDir1Date || '-'}</p>
               </div>
               <div className="col-md-6 mb-3">
-                <label className="form-label fw-bold">Disetujui Oleh:</label>
+                <h6 className="fw-bold">Disetujui Oleh:</h6>
                 <p className="form-control-plaintext">{detailData.approveDir1By || '-'}</p>
               </div>
             </div>
@@ -475,15 +475,15 @@ export default function DetailMeninggalDunia() {
                 </h6>
               </div>
               <div className="col-md-6 mb-3">
-                <label className="form-label fw-bold">Nomor Surat:</label>
+                <h6 className="fw-bold">Nomor Surat:</h6>
                 <p className="form-control-plaintext">{detailData.suratNo || '-'}</p>
               </div>
               <div className="col-md-6 mb-3">
-                <label className="form-label fw-bold">Nomor SPKB:</label>
+                <h6 className="fw-bold">Nomor SPKB:</h6>
                 <p className="form-control-plaintext">{detailData.noSpkb || '-'}</p>
               </div>
               <div className="col-md-6 mb-3">
-                <label className="form-label fw-bold">File SK:</label>
+                <h6 className="fw-bold">File SK:</h6>
                 <p className="form-control-plaintext mb-2">
                   {detailData.sk ? detailData.sk : 'Belum ada file SK'}
                 </p>
@@ -497,7 +497,7 @@ export default function DetailMeninggalDunia() {
                 )}
               </div>
               <div className="col-md-6 mb-3">
-                <label className="form-label fw-bold">File SPKB:</label>
+                <h6 className="fw-bold">File SPKB:</h6>
                 <p className="form-control-plaintext mb-2">
                   {detailData.spkb ? detailData.spkb : 'Belum ada file SPKB'}
                 </p>
