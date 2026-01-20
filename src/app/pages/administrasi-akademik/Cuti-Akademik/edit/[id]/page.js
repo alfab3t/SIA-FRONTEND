@@ -76,11 +76,7 @@ export default function EditCutiAkademikPage() {
   const [saving, setSaving] = useState(false);
   const [prodiList, setProdiList] = useState([]);
   const [studentList, setStudentList] = useState([]);
-  const [loadingProdi, setLoadingProdi] = useState(false);
-  const [loadingStudents, setLoadingStudents] = useState(false);
 
-  const prodiRef = useRef();
-  const mahasiswaRef = useRef();
   const tahunAjaranRef = useRef();
   const semesterRef = useRef();
 
@@ -119,7 +115,6 @@ export default function EditCutiAkademikPage() {
     }
     
     const loadProdi = async () => {
-      setLoadingProdi(true);
       try {
         console.log(`[loadProdi] Loading konsentrasi for username: ${username}`);
         
@@ -151,155 +146,11 @@ export default function EditCutiAkademikPage() {
       } catch (error) {
         console.error("[loadProdi] Network error:", error);
         Toast.error("Terjadi kesalahan saat memuat daftar program studi.");
-      } finally {
-        setLoadingProdi(false);
       }
     };
 
     loadProdi();
   }, [isProdi, userData?.username, userData?.nama]);
-
-  // Helper function to load students for a given konId
-  const loadStudentsForKonId = async (konId) => {
-    if (!konId) {
-      setStudentList([]);
-      return;
-    }
-
-    setLoadingStudents(true);
-    try {
-      const response = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${konId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`[loadStudentsForKonId] Received ${data.length} students:`, data);
-        
-        // Filter only active students (exclude inactive/graduated/dropped out students)
-        const activeStudents = data.filter(item => {
-          // Try multiple possible field names for status
-          const status = (item.mhsStatusKuliah || 
-                         item.statusKuliah || 
-                         item.status || 
-                         item.mhsStatus || 
-                         "").toLowerCase().trim();
-          
-          // List of inactive status keywords
-          const inactiveKeywords = [
-            'lulus', 'graduated', 'drop', 'keluar', 'meninggal', 'died',
-            'tidak aktif', 'nonaktif', 'inactive', 'cuti', 'leave',
-            'putus studi', 'mengundurkan diri', 'resign'
-          ];
-          
-          // Check if status contains any inactive keywords
-          const isInactive = inactiveKeywords.some(keyword => 
-            status.includes(keyword)
-          );
-          
-          // Consider active if status doesn't contain inactive keywords
-          // Allow empty status as it might mean active
-          const isActive = !isInactive;
-          
-          console.log(`[loadStudentsForKonId] Student: ${item.mhsNama}, Status: "${status}", Active: ${isActive}`);
-          return isActive;
-        });
-        
-        console.log(`[loadStudentsForKonId] Filtered to ${activeStudents.length} active students from ${data.length} total`);
-        
-        setStudentList(activeStudents.map(item => ({
-          Value: item.mhsId,
-          Text: item.mhsNama
-        })));
-      } else {
-        Toast.error("Gagal memuat daftar mahasiswa.");
-        setStudentList([]);
-      }
-    } catch (error) {
-      console.error("Error loading students:", error);
-      Toast.error("Terjadi kesalahan saat memuat daftar mahasiswa.");
-      setStudentList([]);
-    } finally {
-      setLoadingStudents(false);
-    }
-  };
-
-  // Load students when prodi is selected (for prodi users)
-  const handleProdiChange = async (e) => {
-    const konId = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      konId: konId,
-      mhsId: "",
-      angkatan: "",
-      tahunAjaran: "", // Reset tahun ajaran when prodi changes
-      tahunAjaranOptions: [] // Reset options
-    }));
-
-    await loadStudentsForKonId(konId);
-  };
-
-  // Handle student selection - auto populate angkatan and generate tahun akademik (for prodi users)
-  const handleStudentChange = async (e) => {
-    const mhsId = e.target.value;
-    
-    setFormData(prev => ({
-      ...prev,
-      mhsId: mhsId,
-      angkatan: "",
-      tahunAjaran: "" // Reset tahun ajaran when student changes
-    }));
-
-    if (!mhsId) {
-      return;
-    }
-
-    try {
-      // Fetch student detail to get mhsAngkatan
-      const response = await fetch(`${API_LINK}Mahasiswa/GetDetail?mhsId=${mhsId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`[handleStudentChange] Student detail:`, data);
-        
-        const angkatan = data.mhsAngkatan;
-        if (angkatan) {
-          // Generate tahun akademik options based on angkatan
-          const tahunSekarang = new Date().getFullYear() - 1;
-          const tahunAjaranOptions = [];
-          
-          for (let i = tahunSekarang; i <= angkatan + 3; i++) {
-            tahunAjaranOptions.push({
-              Value: `${i}/${i + 1}`,
-              Text: `${i}/${i + 1}`
-            });
-          }
-          
-          console.log(`[handleStudentChange] Generated tahun akademik options:`, tahunAjaranOptions);
-          
-          setFormData(prev => ({
-            ...prev,
-            angkatan: angkatan.toString(),
-            tahunAjaranOptions: tahunAjaranOptions
-          }));
-        }
-      } else {
-        console.error("Failed to fetch student detail");
-        Toast.error("Gagal memuat detail mahasiswa.");
-      }
-    } catch (error) {
-      console.error("Error fetching student detail:", error);
-      Toast.error("Terjadi kesalahan saat memuat detail mahasiswa.");
-    }
-  };
 
   // ============================
   // HANDLE INPUT
@@ -307,7 +158,7 @@ export default function EditCutiAkademikPage() {
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     
-    if (files && files[0]) {
+    if (files?.[0]) {
       const file = files[0];
       const maxSize = 10 * 1024 * 1024; // 10MB
       const allowedTypes = [
@@ -364,6 +215,178 @@ export default function EditCutiAkademikPage() {
     }
   }, [errors]);
 
+  // Helper function to fetch and parse API data
+  const fetchDetailData = async (realId) => {
+    const url = `${API_LINK}CutiAkademik/detail?id=${encodeURIComponent(realId)}`;
+    const res = await fetch(url);
+    const raw = await res.text();
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+
+    return data?.id ? data : null;
+  };
+
+  // Helper function to update form data with API response
+  const updateFormDataFromApi = (data) => {
+    setFormData(prev => ({
+      ...prev,
+      tahunAjaran: data.tahunAjaran || "",
+      semester: data.semester || "",
+      oldSurat: data.lampiranSP || "",
+      oldLampiran: data.lampiran || "",
+      suratPernyataan: null,
+      lampiran: null,
+      // Prodi-specific fields
+      mhsId: data.mhsId || "",
+      menimbang: data.menimbang || "",
+    }));
+  };
+
+  // Helper function to fetch user's konsentrasi list
+  const fetchUserKonsentrasiList = async (username) => {
+    const konsentrasiResponse = await fetch(`${API_LINK}Mahasiswa/GetKonsentrasiList?username=${username}`);
+    if (!konsentrasiResponse.ok) {
+      return [];
+    }
+    return await konsentrasiResponse.json();
+  };
+
+  // Helper function to fetch students for a konsentrasi
+  const fetchStudentsForKonsentrasi = async (konsentrasiId) => {
+    const studentsResponse = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${konsentrasiId}`);
+    if (!studentsResponse.ok) {
+      return [];
+    }
+    return await studentsResponse.json();
+  };
+
+  // Helper function to filter active students
+  const filterActiveStudents = (students) => {
+    return students.filter(item => {
+      const status = (item.mhsStatusKuliah || 
+                     item.statusKuliah || 
+                     item.status || 
+                     item.mhsStatus || 
+                     "").toLowerCase().trim();
+      
+      const inactiveKeywords = [
+        'lulus', 'graduated', 'drop', 'keluar', 'meninggal', 'died',
+        'tidak aktif', 'nonaktif', 'inactive', 'cuti', 'leave',
+        'putus studi', 'mengundurkan diri', 'resign'
+      ];
+      
+      const isInactive = inactiveKeywords.some(keyword => 
+        status.includes(keyword)
+      );
+      
+      return !isInactive;
+    });
+  };
+
+  // Helper function to fetch student detail and generate tahun akademik options
+  const fetchStudentDetailAndGenerateOptions = async (mhsId) => {
+    try {
+      const detailResponse = await fetch(`${API_LINK}Mahasiswa/GetDetail?mhsId=${mhsId}`);
+      if (!detailResponse.ok) {
+        return null;
+      }
+      
+      const detailData = await detailResponse.json();
+      const angkatan = detailData.mhsAngkatan;
+      
+      if (!angkatan) {
+        return null;
+      }
+      
+      // Generate tahun akademik options based on angkatan
+      const tahunSekarang = new Date().getFullYear() - 1;
+      const tahunAjaranOptions = [];
+      
+      for (let i = tahunSekarang; i <= angkatan + 3; i++) {
+        tahunAjaranOptions.push({
+          Value: `${i}/${i + 1}`,
+          Text: `${i}/${i + 1}`
+        });
+      }
+      
+      return {
+        angkatan: angkatan.toString(),
+        tahunAjaranOptions
+      };
+    } catch (error) {
+      console.warn("Could not fetch student detail:", error);
+      return null;
+    }
+  };
+
+  // Helper function to find student's konsentrasi
+  const findStudentKonsentrasi = async (mhsId, konsentrasiList, username) => {
+    for (const konsentrasi of konsentrasiList) {
+      const students = await fetchStudentsForKonsentrasi(konsentrasi.id);
+      const activeStudents = filterActiveStudents(students);
+      
+      const studentFound = activeStudents.find(s => s.mhsId === mhsId);
+      if (studentFound) {
+        const studentDetail = await fetchStudentDetailAndGenerateOptions(mhsId);
+        
+        if (studentDetail) {
+          setFormData(prev => ({
+            ...prev,
+            konId: konsentrasi.id,
+            angkatan: studentDetail.angkatan,
+            tahunAjaranOptions: studentDetail.tahunAjaranOptions
+          }));
+        } else {
+          // Fallback if GetDetail fails
+          setFormData(prev => ({
+            ...prev,
+            konId: konsentrasi.id,
+            angkatan: studentFound.angkatan || ""
+          }));
+        }
+        
+        // Load students for this konsentrasi
+        setStudentList(activeStudents.map(item => ({
+          Value: item.mhsId,
+          Text: item.mhsNama
+        })));
+        
+        console.log("Found student's konsentrasi:", konsentrasi.nama);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Helper function to handle prodi-specific data loading
+  const handleProdiDataLoading = async (data) => {
+    if (!data.mhsId || !isProdi) {
+      return;
+    }
+
+    const username = userData?.username || userData?.nama;
+    console.log("Loading prodi data for student:", data.mhsId, "using username:", username);
+    
+    if (!username) {
+      console.warn("No username found for prodi user");
+      return;
+    }
+
+    try {
+      const konsentrasiData = await fetchUserKonsentrasiList(username);
+      console.log("User's konsentrasi list:", konsentrasiData);
+      
+      await findStudentKonsentrasi(data.mhsId, konsentrasiData, username);
+    } catch (error) {
+      console.warn("Could not determine student's konsentrasi:", error);
+    }
+  };
+
   // ============================
   // LOAD DETAIL DARI API (FALLBACK)
   // ============================
@@ -371,138 +394,11 @@ export default function EditCutiAkademikPage() {
     try {
       if (!realId) return;
 
-      const url = `${API_LINK}CutiAkademik/detail?id=${encodeURIComponent(realId)}`;
-      const res = await fetch(url);
-      const raw = await res.text();
+      const data = await fetchDetailData(realId);
+      if (!data) return;
 
-      let data;
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        return;
-      }
-
-      if (!data?.id) return;
-
-      setFormData(prev => ({
-        ...prev,
-        tahunAjaran: data.tahunAjaran || "",
-        semester: data.semester || "",
-        oldSurat: data.lampiranSP || "",
-        oldLampiran: data.lampiran || "",
-        suratPernyataan: null,
-        lampiran: null,
-        // Prodi-specific fields
-        mhsId: data.mhsId || "",
-        menimbang: data.menimbang || "",
-      }));
-
-      // If we have mhsId and this is a prodi user, try to determine the prodi
-      if (data.mhsId && isProdi) {
-        const username = userData?.username || userData?.nama;
-        console.log("Loading prodi data for student:", data.mhsId, "using username:", username);
-        
-        if (username) {
-          // Get the user's konsentrasi list
-          try {
-            const konsentrasiResponse = await fetch(`${API_LINK}Mahasiswa/GetKonsentrasiList?username=${username}`);
-            if (konsentrasiResponse.ok) {
-              const konsentrasiData = await konsentrasiResponse.json();
-              console.log("User's konsentrasi list:", konsentrasiData);
-              
-              // For each konsentrasi, check if this student belongs to it
-              for (const konsentrasi of konsentrasiData) {
-                const studentsResponse = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${konsentrasi.id}`);
-                if (studentsResponse.ok) {
-                  const students = await studentsResponse.json();
-                  
-                  // Filter only active students
-                  const activeStudents = students.filter(item => {
-                    const status = (item.mhsStatusKuliah || 
-                                   item.statusKuliah || 
-                                   item.status || 
-                                   item.mhsStatus || 
-                                   "").toLowerCase().trim();
-                    
-                    const inactiveKeywords = [
-                      'lulus', 'graduated', 'drop', 'keluar', 'meninggal', 'died',
-                      'tidak aktif', 'nonaktif', 'inactive', 'cuti', 'leave',
-                      'putus studi', 'mengundurkan diri', 'resign'
-                    ];
-                    
-                    const isInactive = inactiveKeywords.some(keyword => 
-                      status.includes(keyword)
-                    );
-                    
-                    return !isInactive;
-                  });
-                  
-                  const studentFound = activeStudents.find(s => s.mhsId === data.mhsId);
-                  if (studentFound) {
-                    // Fetch student detail to get mhsAngkatan and generate tahun akademik
-                    try {
-                      const detailResponse = await fetch(`${API_LINK}Mahasiswa/GetDetail?mhsId=${data.mhsId}`);
-                      if (detailResponse.ok) {
-                        const detailData = await detailResponse.json();
-                        const angkatan = detailData.mhsAngkatan;
-                        
-                        // Generate tahun akademik options based on angkatan
-                        const tahunSekarang = new Date().getFullYear() - 1;
-                        const tahunAjaranOptions = [];
-                        
-                        for (let i = tahunSekarang; i <= angkatan + 3; i++) {
-                          tahunAjaranOptions.push({
-                            Value: `${i}/${i + 1}`,
-                            Text: `${i}/${i + 1}`
-                          });
-                        }
-                        
-                        // Found the konsentrasi for this student
-                        setFormData(prev => ({
-                          ...prev,
-                          konId: konsentrasi.id,
-                          angkatan: angkatan.toString(),
-                          tahunAjaranOptions: tahunAjaranOptions
-                        }));
-                        
-                        console.log("Generated tahun akademik options for existing data:", tahunAjaranOptions);
-                      } else {
-                        // Fallback if GetDetail fails
-                        setFormData(prev => ({
-                          ...prev,
-                          konId: konsentrasi.id,
-                          angkatan: studentFound.angkatan || ""
-                        }));
-                      }
-                    } catch (detailError) {
-                      console.warn("Could not fetch student detail:", detailError);
-                      // Fallback if GetDetail fails
-                      setFormData(prev => ({
-                        ...prev,
-                        konId: konsentrasi.id,
-                        angkatan: studentFound.angkatan || ""
-                      }));
-                    }
-                    
-                    // Load students for this konsentrasi
-                    setStudentList(activeStudents.map(item => ({
-                      Value: item.mhsId,
-                      Text: item.mhsNama
-                    })));
-                    
-                    console.log("Found student's konsentrasi:", konsentrasi.nama);
-                    break;
-                  }
-                }
-              }
-            }
-          } catch (error) {
-            console.warn("Could not determine student's konsentrasi:", error);
-          }
-        } else {
-          console.warn("No username found for prodi user");
-        }
-      }
+      updateFormDataFromApi(data);
+      await handleProdiDataLoading(data);
 
     } finally {
       setLoading(false);
@@ -574,7 +470,7 @@ export default function EditCutiAkademikPage() {
     }
 
     const tahunSekarang = new Date().getFullYear() - 1;
-    const angkatanInt = parseInt(angkatan);
+    const angkatanInt = Number.parseInt(angkatan, 10);
     const tahunAkademikList = [];
 
     console.log(`[generateTahunAkademik] Generating for angkatan: ${angkatanInt}, tahunSekarang: ${tahunSekarang}`);
@@ -767,6 +663,20 @@ export default function EditCutiAkademikPage() {
 
   const handleCancel = () => router.back();
 
+  // Helper function to get page title
+  const getPageTitle = () => {
+    if (isProdi) return "Edit Pengajuan Cuti Akademik (Prodi)";
+    if (isMahasiswa) return "Edit Pengajuan Cuti Akademik (Mahasiswa)";
+    return "Edit Pengajuan Cuti Akademik";
+  };
+
+  // Helper function to get breadcrumb label
+  const getBreadcrumbLabel = () => {
+    if (isProdi) return "Edit Pengajuan (Prodi)";
+    if (isMahasiswa) return "Edit Pengajuan (Mahasiswa)";
+    return "Edit Pengajuan";
+  };
+
   const semesterData = [
     { Value: "Ganjil", Text: "Ganjil" },
     { Value: "Genap", Text: "Genap" },
@@ -779,12 +689,12 @@ export default function EditCutiAkademikPage() {
     <MainContent
       layout="Admin"
       loading={loading}
-      title={isProdi ? "Edit Pengajuan Cuti Akademik (Prodi)" : isMahasiswa ? "Edit Pengajuan Cuti Akademik (Mahasiswa)" : "Edit Pengajuan Cuti Akademik"}
+      title={getPageTitle()}
       breadcrumb={[
         { label: "Sistem Informasi Akademik" },
         { label: "Administrasi Akademik" },
         { label: "Cuti Akademik" },
-        { label: isProdi ? "Edit Pengajuan (Prodi)" : isMahasiswa ? "Edit Pengajuan (Mahasiswa)" : "Edit Pengajuan" },
+        { label: getBreadcrumbLabel() },
       ]}
     >
       <form onSubmit={handleSubmit}>
