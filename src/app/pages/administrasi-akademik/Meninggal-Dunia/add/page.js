@@ -36,7 +36,7 @@ export default function AddMeninggalDunia() {
         const data = await res.json();
         setPermission(data);
       } catch (err) {
-        // Error loading permission
+        console.error("Error loading permission:", err);
       }
     };
 
@@ -102,7 +102,7 @@ export default function AddMeninggalDunia() {
           }
         }
       } catch (error) {
-        // Error loading konsentrasi
+        console.error("Error loading konsentrasi:", error);
       }
     };
 
@@ -153,10 +153,10 @@ export default function AddMeninggalDunia() {
           
           setStudentList(formattedStudents);
         } else {
-          const errorText = await response.text();
           Toast.error("Gagal memuat daftar mahasiswa.");
         }
       } catch (error) {
+        console.error("Error loading students:", error);
         Toast.error("Terjadi kesalahan saat memuat daftar mahasiswa.");
       } finally {
         setLoadingStudents(false);
@@ -229,6 +229,7 @@ export default function AddMeninggalDunia() {
           }));
           
         } catch (prodiError) {
+          console.error("Error fetching prodi details:", prodiError);
           // Use detail data only
           setFormData(prev => ({
             ...prev,
@@ -243,6 +244,7 @@ export default function AddMeninggalDunia() {
       }
       
     } catch (error) {
+      console.error("Error fetching student details:", error);
       // Keep the data from dropdown if API fails
     }
   };
@@ -279,7 +281,7 @@ export default function AddMeninggalDunia() {
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     
-    if (files && files[0]) {
+    if (files?.[0]) {
       const file = files[0];
       const maxSize = 10 * 1024 * 1024; // 10MB
       const allowedTypes = [
@@ -418,7 +420,7 @@ export default function AddMeninggalDunia() {
         ]}
       >
         <div className="text-center py-4">
-          <div className="spinner-border" role="status">
+          <div className="spinner-border" aria-live="polite" aria-label="Loading">
             <span className="visually-hidden">Loading...</span>
           </div>
           <p className="mt-2">Memuat halaman...</p>
