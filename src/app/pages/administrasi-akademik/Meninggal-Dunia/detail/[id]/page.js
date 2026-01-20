@@ -28,27 +28,15 @@ export default function DetailMeninggalDunia() {
   const recordId = useMemo(() => {
     if (!params?.id) return null;
     
-    console.log("=== ID PROCESSING DEBUG ===");
-    console.log("Raw params.id:", params.id);
-    
     try {
-      // First decode the URL encoding
       const urlDecodedId = decodeURIComponent(params.id);
-      console.log("URL decoded ID:", urlDecodedId);
-      
-      // Then try to decrypt (for encrypted IDs from main page)
       const decryptedId = decryptIdUrl(urlDecodedId);
-      console.log("Decrypted ID:", decryptedId);
       return decryptedId;
-    } catch (decryptError) {
-      console.log("Decryption failed, trying direct URL decode:", decryptError);
+    } catch {
       try {
-        // Fallback to just URL decoding
         const decodedId = decodeURIComponent(params.id);
-        console.log("Final decoded ID:", decodedId);
         return decodedId;
-      } catch (urlError) {
-        console.log("URL decoding also failed, using original:", urlError);
+      } catch {
         return params.id;
       }
     }
@@ -57,7 +45,6 @@ export default function DetailMeninggalDunia() {
   // Load record data with comprehensive error handling
   useEffect(() => {
     if (!recordId) {
-      console.log("No recordId available");
       setLoading(false);
       setError("ID tidak valid");
       return;
@@ -68,15 +55,8 @@ export default function DetailMeninggalDunia() {
       setError(null);
       
       try {
-        console.log("=== LOADING MENINGGAL DUNIA DETAIL ===");
-        console.log("Record ID:", recordId);
-        
-        // Encode the ID for the API call to handle special characters
         const encodedRecordId = encodeURIComponent(recordId);
-        console.log("Encoded Record ID for API:", encodedRecordId);
-        console.log("API URL:", `${API_LINK}MeninggalDunia/${encodedRecordId}`);
 
-        // Use backend GET {id} endpoint
         const response = await fetch(`${API_LINK}MeninggalDunia/${encodedRecordId}`, {
           method: 'GET',
           headers: {
@@ -85,12 +65,8 @@ export default function DetailMeninggalDunia() {
           }
         });
 
-        console.log("Detail response status:", response.status);
-        console.log("Detail response headers:", response.headers);
-
         if (!response.ok) {
           const errorText = await response.text();
-          console.error("API Error Response:", errorText);
           
           let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
           try {
@@ -104,44 +80,21 @@ export default function DetailMeninggalDunia() {
         }
 
         const responseText = await response.text();
-        console.log("Raw response text:", responseText);
 
         let data;
         try {
           data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error("JSON Parse Error:", parseError);
+        } catch {
           throw new Error("Invalid JSON response from server");
         }
-
-        console.log("Parsed detail data:", data);
         
-        // Validate response structure
         if (!data || typeof data !== 'object') {
           throw new Error("Invalid data structure received from server");
         }
-
-        // Log all expected fields for debugging
-        console.log("=== BACKEND RESPONSE VALIDATION ===");
-        console.log("mhsId:", data.mhsId);
-        console.log("mhsNama:", data.mhsNama);
-        console.log("konNama:", data.konNama);
-        console.log("mhsAngkatan:", data.mhsAngkatan);
-        console.log("konSingkatan:", data.konSingkatan);
-        console.log("lampiran:", data.lampiran);
-        console.log("status:", data.status);
-        console.log("createdBy:", data.createdBy);
-        console.log("approveDir1Date:", data.approveDir1Date);
-        console.log("approveDir1By:", data.approveDir1By);
-        console.log("suratNo:", data.suratNo);
-        console.log("noSpkb:", data.noSpkb);
-        console.log("sk:", data.sk);
-        console.log("spkb:", data.spkb);
         
         setDetailData(data);
         
       } catch (error) {
-        console.error("Error loading detail:", error);
         setError(error.message);
         Toast.error(`Gagal memuat detail pengajuan: ${error.message}`);
       } finally {
@@ -169,8 +122,7 @@ export default function DetailMeninggalDunia() {
     try {
       const encryptedMhsId = encryptIdUrl(detailData.mhsId);
       router.push(`/pages/Profil_Mahasiswa/${encryptedMhsId}`);
-    } catch (error) {
-      console.error("Error encrypting mhsId:", error);
+    } catch {
       Toast.error("Gagal membuka profil mahasiswa.");
     }
   };
@@ -185,8 +137,6 @@ export default function DetailMeninggalDunia() {
     // Use backend file endpoint for downloading lampiran
     const filename = detailData.lampiran;
     const downloadUrl = `${API_LINK}MeninggalDunia/file/${filename}`;
-    console.log("Download Lampiran URL:", downloadUrl);
-    console.log("Original filename:", filename);
     window.open(downloadUrl, "_blank");
   };
 
@@ -200,8 +150,6 @@ export default function DetailMeninggalDunia() {
     // Use backend file endpoint for downloading SK
     const filename = detailData.sk;
     const downloadUrl = `${API_LINK}MeninggalDunia/file/${filename}`;
-    console.log("Download SK URL:", downloadUrl);
-    console.log("Original SK filename:", filename);
     window.open(downloadUrl, "_blank");
   };
 
@@ -215,8 +163,6 @@ export default function DetailMeninggalDunia() {
     // Use backend file endpoint for downloading SPKB
     const filename = detailData.spkb;
     const downloadUrl = `${API_LINK}MeninggalDunia/file/${filename}`;
-    console.log("Download SPKB URL:", downloadUrl);
-    console.log("Original SPKB filename:", filename);
     window.open(downloadUrl, "_blank");
   };
 

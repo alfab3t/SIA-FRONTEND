@@ -26,42 +26,27 @@ export default function EditMeninggalDunia() {
 
   const [errors, setErrors] = useState({});
 
-  // Get the ID from URL params with proper URL encoding handling
   const recordId = useMemo(() => {
     if (!params?.id) return null;
     
-    console.log("=== EDIT ID PROCESSING DEBUG ===");
-    console.log("Raw params.id:", params.id);
-    
     try {
-      // First decode the URL encoding
       const urlDecodedId = decodeURIComponent(params.id);
-      console.log("URL decoded ID:", urlDecodedId);
-      
-      // Then try to decrypt (for encrypted IDs from main page)
       const decryptedId = decryptIdUrl(urlDecodedId);
-      console.log("Decrypted ID:", decryptedId);
       return decryptedId;
-    } catch (decryptError) {
-      console.log("Decryption failed, trying direct URL decode:", decryptError);
+    } catch {
       try {
-        // Fallback to just URL decoding
         const decodedId = decodeURIComponent(params.id);
-        console.log("Final decoded ID:", decodedId);
         return decodedId;
-      } catch (urlError) {
-        console.log("URL decoding also failed, using original:", urlError);
+      } catch {
         return params.id;
       }
     }
   }, [params?.id]);
 
-  // Handle hydration
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Load existing data
   useEffect(() => {
     if (!recordId) {
       setLoading(false);
@@ -72,12 +57,7 @@ export default function EditMeninggalDunia() {
     const loadExistingData = async () => {
       setLoading(true);
       try {
-        console.log("=== LOADING EXISTING MENINGGAL DUNIA DATA ===");
-        console.log("Record ID:", recordId);
-        
-        // Encode the ID for the API call to handle special characters
         const encodedRecordId = encodeURIComponent(recordId);
-        console.log("Encoded Record ID for API:", encodedRecordId);
         
         const response = await fetch(`${API_LINK}MeninggalDunia/${encodedRecordId}`, {
           method: 'GET',
@@ -87,28 +67,21 @@ export default function EditMeninggalDunia() {
           }
         });
 
-        console.log("Edit data response status:", response.status);
-
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error("API Error Response:", errorText);
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
         const data = await response.json();
-        console.log("Existing data received:", data);
         
         setExistingData(data);
         
-        // Populate form with existing data (only file info and mhsId for backend)
         setFormData({
-          lampiranMeninggal: null, // File input will be empty initially
-          existingLampiran: data.lampiran || "", // Store existing file name
-          mhsId: data.mhsId || "", // Keep for backend submission
+          lampiranMeninggal: null,
+          existingLampiran: data.lampiran || "",
+          mhsId: data.mhsId || "",
         });
         
       } catch (error) {
-        console.error("Error loading existing data:", error);
         Toast.error(`Gagal memuat data: ${error.message}`);
         router.push("/pages/administrasi-akademik/Meninggal-Dunia");
       } finally {
@@ -119,15 +92,12 @@ export default function EditMeninggalDunia() {
     loadExistingData();
   }, [recordId, router]);
 
-  // -------------------------------------------
-  // INPUT HANDLER
-  // -------------------------------------------
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     
     if (files?.[0]) {
       const file = files[0];
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      const maxSize = 10 * 1024 * 1024;
       const allowedTypes = [
         'application/pdf',
         'application/msword',
@@ -137,21 +107,18 @@ export default function EditMeninggalDunia() {
         'image/png'
       ];
       
-      // Validate file size
       if (file.size > maxSize) {
         Toast.error(`File ${file.name} terlalu besar. Maksimal 10MB.`);
-        e.target.value = ''; // Clear the input
+        e.target.value = '';
         return;
       }
       
-      // Validate file type
       if (!allowedTypes.includes(file.type)) {
         Toast.error(`Format file ${file.name} tidak didukung. Gunakan PDF, DOC, DOCX, JPG, atau PNG.`);
-        e.target.value = ''; // Clear the input
+        e.target.value = '';
         return;
       }
       
-      console.log(`File ${name} selected:`, file.name, file.size, file.type);
       setFormData((prev) => ({
         ...prev,
         [name]: file,
@@ -163,19 +130,14 @@ export default function EditMeninggalDunia() {
       }));
     }
     
-    // Clear error when user types/selects
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
     }
   };
 
-  // -------------------------------------------
-  // VALIDASI - Only validate file in edit mode
-  // -------------------------------------------
   const validate = () => {
     const newErrors = {};
     
-    // In edit mode, only validate file if no existing file and no new file
     if (!formData.lampiranMeninggal && !formData.existingLampiran) {
       newErrors.lampiranMeninggal = "Lampiran file meninggal dunia wajib di-upload.";
     }
@@ -190,9 +152,6 @@ export default function EditMeninggalDunia() {
     return true;
   };
 
-  // -------------------------------------------
-  // SUBMIT
-  // -------------------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (saving) return;
@@ -203,32 +162,19 @@ export default function EditMeninggalDunia() {
     try {
       const fd = new FormData();
       
-      // Add the fields that match the backend DTO
       fd.append("MhsId", formData.mhsId);
       
-      // Add the file only if a new file is selected
       if (formData.lampiranMeninggal && formData.lampiranMeninggal instanceof File) {
         fd.append("LampiranFile", formData.lampiranMeninggal, formData.lampiranMeninggal.name);
-        console.log("New lampiran file:", formData.lampiranMeninggal.name, formData.lampiranMeninggal.size);
       }
 
-      console.log("EDIT FORM DATA SEND =", {
-        MhsId: formData.mhsId,
-        LampiranFile: formData.lampiranMeninggal?.name || "No new file",
-        ExistingFile: formData.existingLampiran
-      });
-
-      // Encode the ID for the API call to handle special characters
       const encodedRecordId = encodeURIComponent(recordId);
       const res = await fetch(`${API_LINK}MeninggalDunia/${encodedRecordId}`, {
         method: "PUT",
         body: fd,
       });
 
-      console.log("Edit response status:", res.status);
-
       const raw = await res.text();
-      console.log("RAW EDIT RESPONSE =", raw);
 
       let result;
       try {
@@ -251,7 +197,6 @@ export default function EditMeninggalDunia() {
         Toast.error(result?.message || "Gagal memperbarui data.");
       }
     } catch (err) {
-      console.error("Submit error:", err);
       Toast.error(err.message);
     } finally {
       setSaving(false);
@@ -363,7 +308,6 @@ export default function EditMeninggalDunia() {
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
             />
             
-            {/* Show existing file info below the input */}
             {formData.existingLampiran && (
               <div className="mt-2">
                 <small className="text-muted">File saat ini: </small>

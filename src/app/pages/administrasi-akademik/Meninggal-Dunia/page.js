@@ -806,7 +806,7 @@ export default function Page_MeninggalDunia() {
             try {
                 result = JSON.parse(raw);
             } catch {
-                Toast.error("Response server tidak valid. Periksa console untuk detail.");
+                Toast.error("Response server tidak valid.");
                 return;
             }
 
