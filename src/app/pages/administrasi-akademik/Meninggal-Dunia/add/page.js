@@ -36,7 +36,7 @@ export default function AddMeninggalDunia() {
         const data = await res.json();
         setPermission(data);
       } catch (err) {
-        console.error("Gagal load permission:", err);
+        // Error loading permission
       }
     };
 
@@ -81,10 +81,8 @@ export default function AddMeninggalDunia() {
     const loadKonsentrasi = async () => {
       try {
         const username = userData?.username || userData?.nama;
-        console.log(`[loadKonsentrasi] Loading for username: ${username}`);
         
         if (!username) {
-          console.warn("[loadKonsentrasi] No username found");
           return;
         }
 
@@ -97,18 +95,14 @@ export default function AddMeninggalDunia() {
         
         if (response.ok) {
           const data = await response.json();
-          console.log(`[loadKonsentrasi] Received data:`, data);
           
           if (data && data.length > 0) {
             const userKonId = data[0].id;
-            console.log(`[loadKonsentrasi] Setting konId: ${userKonId}`);
             setKonId(userKonId);
           }
-        } else {
-          console.error(`[loadKonsentrasi] API Error: ${response.status}`);
         }
       } catch (error) {
-        console.error("[loadKonsentrasi] Network error:", error);
+        // Error loading konsentrasi
       }
     };
 
@@ -120,42 +114,32 @@ export default function AddMeninggalDunia() {
     const loadStudents = async () => {
       setLoadingStudents(true);
       try {
-        console.log("=== LOADING STUDENTS ===");
-        console.log("isProdi:", isProdi);
-        console.log("konId:", konId);
-        
         let response;
         
         if (isProdi && konId) {
           // For Prodi: use GetByKonsentrasi
-          console.log(`Loading students for konId: ${konId}`);
           response = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${konId}`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
             }
           });
-        } else if (!isProdi) {
+        } else if (isProdi) {
+          // Prodi but konId not loaded yet
+          setLoadingStudents(false);
+          return;
+        } else {
           // For non-Prodi: use old endpoint
-          console.log("Loading all students (non-Prodi)");
           response = await fetch(`${API_LINK}MeninggalDunia/mahasiswa`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
             }
           });
-        } else {
-          // Prodi but konId not loaded yet
-          console.log("Waiting for konId to load...");
-          setLoadingStudents(false);
-          return;
         }
-        
-        console.log("Students response status:", response.status);
         
         if (response.ok) {
           const data = await response.json();
-          console.log("Students data received:", data);
           
           const formattedStudents = data.map(item => {
             const studentData = {
@@ -164,19 +148,15 @@ export default function AddMeninggalDunia() {
               Prodi: item.programStudi || item.prodi || item.konNama || item.konsentrasi || "",
               Angkatan: item.mhsAngkatan || item.angkatan || item.tahunAngkatan || item.year || ""
             };
-            console.log("Formatted student:", studentData);
             return studentData;
           });
           
-          console.log("Final formatted students:", formattedStudents);
           setStudentList(formattedStudents);
         } else {
           const errorText = await response.text();
-          console.error("Failed to load students:", errorText);
           Toast.error("Gagal memuat daftar mahasiswa.");
         }
       } catch (error) {
-        console.error("Error loading students:", error);
         Toast.error("Terjadi kesalahan saat memuat daftar mahasiswa.");
       } finally {
         setLoadingStudents(false);
@@ -184,7 +164,7 @@ export default function AddMeninggalDunia() {
     };
 
     // Load students when konId is available for Prodi, or immediately for non-Prodi
-    if ((isProdi && konId) || !isProdi) {
+    if ((isProdi && konId) || (isProdi === false)) {
       loadStudents();
     }
   }, [isProdi, konId]);
@@ -192,9 +172,6 @@ export default function AddMeninggalDunia() {
   // Handle student selection - auto populate prodi and angkatan
   const handleStudentChange = async (e) => {
     const mhsId = e.target.value;
-    
-    console.log("=== STUDENT SELECTION DEBUG ===");
-    console.log("Selected mhsId:", mhsId);
     
     if (!mhsId) {
       setFormData(prev => ({
@@ -208,14 +185,8 @@ export default function AddMeninggalDunia() {
 
     // First try to get data from the dropdown list
     const selectedStudent = studentList.find(s => s.Value === mhsId);
-    console.log("Selected student from list:", selectedStudent);
     
     if (selectedStudent) {
-      console.log("Setting data from dropdown:", {
-        prodi: selectedStudent.Prodi,
-        angkatan: selectedStudent.Angkatan
-      });
-      
       setFormData(prev => ({
         ...prev,
         mhsId: mhsId,
@@ -226,18 +197,13 @@ export default function AddMeninggalDunia() {
 
     // Also try to get detailed data from API
     try {
-      console.log("Fetching student details from API...");
-      
       const detailResponse = await fetch(`${API_LINK}MeninggalDunia/mahasiswa/${mhsId}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
       
-      console.log("Detail response status:", detailResponse.status);
-      
       if (detailResponse.ok) {
         const detailData = await detailResponse.json();
-        console.log("Detail data received:", detailData);
         
         // Try to get prodi info
         try {
@@ -246,22 +212,14 @@ export default function AddMeninggalDunia() {
             headers: { 'Content-Type': 'application/json' }
           });
           
-          console.log("Prodi response status:", prodiResponse.status);
-          
           let prodiData = null;
           if (prodiResponse.ok) {
             prodiData = await prodiResponse.json();
-            console.log("Prodi data received:", prodiData);
           }
           
           // Update form with API data
           const finalProdi = prodiData?.nama || prodiData?.prodi || prodiData?.proNama || detailData?.prodi || detailData?.programStudi || detailData?.konNama || selectedStudent?.Prodi || "";
           const finalAngkatan = detailData?.mhsAngkatan || detailData?.angkatan || detailData?.tahunAngkatan || selectedStudent?.Angkatan || "";
-          
-          console.log("Final data to set:", {
-            prodi: finalProdi,
-            angkatan: finalAngkatan
-          });
           
           setFormData(prev => ({
             ...prev,
@@ -271,7 +229,6 @@ export default function AddMeninggalDunia() {
           }));
           
         } catch (prodiError) {
-          console.error("Error fetching prodi data:", prodiError);
           // Use detail data only
           setFormData(prev => ({
             ...prev,
@@ -282,12 +239,10 @@ export default function AddMeninggalDunia() {
         }
         
       } else {
-        console.error("Failed to fetch student details:", detailResponse.status);
         // Keep the data from dropdown if API fails
       }
       
     } catch (error) {
-      console.error("Error loading student details:", error);
       // Keep the data from dropdown if API fails
     }
   };
@@ -350,7 +305,6 @@ export default function AddMeninggalDunia() {
         return;
       }
       
-      console.log(`File ${name} selected:`, file.name, file.size, file.type);
       setFormData((prev) => ({
         ...prev,
         [name]: file,
@@ -409,13 +363,7 @@ export default function AddMeninggalDunia() {
       // Add the file with the exact field name from DTO
       if (formData.lampiranMeninggal && formData.lampiranMeninggal instanceof File) {
         fd.append("LampiranFile", formData.lampiranMeninggal, formData.lampiranMeninggal.name);
-        console.log("Lampiran file:", formData.lampiranMeninggal.name, formData.lampiranMeninggal.size);
       }
-
-      console.log("FORM DATA SEND (matching backend DTO) =", {
-        MhsId: formData.mhsId,
-        LampiranFile: formData.lampiranMeninggal?.name
-      });
 
       const res = await fetch(`${API_LINK}MeninggalDunia`, {
         method: "POST",
@@ -423,7 +371,6 @@ export default function AddMeninggalDunia() {
       });
 
       const raw = await res.text();
-      console.log("RAW ADD RESPONSE =", raw);
 
       let result;
       try {
@@ -450,7 +397,6 @@ export default function AddMeninggalDunia() {
         Toast.error(result?.message || "Gagal membuat pengajuan.");
       }
     } catch (err) {
-      console.error("Submit error:", err);
       Toast.error(err.message);
     } finally {
       setSaving(false);
