@@ -7,13 +7,11 @@ import Button from "@/components/common/Button";
 import Label from "@/components/common/Label";
 import { useRouter, useParams } from "next/navigation";
 import { API_LINK } from "@/lib/constant";
-import { getUserData } from "@/context/user";
 import { decryptIdUrl } from "@/lib/encryptor";
 
 export default function EditMeninggalDunia() {
   const router = useRouter();
   const params = useParams();
-  const userData = useMemo(() => getUserData(), []);
 
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -127,7 +125,7 @@ export default function EditMeninggalDunia() {
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     
-    if (files && files[0]) {
+    if (files?.[0]) {
       const file = files[0];
       const maxSize = 10 * 1024 * 1024; // 10MB
       const allowedTypes = [
@@ -275,7 +273,7 @@ export default function EditMeninggalDunia() {
         ]}
       >
         <div className="text-center py-4">
-          <div className="spinner-border" role="status">
+          <div className="spinner-border" aria-live="polite">
             <span className="visually-hidden">Loading...</span>
           </div>
           <p className="mt-2">Memuat halaman...</p>
@@ -297,7 +295,7 @@ export default function EditMeninggalDunia() {
         ]}
       >
         <div className="text-center py-4">
-          <div className="spinner-border" role="status">
+          <div className="spinner-border" aria-live="polite">
             <span className="visually-hidden">Loading...</span>
           </div>
           <p className="mt-2">Memuat data pengajuan...</p>
