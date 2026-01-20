@@ -85,7 +85,7 @@ export default function AddCutiAkademik() {
   const [errors, setErrors] = useState({});
 
   // State for bebas tanggungan check (for Prodi)
-  const [bebasTanggunganStatus, setBebasTanggunganStatus] = useState(null);
+  const [bebasTanggunganStatus, setBebasTanggunganStatus] = useState(null);           
 
   // Helper function to load students for a given konId
   const loadStudentsForKonId = useCallback(async (konId) => {
@@ -432,6 +432,91 @@ export default function AddCutiAkademik() {
     return true;
   };
 
+  // Helper function to build Prodi form data
+  const buildProdiFormData = useCallback((fd) => {
+    const approvalProdi = userData?.nama || userData?.username || userData?.userid || "";
+    
+    fd.append("MhsId", formData.mhsId);
+    fd.append("TahunAjaran", formData.tahunAjaran);
+    fd.append("Semester", formData.semester);
+    fd.append("Menimbang", formData.menimbang);
+    fd.append("ApprovalProdi", approvalProdi);
+    
+    console.log("PRODI FORM DATA SEND =", {
+      MhsId: formData.mhsId,
+      TahunAjaran: formData.tahunAjaran,
+      Semester: formData.semester,
+      Menimbang: formData.menimbang,
+      ApprovalProdi: approvalProdi,
+      SuratPernyataanFile: formData.suratPernyataan?.name,
+      LampiranFile: formData.lampiran?.name
+    });
+  }, [formData, userData]);
+
+  // Helper function to build Mahasiswa form data
+  const buildMahasiswaFormData = useCallback((fd) => {
+    const mhsId = userData?.mhsId || userData?.nama || userData?.userid || userData?.username || "";
+    
+    console.log("=== MAHASISWA SUBMISSION MAPPING ===");
+    console.log("userData.mhsId:", userData?.mhsId);
+    console.log("userData.nama:", userData?.nama);
+    console.log("userData.username:", userData?.username);
+    console.log("userData.userid:", userData?.userid);
+    console.log("Final mhsId for submission:", mhsId);
+    
+    if (!mhsId) {
+      Toast.error("User tidak valid.");
+      return false;
+    }
+    
+    fd.append("Step", "STEP1");
+    fd.append("MhsId", mhsId);
+    fd.append("TahunAjaran", formData.tahunAjaran);
+    fd.append("Semester", formData.semester);
+    
+    console.log("MAHASISWA FORM DATA SEND =", {
+      MhsId: mhsId,
+      TahunAjaran: formData.tahunAjaran,
+      Semester: formData.semester,
+      SuratPernyataanFile: formData.suratPernyataan?.name,
+      LampiranFile: formData.lampiran?.name
+    });
+    
+    return true;
+  }, [formData, userData]);
+
+  // Helper function to append files to form data
+  const appendFilesToFormData = useCallback((fd) => {
+    // Ensure file is properly appended
+    if (formData.suratPernyataan && formData.suratPernyataan instanceof File) {
+      fd.append("LampiranSuratPengajuan", formData.suratPernyataan, formData.suratPernyataan.name);
+      console.log("Surat Pernyataan file:", formData.suratPernyataan.name, formData.suratPernyataan.size);
+    } else {
+      console.error("Surat Pernyataan file is missing or invalid");
+    }
+    
+    if (formData.lampiran && formData.lampiran instanceof File) {
+      fd.append("Lampiran", formData.lampiran, formData.lampiran.name);
+      console.log("Lampiran file:", formData.lampiran.name, formData.lampiran.size);
+    }
+  }, [formData]);
+
+  // Helper function to handle successful submission
+  const handleSubmissionSuccess = useCallback((result) => {
+    if (isProdi) {
+      // Mark this application as created by prodi in session storage
+      const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
+      if (!prodiCreatedApps.includes(result.draftId)) {
+        prodiCreatedApps.push(result.draftId);
+        sessionStorage.setItem('prodiCreatedApps', JSON.stringify(prodiCreatedApps));
+      }
+      Toast.success("Pengajuan Cuti berhasil dibuat untuk mahasiswa.");
+    } else {
+      Toast.success("Pengajuan Cuti berhasil dibuat.");
+    }
+    router.push("/pages/administrasi-akademik/Cuti-Akademik");
+  }, [isProdi, router]);
+
   // -------------------------------------------
   // SUBMIT
   // -------------------------------------------
@@ -446,80 +531,13 @@ export default function AddCutiAkademik() {
       const fd = new FormData();
       
       if (isProdi) {
-        // Prodi submission
-        const approvalProdi = userData?.nama || userData?.username || userData?.userid || "";
-        
-        fd.append("MhsId", formData.mhsId);
-        fd.append("TahunAjaran", formData.tahunAjaran);
-        fd.append("Semester", formData.semester);
-        
-        // Ensure file is properly appended
-        if (formData.suratPernyataan && formData.suratPernyataan instanceof File) {
-          fd.append("LampiranSuratPengajuan", formData.suratPernyataan, formData.suratPernyataan.name);
-          console.log("Surat Pernyataan file:", formData.suratPernyataan.name, formData.suratPernyataan.size);
-        } else {
-          console.error("Surat Pernyataan file is missing or invalid");
-        }
-        
-        if (formData.lampiran && formData.lampiran instanceof File) {
-          fd.append("Lampiran", formData.lampiran, formData.lampiran.name);
-          console.log("Lampiran file:", formData.lampiran.name, formData.lampiran.size);
-        }
-        
-        fd.append("Menimbang", formData.menimbang);
-        fd.append("ApprovalProdi", approvalProdi);
-        
-        console.log("PRODI FORM DATA SEND =", {
-          MhsId: formData.mhsId,
-          TahunAjaran: formData.tahunAjaran,
-          Semester: formData.semester,
-          Menimbang: formData.menimbang,
-          ApprovalProdi: approvalProdi,
-          SuratPernyataanFile: formData.suratPernyataan?.name,
-          LampiranFile: formData.lampiran?.name
-        });
+        buildProdiFormData(fd);
       } else {
-        // Mahasiswa submission
-        const mhsId = userData?.mhsId || userData?.nama || userData?.userid || userData?.username || "";
-        
-        console.log("=== MAHASISWA SUBMISSION MAPPING ===");
-        console.log("userData.mhsId:", userData?.mhsId);
-        console.log("userData.nama:", userData?.nama);
-        console.log("userData.username:", userData?.username);
-        console.log("userData.userid:", userData?.userid);
-        console.log("Final mhsId for submission:", mhsId);
-        
-        if (!mhsId) {
-          Toast.error("User tidak valid.");
-          return;
-        }
-        
-        fd.append("Step", "STEP1");
-        fd.append("MhsId", mhsId);
-        fd.append("TahunAjaran", formData.tahunAjaran);
-        fd.append("Semester", formData.semester);
-        
-        // Ensure file is properly appended
-        if (formData.suratPernyataan && formData.suratPernyataan instanceof File) {
-          fd.append("LampiranSuratPengajuan", formData.suratPernyataan, formData.suratPernyataan.name);
-          console.log("Surat Pernyataan file:", formData.suratPernyataan.name, formData.suratPernyataan.size);
-        } else {
-          console.error("Surat Pernyataan file is missing or invalid");
-        }
-        
-        if (formData.lampiran && formData.lampiran instanceof File) {
-          fd.append("Lampiran", formData.lampiran, formData.lampiran.name);
-          console.log("Lampiran file:", formData.lampiran.name, formData.lampiran.size);
-        }
-        
-        console.log("MAHASISWA FORM DATA SEND =", {
-          MhsId: mhsId,
-          TahunAjaran: formData.tahunAjaran,
-          Semester: formData.semester,
-          SuratPernyataanFile: formData.suratPernyataan?.name,
-          LampiranFile: formData.lampiran?.name
-        });
+        const success = buildMahasiswaFormData(fd);
+        if (!success) return;
       }
+
+      appendFilesToFormData(fd);
 
       // Use appropriate endpoint
       const endpoint = isProdi 
@@ -545,18 +563,7 @@ export default function AddCutiAkademik() {
       }
 
       if (result?.draftId) {
-        if (isProdi) {
-          // Mark this application as created by prodi in session storage
-          const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
-          if (!prodiCreatedApps.includes(result.draftId)) {
-            prodiCreatedApps.push(result.draftId);
-            sessionStorage.setItem('prodiCreatedApps', JSON.stringify(prodiCreatedApps));
-          }
-          Toast.success("Pengajuan Cuti berhasil dibuat untuk mahasiswa.");
-        } else {
-          Toast.success("Pengajuan Cuti berhasil dibuat.");
-        }
-        router.push("/pages/administrasi-akademik/Cuti-Akademik");
+        handleSubmissionSuccess(result);
       } else {
         Toast.error(result?.message || "Gagal membuat pengajuan.");
       }
@@ -678,55 +685,53 @@ export default function AddCutiAkademik() {
 
       <form onSubmit={handleSubmit}>
         {isProdi && (
-          <>
-            <div className="row mt-3">
-              <div className="col-lg-4">
-                <DropDown
-                  ref={prodiRef}
-                  forInput="konId"
-                  label="Program Studi"
-                  type="pilih"
-                  arrData={prodiList}
-                  value={formData.konId}
-                  onChange={handleProdiChange}
-                  isRequired={true}
-                  isDisabled={loadingProdi}
-                  errorMessage={errors.konId}
-                  searchable={true}
-                />
-              </div>
-
-              <div className="col-lg-4">
-                <DropDown
-                  ref={mahasiswaRef}
-                  forInput="mhsId"
-                  label="Mahasiswa"
-                  type="pilih"
-                  arrData={studentList}
-                  value={formData.mhsId}
-                  onChange={handleStudentChange}
-                  isRequired={true}
-                  isDisabled={!formData.konId || loadingStudents}
-                  errorMessage={errors.mhsId}
-                  searchable={true}
-                />
-              </div>
-              <div className="col-lg-4">
-                <Label
-                  text="Angkatan"
-                  htmlFor="angkatan"
-                  required={false}
-                />
-                <input
-                  type="text"
-                  className="form-control rounded-4 blue-element"
-                  value={formData.angkatan}
-                  disabled
-                  placeholder=""
-                />
-              </div>
+          <div className="row mt-3">
+            <div className="col-lg-4">
+              <DropDown
+                ref={prodiRef}
+                forInput="konId"
+                label="Program Studi"
+                type="pilih"
+                arrData={prodiList}
+                value={formData.konId}
+                onChange={handleProdiChange}
+                isRequired={true}
+                isDisabled={loadingProdi}
+                errorMessage={errors.konId}
+                searchable={true}
+              />
             </div>
-          </>
+
+            <div className="col-lg-4">
+              <DropDown
+                ref={mahasiswaRef}
+                forInput="mhsId"
+                label="Mahasiswa"
+                type="pilih"
+                arrData={studentList}
+                value={formData.mhsId}
+                onChange={handleStudentChange}
+                isRequired={true}
+                isDisabled={!formData.konId || loadingStudents}
+                errorMessage={errors.mhsId}
+                searchable={true}
+              />
+            </div>
+            <div className="col-lg-4">
+              <Label
+                text="Angkatan"
+                htmlFor="angkatan"
+                required={false}
+              />
+              <input
+                type="text"
+                className="form-control rounded-4 blue-element"
+                value={formData.angkatan}
+                disabled
+                placeholder=""
+              />
+            </div>
+          </div>
         )}
 
         <div className="row mt-3">
