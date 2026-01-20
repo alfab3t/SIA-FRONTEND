@@ -51,13 +51,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const router = useRouter();
   const [dataCutiAkademik, setDataCutiAkademik] = useState([]);
   const [dataRiwayat, setDataRiwayat] = useState([]);
-  const [riwayatLoaded, setRiwayatLoaded] = useState(false);
   const [loadingRiwayat, setLoadingRiwayat] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showRiwayat, setShowRiwayat] = useState(false);
 
   const sortRef = useRef();
-  const statusRef = useRef();
   const prodiRef = useRef();
 
 
@@ -72,7 +70,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI";
   const isWadir1 = fixedRole === "ROL01" || fixedRole === "WADIR1";
   const isFinance = fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE" || 
-                    (userData?.nama && userData.nama.toLowerCase().includes('finance'));
+                    userData?.nama?.toLowerCase().includes('finance');
   const isDAAK = fixedRole === "ROL21" || fixedRole === "DAAK";
   
   
@@ -87,17 +85,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     { Value: "tanggal_asc", Text: "Tanggal Pengajuan [↑]" },
     { Value: "id_asc", Text: "No Pengajuan [↑]" },
     { Value: "id_desc", Text: "No Pengajuan [↓]" },
-  ];
-
-  const dataFilterStatus = [
-    { Value: "", Text: "Semua Status" },
-    { Value: "Draft", Text: "Draft" },
-    { Value: "Belum Disetujui Prodi", Text: "Belum Disetujui Prodi" },
-    { Value: "Belum Disetujui Wadir 1", Text: "Belum Disetujui Wadir 1" },
-    { Value: "Belum Disetujui Finance", Text: "Belum Disetujui Finance" },
-    { Value: "Menunggu Upload SK", Text: "Menunggu Upload SK" },
-    { Value: "Disetujui", Text: "Disetujui" },
-    { Value: "Ditolak", Text: "Ditolak" },
   ];
 
   const dataFilterProdi = [
@@ -119,15 +106,13 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const [totalData, setTotalData] = useState(0);
   const [totalDataRiwayat, setTotalDataRiwayat] = useState(0);
   const [pageSize] = useState(10);
-  const [search, setSearch] = useState("");
+  const [search] = useState("");
   const [searchRiwayat, setSearchRiwayat] = useState("");
   const [sortBy, setSortBy] = useState(dataFilterSort[0].Value);
-  const [sortStatus, setSortStatus] = useState(dataFilterStatus[0].Value);
   const [filterProdi, setFilterProdi] = useState(dataFilterProdi[0].Value);
   
   // State for bebas tanggungan check
   const [bebasTanggunganStatus, setBebasTanggunganStatus] = useState(null);
-  const [checkingBebasTanggungan, setCheckingBebasTanggungan] = useState(false);
   
   // State for Prodi's konsentrasi
   const [prodiKonsentrasi, setProdiKonsentrasi] = useState(null);
@@ -139,7 +124,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     
     const checkBebasTanggungan = async () => {
       try {
-        setCheckingBebasTanggungan(true);
         const userId = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
         
         console.log(`[checkBebasTanggungan] Checking for userId: ${userId}`);
@@ -165,8 +149,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         }
       } catch (error) {
         console.error("[checkBebasTanggungan] Network error:", error);
-      } finally {
-        setCheckingBebasTanggungan(false);
       }
     };
 
@@ -221,6 +203,384 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     loadProdiKonsentrasi();
   }, [isProdi, userData]);
   
+  // Helper function to determine role-based parameters
+  const getRoleBasedParams = useCallback(() => {
+    let mhsId = "%";
+    let statusFilter = "";
+    let userId = "";
+    
+    if (isMahasiswa) {
+      mhsId = userData?.mhsId || userData?.nama || userData?.username || userData?.userid || "";
+      if (!mhsId) {
+        console.error("Mahasiswa ID not found in userData");
+        return null;
+      }
+      // statusFilter remains empty for mahasiswa
+    } else if (isProdi) {
+      // statusFilter remains empty for prodi
+      userId = userData?.username || "";
+      // mhsId remains "%" for prodi
+    } else if (isWadir1) {
+      statusFilter = "Belum Disetujui Wadir 1";
+      // mhsId remains "%" for wadir1
+    } else if (isFinance) {
+      statusFilter = "Belum Disetujui Finance";
+      // mhsId remains "%" for finance
+    } else if (isDAAK) {
+      statusFilter = "Menunggu Upload SK";
+      // mhsId remains "%" for DAAK
+    } else if (isAdmin) {
+      // statusFilter remains empty for admin
+      // mhsId remains "%" for admin
+      // userId remains empty for admin
+    }
+
+    return { mhsId, statusFilter, userId };
+  }, [isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData]);
+
+  // Helper function to filter data based on role
+  const filterDataByRole = useCallback((actualData) => {
+    return actualData.filter(item => {
+      const currentStatus = item.status || item.cak_status || "";
+      
+      if (isMahasiswa) {
+        return currentStatus === "Draft" || currentStatus === "Disetujui";
+      }
+      
+      if (isProdi) {
+        return filterProdiData(item, currentStatus);
+      }
+      
+      if (isDAAK || isAdmin) {
+        return filterAdminData(currentStatus);
+      }
+      
+      // For Wadir1 and Finance
+      return currentStatus !== "Disetujui";
+    });
+  }, [isMahasiswa, isProdi, isDAAK, isAdmin, prodiKonsentrasi]);
+
+  // Helper function for Prodi data filtering
+  const filterProdiData = useCallback((item, currentStatus) => {
+    const itemProdi = item.prodi || item.kon_nama || item.konsentrasi || "";
+    const normalizeProdiName = (name) => {
+      if (!name) return "";
+      return name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    };
+    
+    const normalizedItemProdi = normalizeProdiName(itemProdi);
+    const normalizedProdiKonsentrasi = normalizeProdiName(prodiKonsentrasi);
+    
+    if (prodiKonsentrasi && normalizedItemProdi !== normalizedProdiKonsentrasi) {
+      return false;
+    }
+    
+    if (currentStatus === "Draft") {
+      const approveProdiValue = item.approveProdi || item.cak_approve_prodi || "";
+      return approveProdiValue !== "" && approveProdiValue;
+    }
+    
+    return currentStatus === "Belum Disetujui Prodi" || currentStatus === "Belum Disetujui Wadir 1";
+  }, [prodiKonsentrasi]);
+
+  // Helper function for Admin data filtering
+  const filterAdminData = useCallback((currentStatus) => {
+    return currentStatus === "Belum Disetujui Prodi" ||
+           currentStatus === "Belum Disetujui Wadir 1" ||
+           currentStatus === "Menunggu Upload SK";
+  }, []);
+
+  // Helper function to determine actions for each role
+  const determineActions = useCallback((item, currentStatus, isDraft) => {
+    if (isMahasiswa) {
+      return determineMahasiswaActions(item, currentStatus, isDraft);
+    }
+    
+    if (isProdi) {
+      return determineProdiActions(currentStatus);
+    }
+    
+    if (isWadir1) {
+      return determineWadir1Actions(currentStatus);
+    }
+    
+    if (isFinance) {
+      return determineFinanceActions(currentStatus);
+    }
+    
+    if (isDAAK || isAdmin) {
+      return determineAdminActions(currentStatus);
+    }
+    
+    return ["Detail"];
+  }, [isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin]);
+
+  // Helper function for Mahasiswa actions
+  const determineMahasiswaActions = useCallback((item, currentStatus, isDraft) => {
+    const approveProdiValue = item.approveProdi || item.cak_approve_prodi || "";
+    
+    if (approveProdiValue && approveProdiValue !== "" && currentStatus !== "Disetujui") {
+      return ["Detail"];
+    }
+    
+    if (isDraft) {
+      return ["Detail", "Edit", "Delete", "Ajukan"];
+    }
+    
+    if (currentStatus === "Disetujui") {
+      return ["Detail", "DownloadSK"];
+    }
+    
+    return ["Detail"];
+  }, []);
+
+  // Helper function for Prodi actions
+  const determineProdiActions = useCallback((currentStatus) => {
+    if (currentStatus === "Draft") {
+      return ["Detail", "Edit", "Delete", "Ajukan"];
+    }
+    
+    if (currentStatus === "Belum Disetujui Prodi") {
+      return ["Detail", "Approve", "Reject"];
+    }
+    
+    return ["Detail"];
+  }, []);
+
+  // Helper function for Wadir1 actions
+  const determineWadir1Actions = useCallback((currentStatus) => {
+    if (currentStatus === "Belum Disetujui Wadir 1") {
+      return ["Detail", "Approve", "Reject"];
+    }
+    return ["Detail"];
+  }, []);
+
+  // Helper function for Finance actions
+  const determineFinanceActions = useCallback((currentStatus) => {
+    if (currentStatus === "Belum Disetujui Finance") {
+      return ["Detail", "Approve", "Reject"];
+    }
+    return ["Detail"];
+  }, []);
+
+  // Helper function for Admin actions
+  const determineAdminActions = useCallback((currentStatus) => {
+    const isAllApprovalsComplete = currentStatus && 
+      !currentStatus.includes("Belum Disetujui Prodi") && 
+      !currentStatus.includes("Belum Disetujui Wadir 1") && 
+      !currentStatus.includes("Belum Disetujui Finance") &&
+      !currentStatus.includes("Draft") &&
+      !currentStatus.includes("Ditolak");
+      
+    const isReadyForSK = currentStatus === "Menunggu Upload SK" || 
+                       currentStatus === "Disetujui" ||
+                       isAllApprovalsComplete;
+    
+    return isReadyForSK ? ["Detail", "UploadSK"] : ["Detail"];
+  }, []);
+
+  // Helper function to format table row
+  const formatTableRow = useCallback((item, index, startIndex, currentStatus, actions) => {
+    const isDraft = item.status === "Draft" || item.id === "DRAFT" || !item.id?.includes("PMA");
+    const noSK = item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no || "";
+    
+    // Extract nama mahasiswa and prodi from backend data
+    let namaMahasiswa = item.NamaMahasiswa || item.namaMahasiswa || item.mhs_nama || item.nama_mahasiswa || "";
+    let prodi = item.Prodi || item.prodi || item.kon_nama || item.kon_singkatan || "";
+    
+    // Set defaults if empty
+    if (!namaMahasiswa || namaMahasiswa === "") namaMahasiswa = "-";
+    if (!prodi || prodi === "") prodi = "-";
+
+    // Determine No Pengajuan display
+    const approveProdiValue = item.approveProdi || item.cak_approve_prodi || "";
+    const isCreatedByProdi = approveProdiValue && approveProdiValue !== "";
+    
+    let noPengajuan;
+    if (isDraft && isCreatedByProdi) {
+      noPengajuan = "Draft";
+    } else if (isMahasiswa && isDraft) {
+      noPengajuan = "Draft";
+    } else {
+      noPengajuan = item.id || item.idDisplay || item.cak_id || "-";
+    }
+
+    // Base row data
+    const rowData = {
+      No: startIndex + index + 1, 
+      id: item.cak_id || item.id || item.idDisplay, 
+      "No Pengajuan": noPengajuan, 
+      "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
+      "No SK": noSK || "-", 
+      "Nama Mahasiswa": namaMahasiswa,
+      Prodi: prodi,
+      "Disetujui Prodi": getProdiIcon(currentStatus, item),
+      "Disetujui Wadir 1": getWadir1Icon(currentStatus),
+      Status: currentStatus || "-",
+    };
+
+    // Add SK Cuti Akademik column ONLY for Admin role
+    if (isAdmin || isDAAK) {
+      rowData["SK Cuti Akademik"] = formatSKCutiAkademikColumn(currentStatus);
+      rowData.Aksi = actions;
+      rowData.Alignment = new Array(11).fill("center");
+    } else {
+      rowData.Aksi = actions;
+      rowData.Alignment = new Array(10).fill("center");
+    }
+
+    return rowData;
+  }, [isAdmin, isDAAK, isMahasiswa]);
+
+  // Helper function to format SK Cuti Akademik column
+  const formatSKCutiAkademikColumn = useCallback((currentStatus) => {
+    if (isAdmin || isDAAK) {
+      return currentStatus === "Menunggu Upload SK" ? "DownloadSK" : "-";
+    }
+    return "-";
+  }, [isAdmin, isDAAK]);
+
+  // Helper function to determine Prodi approval status icon
+  const getProdiIcon = useCallback((status, item) => {
+    if (!status) return "⏳";
+    
+    const statusLower = status.toLowerCase();
+    
+    if (statusLower === "draft") {
+      return "✗";
+    } else if (statusLower === "belum disetujui prodi") {
+      return "✗";
+    } else if (statusLower.includes("ditolak") && statusLower.includes("prodi")) {
+      return "✗";
+    } else if (statusLower === "menunggu upload sk" || 
+               statusLower.includes("disetujui") || 
+               statusLower.includes("wadir") || 
+               statusLower.includes("finance")) {
+      return "✓";
+    } else {
+      return "⏳";
+    }
+  }, []);
+
+  // Helper function to determine Wadir 1 approval status icon
+  const getWadir1Icon = useCallback((status) => {
+    if (!status) return "⏳";
+    
+    const statusLower = status.toLowerCase();
+    if (statusLower === "draft" || statusLower === "belum disetujui prodi") {
+      return "✗";
+    } else if (statusLower === "belum disetujui wadir 1") {
+      return "✗";
+    } else if (statusLower.includes("ditolak")) {
+      return "✗";
+    } else if (statusLower === "menunggu upload sk" || 
+               statusLower.includes("disetujui") || 
+               statusLower.includes("finance") || 
+               statusLower.includes("upload sk")) {
+      return "✓";
+    } else {
+      return "⏳";
+    }
+  }, []);
+
+  // Helper function to build API parameters for main data loading
+  const buildMainDataParams = useCallback((roleParams, backendRole) => {
+    const { mhsId, statusFilter, userId } = roleParams;
+    const params = new URLSearchParams();
+    
+    if (isMahasiswa) {
+      params.append('mhsId', mhsId);
+    } else {
+      params.append('mhsId', mhsId || '%');
+    }
+    
+    if (statusFilter) params.append('status', statusFilter);
+    if (userId) params.append('userId', userId);
+    if (backendRole) params.append('role', backendRole);
+    if (search) params.append('search', search);
+
+    return params;
+  }, [isMahasiswa, search]);
+
+  // Helper function to fetch main data from API
+  const fetchMainData = useCallback(async (params) => {
+    const url = `${API_LINK}CutiAkademik?${params}`;
+    console.log("API URL:", url);
+
+    const [response] = await Promise.all([
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      }),
+      new Promise(resolve => setTimeout(resolve, 250))
+    ]);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API Error Response:", errorText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const responseText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("JSON Parse Error:", parseError);
+      throw new Error("Invalid JSON response from server");
+    }
+
+    return data;
+  }, []);
+
+  // Helper function to process and format main data
+  const processMainData = useCallback((actualData, page) => {
+    const pendingData = filterDataByRole(actualData);
+    const totalPendingItems = pendingData.length;
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedPendingData = pendingData.slice(startIndex, endIndex);
+
+    const formattedData = paginatedPendingData.map((item, index) => {
+      const isDraft = item.status === "Draft" || item.id === "DRAFT" || !item.id?.includes("PMA");
+      const currentStatus = item.status || item.cak_status || "";
+      const actions = determineActions(item, currentStatus, isDraft);
+
+      return formatTableRow(item, index, startIndex, currentStatus, actions);
+    });
+
+    return { formattedData, totalPendingItems };
+  }, [filterDataByRole, determineActions, formatTableRow, pageSize]);
+
+  // Helper function to extract array data from response
+  const extractArrayData = useCallback((data) => {
+    let actualData = data;
+    if (data && typeof data === 'object') {
+      if (data.data && Array.isArray(data.data)) {
+        actualData = data.data;
+      } else if (data.items && Array.isArray(data.items)) {
+        actualData = data.items;
+      } else if (data.result && Array.isArray(data.result)) {
+        actualData = data.result;
+      } else if (!Array.isArray(data)) {
+        const arrayProps = Object.keys(data).filter(key => Array.isArray(data[key]));
+        if (arrayProps.length > 0) {
+          actualData = data[arrayProps[0]];
+        }
+      }
+    }
+
+    if (!Array.isArray(actualData)) {
+      console.log("Data is not array after processing");
+      return [];
+    }
+
+    return actualData;
+  }, []);
+
   const loadData = useCallback(
     async (page = 1) => {
       try {
@@ -229,563 +589,307 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         console.log("=== DEBUG LOAD DATA ===");
         console.log("User Data:", userData);
         console.log("Fixed Role:", fixedRole);
-        console.log("User Nama:", userData?.nama);
-        console.log("Is Mahasiswa:", isMahasiswa);
-        console.log("Is Prodi:", isProdi);
-        console.log("Is Wadir1:", isWadir1);
-        console.log("Is Finance:", isFinance);
-        console.log("Is DAAK:", isDAAK);
-        console.log("Is Admin:", isAdmin);
 
-        
-        
-        let mhsId = "%"; 
-        let statusFilter = "";
-        let userId = "";
-        
-        if (isMahasiswa) {
-          // Try multiple possible fields for mahasiswa ID
-          mhsId = userData?.mhsId || userData?.nama || userData?.username || userData?.userid || "";
-          
-          console.log("=== MAHASISWA ID MAPPING ===");
-          console.log("userData.mhsId:", userData?.mhsId);
-          console.log("userData.nama:", userData?.nama);
-          console.log("userData.username:", userData?.username);
-          console.log("userData.userid:", userData?.userid);
-          console.log("Final mhsId used:", mhsId);
-          
-          if (!mhsId) {
-            console.error("Mahasiswa ID not found in userData");
-            setDataCutiAkademik([]);
-            setTotalData(0);
-            return;
-          }
-          statusFilter = ""; 
-        } else if (isProdi) {
-          // For Prodi users, show:
-          // 1. Draft applications created by Prodi
-          // 2. Applications waiting for Prodi approval
-          statusFilter = ""; // Don't filter by status at API level, we'll filter in frontend
-          userId = userData?.username || "";
-          mhsId = "%";
-          console.log("PRODI - will show drafts created by Prodi and applications needing Prodi approval");
-        } else if (isWadir1) {
-          
-          statusFilter = "Belum Disetujui Wadir 1";
-          mhsId = "%";
-        } else if (isFinance) {
-          
-          statusFilter = "Belum Disetujui Finance";
-          mhsId = "%";
-        } else if (isDAAK) {
-          
-          statusFilter = "Menunggu Upload SK";
-          mhsId = "%";
-        } else if (isAdmin) {
-          
-          
-          statusFilter = ""; 
-          mhsId = "%";
-          userId = "";
-        }
-
-        // Map frontend role to backend role codes
-        let backendRole = fixedRole;
-        if (fixedRole === "ADMIN SIA" || fixedRole === "ADMIN") {
-          backendRole = "ROL21"; // 
-        }
-
-        console.log("API Parameters:", { mhsId, statusFilter, userId, role: backendRole, search });
-        console.log("Workflow Path:", 
-          isMahasiswa ? "MAHASISWA" : 
-          isProdi ? "PRODI" : 
-          isWadir1 ? "WADIR1" : 
-          isFinance ? "FINANCE" : 
-          isDAAK ? "DAAK" : 
-          isAdmin ? "ADMIN" : "UNKNOWN");
-
-        
-        const params = new URLSearchParams();
-        
-        
-        if (isMahasiswa) {
-          // For mahasiswa, ALWAYS filter by their mhsId - never use wildcard
-          params.append('mhsId', mhsId);
-          console.log("MAHASISWA FILTER - Using exact mhsId:", mhsId);
-        } else {
-          // For other roles, use wildcard or specific filter
-          params.append('mhsId', mhsId || '%');
-        }
-        
-        
-        if (statusFilter) params.append('status', statusFilter);
-        if (userId) params.append('userId', userId);
-        if (backendRole) params.append('role', backendRole);
-        if (search) params.append('search', search);
-
-        const url = `${API_LINK}CutiAkademik?${params}`;
-        console.log("API URL:", url);
-
-        // Add minimum loading time for better UX (but keep it fast - 250ms)
-        const [response] = await Promise.all([
-          fetch(url, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            }
-          }),
-          new Promise(resolve => setTimeout(resolve, 250))
-        ]);
-        
-        console.log("Response Status:", response.status);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("API Error Response:", errorText);
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const responseText = await response.text();
-        console.log("Raw Response:", responseText);
-
-        let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error("JSON Parse Error:", parseError);
-          throw new Error("Invalid JSON response from server");
-        }
-
-        console.log("Parsed API Response Data:", data);
-
-        
-        let actualData = data;
-        if (data && typeof data === 'object') {
-          
-          if (data.data && Array.isArray(data.data)) {
-            actualData = data.data;
-          }
-          
-          else if (data.items && Array.isArray(data.items)) {
-            actualData = data.items;
-          }
-          
-          else if (data.result && Array.isArray(data.result)) {
-            actualData = data.result;
-          }
-          
-          else if (!Array.isArray(data)) {
-            console.log("Response is object but not array, checking properties...");
-            const arrayProps = Object.keys(data).filter(key => Array.isArray(data[key]));
-            if (arrayProps.length > 0) {
-              actualData = data[arrayProps[0]];
-              console.log(`Using array property: ${arrayProps[0]}`);
-            }
-          }
-        }
-
-        if (!Array.isArray(actualData)) {
-          console.log("Data is not array after processing, setting empty array");
-          console.log("Actual data type:", typeof actualData);
-          console.log("Actual data:", actualData);
+        const roleParams = getRoleBasedParams();
+        if (!roleParams) {
           setDataCutiAkademik([]);
           setTotalData(0);
           return;
         }
 
-        console.log("Processing array data:", actualData);
-
-        
-        const pendingData = actualData.filter(item => {
-          const currentStatus = item.status || item.cak_status || "";
-          
-          if (isMahasiswa) {
-            // Mahasiswa can see their Draft applications and approved applications
-            if (currentStatus === "Draft" || currentStatus === "Disetujui") {
-              return true; 
-            }
-            return false; 
-          } else if (isProdi) {
-            // For Prodi users, first filter by konsentrasi
-            const itemProdi = item.prodi || item.kon_nama || item.konsentrasi || "";
-            
-            // Normalize both values by removing abbreviation in parentheses for comparison
-            const normalizeProdiName = (name) => {
-              if (!name) return "";
-              return name.replace(/\s*\([^)]*\)\s*$/, '').trim();
-            };
-            
-            const normalizedItemProdi = normalizeProdiName(itemProdi);
-            const normalizedProdiKonsentrasi = normalizeProdiName(prodiKonsentrasi);
-            
-            console.log("=== PRODI KONSENTRASI FILTERING DEBUG ===");
-            console.log("Item ID:", item.cak_id || item.id);
-            console.log("Item Prodi (raw):", itemProdi);
-            console.log("Item Prodi (normalized):", normalizedItemProdi);
-            console.log("Prodi Konsentrasi (normalized):", normalizedProdiKonsentrasi);
-            console.log("Match:", normalizedItemProdi === normalizedProdiKonsentrasi);
-            
-            // If Prodi's konsentrasi is loaded, filter by it (using normalized names)
-            if (prodiKonsentrasi && normalizedItemProdi !== normalizedProdiKonsentrasi) {
-              console.log("→ FILTERED OUT: Not in Prodi's konsentrasi");
-              return false;
-            }
-            
-            // Then apply status-based filtering
-            // For Prodi users, show only:
-            // 1. Draft applications created by Prodi (not by Mahasiswa)
-            // 2. Applications waiting for Prodi approval ("Belum Disetujui Prodi")
-            // 3. Applications waiting for Wadir 1 approval ("Belum Disetujui Wadir 1")
-            
-            if (currentStatus === "Draft") {
-              // PRIMARY CHECK: Use approveProdi field to determine who created the draft
-              // - If approveProdi is empty (""), it was created by Mahasiswa → DON'T show to Prodi
-              // - If approveProdi has value (e.g., "arie_k"), it was created by Prodi → show to Prodi
-              const approveProdiValue = item.approveProdi || item.cak_approve_prodi || "";
-              
-              console.log("=== PRODI DRAFT FILTERING DEBUG ===");
-              console.log("Item ID:", item.cak_id || item.id);
-              console.log("approveProdi value:", approveProdiValue);
-              console.log("approveProdi type:", typeof approveProdiValue);
-              console.log("Is empty:", approveProdiValue === "");
-              console.log("Has value:", approveProdiValue !== "");
-              
-              // If approveProdi is empty, this draft was created by Mahasiswa
-              // Prodi should NOT see drafts created by Mahasiswa
-              if (approveProdiValue === "" || !approveProdiValue) {
-                console.log("→ FILTERED OUT: Draft created by Mahasiswa (approveProdi is empty)");
-                return false;
-              }
-              
-              // If approveProdi has value, this draft was created by Prodi
-              // Prodi should see their own drafts
-              console.log("→ INCLUDED: Draft created by Prodi (approveProdi has value)");
-              return true;
-            } else if (currentStatus === "Belum Disetujui Prodi" || 
-                       currentStatus === "Belum Disetujui Wadir 1") {
-              return true;
-            }
-            
-            return false;
-          } else {
-            // For other roles (Wadir1, Finance, DAAK, Admin)
-            if (isDAAK || isAdmin) {
-              // For Admin/DAAK users, show specific statuses:
-              // 1. Belum Disetujui Prodi
-              // 2. Belum Disetujui Wadir 1  
-              // 3. Menunggu Upload SK
-              if (currentStatus === "Belum Disetujui Prodi" ||
-                  currentStatus === "Belum Disetujui Wadir 1" ||
-                  currentStatus === "Menunggu Upload SK") {
-                return true;
-              }
-              return false;
-            } else {
-              // For Wadir1 and Finance, exclude completed applications
-              if (currentStatus === "Disetujui") {
-                return false;
-              }
-              return true;
-            }
-          }
-        });
-
-        console.log("Filtered pending data:", pendingData);
-        console.log("=== PRODI FILTERING DEBUG ===");
-        if (isProdi) {
-          console.log("Total items from API:", actualData.length);
-          console.log("Items after Prodi filtering:", pendingData.length);
-          console.log("Sample filtered items:", pendingData.slice(0, 3).map(item => ({
-            id: item.id || item.cak_id,
-            status: item.status || item.cak_status,
-            createdBy: item.cak_created_by,
-            menimbang: item.menimbang ? "has menimbang" : "no menimbang"
-          })));
+        // Map frontend role to backend role codes
+        let backendRole = fixedRole;
+        if (fixedRole === "ADMIN SIA" || fixedRole === "ADMIN") {
+          backendRole = "ROL21";
         }
 
-        
-        const totalPendingItems = pendingData.length;
-        const startIndex = (page - 1) * pageSize;
-        const endIndex = startIndex + pageSize;
-        const paginatedPendingData = pendingData.slice(startIndex, endIndex);
+        console.log("API Parameters:", { ...roleParams, role: backendRole, search });
 
-        const formattedData = paginatedPendingData.map((item, index) => {
-          
-          const isDraft = item.status === "Draft" || item.id === "DRAFT" || !item.id?.includes("PMA");
+        const params = buildMainDataParams(roleParams, backendRole);
+        const data = await fetchMainData(params);
+        const actualData = extractArrayData(data);
 
-          
-          let actions = ["Detail"];
-          
-          const currentStatus = item.status || item.cak_status || "";
-          // Backend generates SK numbers dynamically for "Disetujui" status and puts them in SuratNo field
-          const hasUploadedSK = item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no;
-          
-          if (isMahasiswa) {
-            // PRIMARY CHECK: Use approveProdi field to determine who created the application
-            // - If approveProdi is empty (""), it was created by Mahasiswa → Mahasiswa can edit/delete/ajukan
-            // - If approveProdi has value (e.g., "arie_k"), it was created by Prodi → Mahasiswa can only view
-            const approveProdiValue = item.approveProdi || item.cak_approve_prodi || "";
-            
-            console.log("=== MAHASISWA ACTION DEBUG ===");
-            console.log("Item ID:", item.cak_id || item.id);
-            console.log("Status:", currentStatus);
-            console.log("approveProdi value:", approveProdiValue);
-            console.log("Is empty (created by Mahasiswa):", approveProdiValue === "");
-            console.log("Has value (created by Prodi):", approveProdiValue !== "");
-            
-            // If approveProdi has value, this was created by Prodi
-            // Mahasiswa can ONLY view for ALL statuses EXCEPT "Disetujui"
-            if (approveProdiValue && approveProdiValue !== "" && currentStatus !== "Disetujui") {
-              console.log("→ Created by Prodi: Mahasiswa can only view");
-              actions = ["Detail"];
-            } else if (isDraft) {
-              // Mahasiswa can edit/delete/submit their own draft applications
-              actions = ["Detail", "Edit", "Delete", "Ajukan"];
-            } else if (currentStatus === "Disetujui") {
-              // Mahasiswa can view and download SK for approved applications (regardless of who created them)
-              actions = ["Detail", "DownloadSK"];
-            } else {
-              // Mahasiswa can only view their own submitted applications
-              actions = ["Detail"];
-            }
-          } else if (isProdi) {
-            if (currentStatus === "Draft") {
-              // Prodi can edit/delete/submit draft applications
-              actions = ["Detail", "Edit", "Delete", "Ajukan"];
-            } else if (currentStatus === "Belum Disetujui Prodi") {
-              // Prodi can approve/reject applications waiting for Prodi approval
-              actions = ["Detail", "Approve", "Reject"];
-            } else {
-              // For other statuses (like "Belum Disetujui Wadir 1"), Prodi can only view
-              actions = ["Detail"];
-            }
-          } else if (isWadir1) {
-            if (currentStatus === "Belum Disetujui Wadir 1") {
-              actions = ["Detail", "Approve", "Reject"];
-            } else {
-              actions = ["Detail"];
-            }
-          } else if (isFinance) {
-            if (currentStatus === "Belum Disetujui Finance") {
-              actions = ["Detail", "Approve", "Reject"];
-            } else {
-              actions = ["Detail"];
-            }
-          } else if (isDAAK || isAdmin) {
-            // Check if all three approvals are complete
-            const isAllApprovalsComplete = currentStatus && 
-              !currentStatus.includes("Belum Disetujui Prodi") && 
-              !currentStatus.includes("Belum Disetujui Wadir 1") && 
-              !currentStatus.includes("Belum Disetujui Finance") &&
-              !currentStatus.includes("Draft") &&
-              !currentStatus.includes("Ditolak");
-              
-            // Additional check for specific approved statuses
-            const isReadyForSK = currentStatus === "Menunggu Upload SK" || 
-                               currentStatus === "Disetujui" ||
-                               isAllApprovalsComplete;
-            
-            // Debug admin actions logic
-            if (index === 0) {
-              console.log("=== ADMIN ACTIONS DEBUG ===");
-              console.log("Current Status:", currentStatus);
-              console.log("All Approvals Complete:", isAllApprovalsComplete);
-              console.log("Ready for SK:", isReadyForSK);
-              console.log("Has Uploaded SK:", hasUploadedSK);
-            }
-            
-            if (isReadyForSK) {
-              // All approvals complete - admin can manage SK
-              // Always show UploadSK in Aksi column (not DownloadSK)
-              actions = ["Detail", "UploadSK"];
-            } else {
-              // Approvals still pending - admin can only view
-              actions = ["Detail"];
-            }
-            
-            // Debug final actions
-            if (index === 0) {
-              console.log("Final Admin Actions:", actions);
-            }
-          }
+        if (!Array.isArray(actualData)) {
+          console.log("Data is not array after processing, setting empty array");
+          setDataCutiAkademik([]);
+          setTotalData(0);
+          return;
+        }
 
-          
-          // Function to format SK Cuti Akademik column (only for Admin role)
-          const formatSKCutiAkademikColumn = (skNo, itemId) => {
-            if (isAdmin || isDAAK) {
-              // Admin can download SK when status is "Menunggu Upload SK"
-              if (currentStatus === "Menunggu Upload SK") {
-                return "DownloadSK";
-              } else {
-                // For other statuses, return dash
-                return "-";
-              }
-            } else {
-              // Other roles cannot access SK download
-              return "-";
-            }
-          };
-
-          // Function to determine Prodi approval status icon
-          const getProdiIcon = (status, item) => {
-            if (!status) return "⏳";
-            
-            const statusLower = status.toLowerCase();
-            
-            // For Draft status, always show X (not approved yet)
-            if (statusLower === "draft") {
-              return "✗"; // X - Draft not approved yet
-            } else if (statusLower === "belum disetujui prodi") {
-              return "✗"; // X - waiting for Prodi approval
-            } else if (statusLower.includes("ditolak") && statusLower.includes("prodi")) {
-              return "✗"; // X - rejected by Prodi
-            } else if (statusLower === "menunggu upload sk" || 
-                       statusLower.includes("disetujui") || 
-                       statusLower.includes("wadir") || 
-                       statusLower.includes("finance")) {
-              return "✓"; // Checkmark - approved (including Menunggu Upload SK)
-            } else {
-              return "⏳"; // Default pending
-            }
-          };
-
-          // Function to determine Wadir 1 approval status icon
-          const getWadir1Icon = (status) => {
-            if (!status) return "⏳";
-            
-            const statusLower = status.toLowerCase();
-            if (statusLower === "draft" || statusLower === "belum disetujui prodi") {
-              return "✗"; // X - not approved yet (Draft or waiting for Prodi)
-            } else if (statusLower === "belum disetujui wadir 1") {
-              return "✗"; // X - waiting for Wadir 1 approval
-            } else if (statusLower.includes("ditolak")) {
-              return "✗"; // X - rejected
-            } else if (statusLower === "menunggu upload sk" || 
-                       statusLower.includes("disetujui") || 
-                       statusLower.includes("finance") || 
-                       statusLower.includes("upload sk")) {
-              return "✓"; // Checkmark - approved (including Menunggu Upload SK)
-            } else {
-              return "⏳"; // Default pending
-            }
-          };
-
-          
-          
-          if (index === 0) {
-            console.log("Sample item structure:", item);
-            console.log("Available keys:", Object.keys(item));
-          }
-
-          
-          // Backend now generates SK numbers dynamically for "Disetujui" status
-          // The generated SK number is in the SuratNo field from backend DTO
-          const noSK = item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no || "";
-          
-          // Debug SK number reading
-          if (index === 0) {
-            console.log("=== SK DEBUG ===");
-            console.log("item.SuratNo (backend generated):", item.SuratNo);
-            console.log("item.suratNo (database field):", item.suratNo);
-            console.log("item.srt_no:", item.srt_no);
-            console.log("item.cak_srt_no:", item.cak_srt_no);
-            console.log("Final noSK:", noSK);
-          }
-
-          // Extract nama mahasiswa and prodi from backend data
-          let namaMahasiswa = item.NamaMahasiswa ||  // Primary field from backend DTO
-                             item.namaMahasiswa || 
-                             item.mhs_nama || 
-                             item.nama_mahasiswa || 
-                             "";
-
-          let prodi = item.Prodi ||  // Primary field from backend DTO
-                     item.prodi ||
-                     item.kon_nama ||  // This is what your SQL returns
-                     item.kon_singkatan || 
-                     "";
-
-          // Set defaults if empty
-          if (!namaMahasiswa || namaMahasiswa === "") namaMahasiswa = "-";
-          if (!prodi || prodi === "") prodi = "-";
-
-          // Debug backend data for first item
-          if (index === 0) {
-            console.log("=== MAIN TABLE BACKEND DATA DEBUG ===");
-            console.log("Backend NamaMahasiswa:", item.NamaMahasiswa);
-            console.log("Backend Prodi:", item.Prodi);
-            console.log("Backend SuratNo:", item.SuratNo);
-            console.log("Final namaMahasiswa:", namaMahasiswa);
-            console.log("Final prodi:", prodi);
-            console.log("Available fields:", Object.keys(item));
-          }
-
-          // Determine if this application was created by Prodi using approveProdi field
-          // - If approveProdi is empty (""), it was created by Mahasiswa
-          // - If approveProdi has value (e.g., "arie_k"), it was created by Prodi
-          const approveProdiValue = item.approveProdi || item.cak_approve_prodi || "";
-          const isCreatedByProdi = approveProdiValue && approveProdiValue !== "";
-
-          // Determine No Pengajuan display
-          let noPengajuan;
-          if (isDraft && isCreatedByProdi) {
-            // If it's a draft created by Prodi, show "Draft"
-            noPengajuan = "Draft";
-          } else if (isMahasiswa && isDraft) {
-            // If it's a draft created by Mahasiswa, show "Draft"
-            noPengajuan = "Draft";
-          } else {
-            // For submitted applications, show the actual ID
-            noPengajuan = item.id || item.idDisplay || item.cak_id || "-";
-          }
-
-          // Base row data
-          const rowData = {
-            No: startIndex + index + 1, 
-            id: item.cak_id || item.id || item.idDisplay, 
-            "No Pengajuan": noPengajuan, 
-            "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
-            "No SK": noSK || "-", 
-            "Nama Mahasiswa": namaMahasiswa,
-            Prodi: prodi,
-            "Disetujui Prodi": getProdiIcon(currentStatus, item),
-            "Disetujui Wadir 1": getWadir1Icon(currentStatus),
-            Status: currentStatus || "-",
-          };
-
-          // Add SK Cuti Akademik column ONLY for Admin role (positioned before Aksi)
-          if (isAdmin || isDAAK) {
-            rowData["SK Cuti Akademik"] = formatSKCutiAkademikColumn(noSK, item.cak_id || item.id);
-            rowData.Aksi = actions; // Aksi comes after SK Cuti Akademik
-            rowData.Alignment = Array(11).fill("center"); // 11 columns for Admin (added Nama Mahasiswa + Prodi)
-          } else {
-            rowData.Aksi = actions; // Aksi comes directly after Status for other roles
-            rowData.Alignment = Array(10).fill("center"); // 10 columns for other roles (added Nama Mahasiswa + Prodi)
-          }
-
-          return rowData;
-        });
+        const { formattedData, totalPendingItems } = processMainData(actualData, page);
 
         console.log("Formatted data:", formattedData);
-        console.log(`Showing ${formattedData.length} items of ${totalPendingItems} total (page ${page})`);
-
         setDataCutiAkademik(formattedData);
         setTotalData(totalPendingItems); 
         setCurrentPage(page);
       } catch (err) {
         console.error("Error loading data:", err);
         Toast.error(`Gagal memuat data pengajuan: ${err.message}`);
-        
-        
         setDataCutiAkademik([]);
         setTotalData(0);
       } finally {
         setLoading(false);
       }
     },
-    [fixedRole, isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData, search, prodiKonsentrasi]
+    [fixedRole, isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData, search, prodiKonsentrasi, getRoleBasedParams, buildMainDataParams, fetchMainData, extractArrayData, processMainData]
   );
+
+  // Helper function to build riwayat API parameters
+  const buildRiwayatParams = useCallback(() => {
+    const params = new URLSearchParams();
+    
+    if (!isAdmin && userData?.username) {
+      const userIdentifier = isMahasiswa ? 
+        (userData?.mhsId || userData?.nama || userData?.username) : 
+        userData?.username;
+      params.append('userId', userIdentifier);
+    }
+    
+    return params;
+  }, [isAdmin, isMahasiswa, userData]);
+
+  // Helper function to fetch and parse riwayat data
+  const fetchRiwayatData = useCallback(async (params) => {
+    const url = `${API_LINK}CutiAkademik/riwayat?${params}`;
+    console.log("Riwayat API URL:", url);
+
+    const [response] = await Promise.all([
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      }),
+      new Promise(resolve => setTimeout(resolve, 250))
+    ]);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Riwayat API Error Response:", errorText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const responseText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Riwayat JSON Parse Error:", parseError);
+      throw new Error("Invalid JSON response from server");
+    }
+
+    return data;
+  }, []);
+
+  // Helper function to parse date from string
+  const parseDateFromString = useCallback((tanggalStr) => {
+    if (!tanggalStr) return null;
+    
+    const dateMatch = tanggalStr.match(/(\d{2})\s+(\w+)\s+(\d{4})/);
+    if (!dateMatch) return null;
+    
+    const [, , monthName, year] = dateMatch;
+    const monthMap = {
+      'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+      'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+    };
+    
+    const month = monthMap[monthName];
+    return month ? { month, year } : null;
+  }, []);
+
+  // Helper function to convert month to Roman numerals
+  const convertToRomanMonth = useCallback((month) => {
+    const romanMonths = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+    return romanMonths[month] || '';
+  }, []);
+
+  // Helper function to extract sequence from ID
+  const extractSequenceFromId = useCallback((idStr) => {
+    if (!idStr) return "001";
+    const sequenceMatch = idStr.match(/^(\d{3})/);
+    return sequenceMatch ? sequenceMatch[1] : "001";
+  }, []);
+
+  // Helper function to generate SK number
+  const generateSKNumber = useCallback((item) => {
+    let nomorSK = item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no || "";
+    
+    if (!nomorSK && item.status === "Disetujui") {
+      try {
+        const tanggalStr = item.tanggal || item.cak_created_date || "";
+        const dateInfo = parseDateFromString(tanggalStr);
+        
+        if (dateInfo) {
+          const romanMonth = convertToRomanMonth(dateInfo.month);
+          const idStr = item.id || item.cak_id || "";
+          const sequence = extractSequenceFromId(idStr);
+          
+          nomorSK = `${sequence}/PA-WADIR-I/SKC/${romanMonth}/${dateInfo.year}`;
+          console.log(`Generated SK for ${idStr}: ${nomorSK}`);
+        }
+      } catch (error) {
+        console.warn("Error generating SK number:", error);
+      }
+    }
+    
+    return nomorSK;
+  }, [parseDateFromString, convertToRomanMonth, extractSequenceFromId]);
+
+  // Helper function to fetch missing data from detail API
+  const fetchMissingData = useCallback(async (item, namaMahasiswa, prodi) => {
+    if (!namaMahasiswa || !prodi || namaMahasiswa === "" || prodi === "") {
+      try {
+        const detailUrl = `${API_LINK}CutiAkademik/detail?id=${item.id || item.cak_id}`;
+        
+        const detailResponse = await fetch(detailUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (detailResponse.ok) {
+          const detailData = await detailResponse.json();
+          
+          if (!namaMahasiswa || namaMahasiswa === "") {
+            namaMahasiswa = detailData.mahasiswa ||           
+                           detailData.mhs_nama || 
+                           detailData.namaMahasiswa || 
+                           detailData.nama_mahasiswa || 
+                           detailData.mahasiswaNama ||
+                           detailData.nama ||
+                           detailData.name || "-";
+          }
+          
+          if (!prodi || prodi === "") {
+            prodi = detailData.konsentrasi ||                 
+                   detailData.prodiNama ||                    
+                   detailData.konsentrasiSingkatan ||         
+                   detailData.kon_singkatan || 
+                   detailData.prodi || 
+                   detailData.programStudi || 
+                   detailData.program_studi || 
+                   detailData.jurusan || "-";
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to fetch detail for", item.id, ":", error.message);
+      }
+    }
+    
+    return {
+      namaMahasiswa: namaMahasiswa || "-",
+      prodi: prodi || "-"
+    };
+  }, []);
+
+  // Helper function to format riwayat item
+  const formatRiwayatItem = useCallback(async (item, index) => {
+    let namaMahasiswa = item.NamaMahasiswa || item.namaMahasiswa || item.mhs_nama || 
+                       item.nama_mahasiswa || item.mahasiswaNama || item.mahasiswa || 
+                       item.nama || item.name || "";
+
+    let prodi = item.Prodi || item.prodi || item.kon_nama || item.kon_singkatan || 
+               item.konsentrasi || item.konsentrasiSingkatan || item.programStudi || 
+               item.program_studi || item.prodiNama || "";
+
+    const missingData = await fetchMissingData(item, namaMahasiswa, prodi);
+    namaMahasiswa = missingData.namaMahasiswa;
+    prodi = missingData.prodi;
+
+    const nomorSK = generateSKNumber(item);
+
+    return {
+      No: index + 1,
+      id: item.cak_id || item.id,
+      "No Cuti Akademik": item.id || item.cak_id || "-",
+      "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
+      "Nomor SK": nomorSK || "-",
+      NIM: item.mhsId || item.mhs_id || item.cak_mhs_id || "-",
+      "Nama Mahasiswa": namaMahasiswa,
+      Prodi: prodi,
+      Aksi: ["Detail"],
+      Alignment: new Array(8).fill("center"),
+    };
+  }, [fetchMissingData, generateSKNumber]);
+
+  // Helper function to apply search filter
+  const applySearchFilter = useCallback((data, searchTerm) => {
+    if (!searchTerm || searchTerm.trim() === "") return data;
+    
+    const normalizedSearchTerm = searchTerm.toLowerCase().trim();
+    
+    return data.filter(item => {
+      const searchableFields = [
+        String(item["No Cuti Akademik"] || ""),
+        String(item["Tanggal Pengajuan"] || ""),
+        String(item["Nomor SK"] || ""),
+        String(item.NIM || ""),
+        String(item["Nama Mahasiswa"] || ""),
+        String(item.Prodi || "")
+      ];
+      
+      const searchableText = searchableFields
+        .join(" ")
+        .toLowerCase()
+        .replaceAll(/\s+/g, " ")
+        .trim();
+      
+      const isMatch = searchableText.includes(normalizedSearchTerm);
+      const exactFieldMatch = searchableFields.some(field => 
+        String(field).toLowerCase().includes(normalizedSearchTerm)
+      );
+      
+      return isMatch || exactFieldMatch;
+    });
+  }, []);
+
+  // Helper function to apply prodi filter
+  const applyProdiFilter = useCallback((data, prodiFilter) => {
+    if (!prodiFilter || prodiFilter.trim() === "") return data;
+    
+    return data.filter(item => {
+      const itemProdi = String(item.Prodi || "").trim();
+      return itemProdi === prodiFilter;
+    });
+  }, []);
+
+  // Helper function to apply sorting
+  const applySorting = useCallback((data, sortBy) => {
+    if (!sortBy || sortBy === "") return data;
+    
+    return [...data].sort((a, b) => {
+      let valueA, valueB;
+      
+      switch (sortBy) {
+        case "tanggal_desc":
+          valueA = new Date(a["Tanggal Pengajuan"] || "1900-01-01");
+          valueB = new Date(b["Tanggal Pengajuan"] || "1900-01-01");
+          return valueB - valueA;
+          
+        case "tanggal_asc":
+          valueA = new Date(a["Tanggal Pengajuan"] || "1900-01-01");
+          valueB = new Date(b["Tanggal Pengajuan"] || "1900-01-01");
+          return valueA - valueB;
+          
+        case "id_asc":
+          valueA = String(a["No Cuti Akademik"] || "");
+          valueB = String(b["No Cuti Akademik"] || "");
+          return valueA.localeCompare(valueB);
+          
+        case "id_desc":
+          valueA = String(a["No Cuti Akademik"] || "");
+          valueB = String(b["No Cuti Akademik"] || "");
+          return valueB.localeCompare(valueA);
+          
+        default:
+          return 0;
+      }
+    });
+  }, []);
 
   const loadDataRiwayat = useCallback(
     async (page = 1) => {
@@ -793,401 +897,35 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         setLoadingRiwayat(true);
         console.log("=== LOADING RIWAYAT DATA ===");
 
-        console.log("=== DEBUG LOAD RIWAYAT ===");
-        console.log("Search Riwayat:", searchRiwayat);
+        const params = buildRiwayatParams();
+        const data = await fetchRiwayatData(params);
+        const actualData = extractArrayData(data);
 
-        
-        
-        let statusForRiwayat = ""; 
-        
-        
-        if (isProdi) {
-          
-          statusForRiwayat = "";
-        } else if (isWadir1 || isFinance || isDAAK || isAdmin) {
-          
-          statusForRiwayat = "";
-        }
-
-        const params = new URLSearchParams();
-        
-        
-        if (!isAdmin && userData?.username) {
-          // For mahasiswa, use their ID from nama field (which contains NIM)
-          const userIdentifier = isMahasiswa ? 
-            (userData?.mhsId || userData?.nama || userData?.username) : 
-            userData?.username;
-          
-          console.log("=== RIWAYAT USER IDENTIFIER ===");
-          console.log("Is Mahasiswa:", isMahasiswa);
-          console.log("userData.nama:", userData?.nama);
-          console.log("userData.mhsId:", userData?.mhsId);
-          console.log("userData.username:", userData?.username);
-          console.log("Final userIdentifier:", userIdentifier);
-          
-          params.append('userId', userIdentifier);
-        }
-        if (statusForRiwayat) params.append('status', statusForRiwayat);
-        // DON'T send search to backend - we'll filter in frontend
-        // if (searchRiwayat) params.append('search', searchRiwayat);
-
-        
-        const url = `${API_LINK}CutiAkademik/riwayat?${params}`;
-        console.log("Riwayat API URL:", url);
-
-        // Add minimum loading time for better UX (but keep it fast - 200ms)
-        const [response] = await Promise.all([
-          fetch(url, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            }
-          }),
-          new Promise(resolve => setTimeout(resolve, 250))
-        ]);
-        
-        console.log("Riwayat Response Status:", response.status);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("Riwayat API Error Response:", errorText);
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const responseText = await response.text();
-        console.log("Riwayat Raw Response:", responseText);
-
-        let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error("Riwayat JSON Parse Error:", parseError);
-          throw new Error("Invalid JSON response from server");
-        }
-
-        console.log("Riwayat Parsed API Response:", data);
-
-        
-        let actualData = data;
-        if (data && typeof data === 'object') {
-          if (data.data && Array.isArray(data.data)) {
-            actualData = data.data;
-          } else if (data.items && Array.isArray(data.items)) {
-            actualData = data.items;
-          } else if (data.result && Array.isArray(data.result)) {
-            actualData = data.result;
-          } else if (!Array.isArray(data)) {
-            const arrayProps = Object.keys(data).filter(key => Array.isArray(data[key]));
-            if (arrayProps.length > 0) {
-              actualData = data[arrayProps[0]];
-            }
-          }
-        }
-
-        if (!Array.isArray(actualData)) {
-          console.log("Riwayat data is not array after processing");
+        if (actualData.length === 0) {
           setDataRiwayat([]);
           setTotalDataRiwayat(0);
           return;
         }
 
-        console.log("Processing riwayat array data:", actualData);
-
-        
-        
+        // Filter for "Disetujui" status only
         const completedData = actualData.filter(item => {
           const currentStatus = item.status || item.cak_status || "";
-          
-          // For all roles, show only "Disetujui" status in Riwayat
-          // Note: Prodi filtering will be done AFTER fetching detail data (because prodi field is empty in riwayat API)
           return currentStatus === "Disetujui";
         });
 
-        console.log("Filtered completed data for riwayat:", completedData);
-
+        // Format all data with fallback API calls
+        const formattedDataPromises = completedData.map((item, index) => 
+          formatRiwayatItem(item, index)
+        );
         
-        // Process ALL data first (no pagination yet) - Optimized with fallback API calls
-        const formattedDataPromises = completedData.map(async (item, index) => {
-          // Debug: Log the first item to see available fields
-          if (index === 0) {
-            console.log("=== RIWAYAT ITEM STRUCTURE DEBUG ===");
-            console.log("Available fields:", Object.keys(item));
-            console.log("Sample item:", item);
-            console.log("=== RIWAYAT SK FIELD DEBUG ===");
-            console.log("item.SuratNo (backend generated):", item.SuratNo);
-            console.log("item.suratNo (database field):", item.suratNo);
-            console.log("item.srt_no:", item.srt_no);
-            console.log("item.cak_srt_no:", item.cak_srt_no);
-            console.log("item.noSK:", item.noSK);
-            console.log("=== ALL ITEM FIELDS FOR SK DEBUGGING ===");
-            // Log all fields that might contain SK information
-            Object.keys(item).forEach(key => {
-              if (key.toLowerCase().includes('sk') || key.toLowerCase().includes('surat') || key.toLowerCase().includes('no')) {
-                console.log(`${key}:`, item[key]);
-              }
-            });
-            console.log("=== SK GENERATION DEBUG ===");
-            console.log("Item status:", item.status);
-            console.log("Item tanggal:", item.tanggal);
-            console.log("Item id:", item.id || item.cak_id);
-          }
-
-          // Use backend DTO field names (NamaMahasiswa and Prodi from your DTO)
-          let namaMahasiswa = item.NamaMahasiswa ||  // Primary field from backend DTO
-                             item.namaMahasiswa || 
-                             item.mhs_nama || 
-                             item.nama_mahasiswa || 
-                             item.mahasiswaNama ||
-                             item.mahasiswa ||
-                             item.nama ||
-                             item.name ||
-                             "";
-
-          // Use backend DTO field names (Prodi from your DTO)  
-          let prodi = item.Prodi ||  // Primary field from backend DTO
-                     item.prodi ||
-                     item.kon_nama ||  // This is what your SQL returns
-                     item.kon_singkatan || 
-                     item.konsentrasi || 
-                     item.konsentrasiSingkatan ||
-                     item.programStudi || 
-                     item.program_studi ||
-                     item.prodiNama ||
-                     "";
-
-          // If nama mahasiswa or prodi is missing, fetch from detail API
-          if (!namaMahasiswa || !prodi || namaMahasiswa === "" || prodi === "") {
-            try {
-              const detailUrl = `${API_LINK}CutiAkademik/detail?id=${item.id || item.cak_id}`;
-              
-              const detailResponse = await fetch(detailUrl, {
-                method: 'GET',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json'
-                }
-              });
-              
-              if (detailResponse.ok) {
-                const detailData = await detailResponse.json();
-                
-                // Extract nama mahasiswa if not found in main data
-                if (!namaMahasiswa || namaMahasiswa === "") {
-                  namaMahasiswa = detailData.mahasiswa ||           
-                                 detailData.mhs_nama || 
-                                 detailData.namaMahasiswa || 
-                                 detailData.nama_mahasiswa || 
-                                 detailData.mahasiswaNama ||
-                                 detailData.nama ||
-                                 detailData.name || "-";
-                }
-                
-                // Extract prodi if not found in main data
-                if (!prodi || prodi === "") {
-                  prodi = detailData.konsentrasi ||                 
-                         detailData.prodiNama ||                    
-                         detailData.konsentrasiSingkatan ||         
-                         detailData.kon_singkatan || 
-                         detailData.prodi || 
-                         detailData.programStudi || 
-                         detailData.program_studi || 
-                         detailData.jurusan || "-";
-                }
-              }
-            } catch (error) {
-              console.warn("Failed to fetch detail for", item.id, ":", error.message);
-            }
-          }
-
-          // Set defaults if still empty
-          if (!namaMahasiswa || namaMahasiswa === "") namaMahasiswa = "-";
-          if (!prodi || prodi === "") prodi = "-";
-
-          // Generate SK number for "Disetujui" status if not provided by backend
-          let nomorSK = item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no || "";
-          
-          // If no SK number and status is "Disetujui", generate it dynamically (frontend fallback)
-          if (!nomorSK && item.status === "Disetujui") {
-            try {
-              // Extract date from tanggal field (format: "05 Jan 2026")
-              const tanggalStr = item.tanggal || item.cak_created_date || "";
-              if (tanggalStr) {
-                // Parse date to get month and year
-                const dateMatch = tanggalStr.match(/(\d{2})\s+(\w+)\s+(\d{4})/);
-                if (dateMatch) {
-                  const [, day, monthName, year] = dateMatch;
-                  
-                  // Convert month name to number
-                  const monthMap = {
-                    'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
-                    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
-                  };
-                  const month = monthMap[monthName];
-                  
-                  if (month) {
-                    // Convert month to Roman numerals
-                    const romanMonths = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
-                    const romanMonth = romanMonths[month];
-                    
-                    // Extract sequence from ID (e.g., "031/PMA/CA/I/2026" -> "031")
-                    const idStr = item.id || item.cak_id || "";
-                    const sequenceMatch = idStr.match(/^(\d{3})/);
-                    const sequence = sequenceMatch ? sequenceMatch[1] : "001";
-                    
-                    // Generate SK number: "031/PA-WADIR-I/SKC/I/2026"
-                    nomorSK = `${sequence}/PA-WADIR-I/SKC/${romanMonth}/${year}`;
-                    
-                    console.log(`Generated SK for ${idStr}: ${nomorSK}`);
-                  }
-                }
-              }
-            } catch (error) {
-              console.warn("Error generating SK number:", error);
-            }
-          }
-
-          return {
-            No: index + 1, // Temporary number, will be updated after pagination
-            id: item.cak_id || item.id,
-            "No Cuti Akademik": item.id || item.cak_id || "-",
-            "Tanggal Pengajuan": item.tanggal || item.cak_created_date || "-",
-            // Use generated SK number (includes backend SuratNo or frontend-generated fallback)
-            "Nomor SK": nomorSK || "-",
-            NIM: item.mhsId || item.mhs_id || item.cak_mhs_id || "-",
-            "Nama Mahasiswa": namaMahasiswa,
-            Prodi: prodi,
-            Aksi: ["Detail"],
-            Alignment: Array(8).fill("center"),
-          };
-        });
-
-        
-        console.log("Processing data with fallback API calls if needed...");
         let allFormattedData = await Promise.all(formattedDataPromises);
 
-        console.log("All formatted data ready:", allFormattedData.length);
+        // Apply filters and sorting
+        allFormattedData = applySearchFilter(allFormattedData, searchRiwayat);
+        allFormattedData = applyProdiFilter(allFormattedData, filterProdi);
+        allFormattedData = applySorting(allFormattedData, sortBy);
 
-        // PRODI KONSENTRASI FILTERING - REMOVED for Riwayat
-        // Prodi can see all prodi in Riwayat tab
-        console.log("=== RIWAYAT - NO PRODI FILTERING ===");
-        console.log("Prodi can see all prodi in Riwayat tab");
-
-        // FRONTEND SEARCH FILTERING - Search in ALL fields
-        if (searchRiwayat && searchRiwayat.trim() !== "") {
-          const searchTerm = searchRiwayat.toLowerCase().trim();
-          console.log("=== FRONTEND SEARCH FILTERING ===");
-          console.log("Search term:", searchTerm);
-          console.log("Total data before search:", allFormattedData.length);
-          
-          allFormattedData = allFormattedData.filter(item => {
-            // Search in all text fields - convert to string and handle null/undefined values
-            const searchableFields = [
-              String(item["No Cuti Akademik"] || ""),
-              String(item["Tanggal Pengajuan"] || ""),
-              String(item["Nomor SK"] || ""),
-              String(item.NIM || ""),
-              String(item["Nama Mahasiswa"] || ""),
-              String(item.Prodi || "")
-            ];
-            
-            // Join all fields and normalize for search
-            const searchableText = searchableFields
-              .join(" ")
-              .toLowerCase()
-              .replace(/\s+/g, " ") // Replace multiple spaces with single space
-              .trim();
-            
-            // Check if search term exists in the combined text
-            const isMatch = searchableText.includes(searchTerm);
-            
-            // Also check individual fields for exact matches
-            const exactFieldMatch = searchableFields.some(field => 
-              String(field).toLowerCase().includes(searchTerm)
-            );
-            
-            const finalMatch = isMatch || exactFieldMatch;
-            
-            if (finalMatch) {
-              console.log("Match found:", {
-                noCuti: item["No Cuti Akademik"],
-                nim: item.NIM,
-                nama: item["Nama Mahasiswa"],
-                prodi: item.Prodi,
-                nomorSK: item["Nomor SK"],
-                searchableText: searchableText.substring(0, 100) + "...",
-                matchType: isMatch ? "combined" : "individual"
-              });
-            }
-            
-            return finalMatch;
-          });
-          
-          console.log(`Search results: ${allFormattedData.length} items found out of original data`);
-        }
-
-        // FRONTEND PRODI FILTERING - Filter by selected prodi
-        if (filterProdi && filterProdi.trim() !== "") {
-          console.log("=== FRONTEND PRODI FILTERING ===");
-          console.log("Filter prodi:", filterProdi);
-          console.log("Total data before prodi filter:", allFormattedData.length);
-          
-          allFormattedData = allFormattedData.filter(item => {
-            const itemProdi = String(item.Prodi || "").trim();
-            const isMatch = itemProdi === filterProdi;
-            
-            if (isMatch) {
-              console.log("Prodi match found:", {
-                noCuti: item["No Cuti Akademik"],
-                nama: item["Nama Mahasiswa"],
-                prodi: itemProdi
-              });
-            }
-            
-            return isMatch;
-          });
-          
-          console.log(`Prodi filter results: ${allFormattedData.length} items found`);
-        }
-
-        // FRONTEND SORTING - Apply sorting to filtered data
-        if (sortBy && sortBy !== "") {
-          console.log("=== FRONTEND SORTING ===");
-          console.log("Sort by:", sortBy);
-          
-          allFormattedData.sort((a, b) => {
-            let valueA, valueB;
-            
-            switch (sortBy) {
-              case "tanggal_desc":
-                valueA = new Date(a["Tanggal Pengajuan"] || "1900-01-01");
-                valueB = new Date(b["Tanggal Pengajuan"] || "1900-01-01");
-                return valueB - valueA; // Descending
-                
-              case "tanggal_asc":
-                valueA = new Date(a["Tanggal Pengajuan"] || "1900-01-01");
-                valueB = new Date(b["Tanggal Pengajuan"] || "1900-01-01");
-                return valueA - valueB; // Ascending
-                
-              case "id_asc":
-                valueA = String(a["No Cuti Akademik"] || "");
-                valueB = String(b["No Cuti Akademik"] || "");
-                return valueA.localeCompare(valueB); // Ascending
-                
-              case "id_desc":
-                valueA = String(a["No Cuti Akademik"] || "");
-                valueB = String(b["No Cuti Akademik"] || "");
-                return valueB.localeCompare(valueA); // Descending
-                
-              default:
-                return 0;
-            }
-          });
-          
-          console.log("Data sorted successfully");
-        }
-
-        // Apply pagination to filtered data
+        // Apply pagination
         const totalFilteredItems = allFormattedData.length;
         const startIndex = (page - 1) * pageSize;
         const endIndex = startIndex + pageSize;
@@ -1199,27 +937,110 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           No: startIndex + index + 1
         }));
 
-        console.log("Final paginated data:", finalData.length);
-        console.log(`Showing ${finalData.length} items of ${totalFilteredItems} total (page ${page})`);
+        console.log(`Final paginated data: ${finalData.length} items of ${totalFilteredItems} total (page ${page})`);
 
         setDataRiwayat(finalData);
         setTotalDataRiwayat(totalFilteredItems); 
         setCurrentPageRiwayat(page);
-        setRiwayatLoaded(true); // Mark as loaded
       } catch (err) {
         console.error("Error loading riwayat:", err);
         Toast.error(`Gagal memuat data riwayat: ${err.message}`);
-        
-        
         setDataRiwayat([]);
         setTotalDataRiwayat(0);
       } finally {
         setLoadingRiwayat(false);
       }
     },
-    [userData, searchRiwayat, sortBy, filterProdi, isProdi, isWadir1, isFinance, isDAAK, isAdmin, isMahasiswa, pageSize]
+    [userData, searchRiwayat, sortBy, filterProdi, isProdi, isWadir1, isFinance, isDAAK, isAdmin, isMahasiswa, pageSize, buildRiwayatParams, fetchRiwayatData, extractArrayData, formatRiwayatItem, applySearchFilter, applyProdiFilter, applySorting]
   );
   
+  // Helper function to validate user data for submission
+  const validateUserForSubmission = useCallback(() => {
+    const modifiedBy = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
+    
+    console.log("=== MODIFIED BY MAPPING ===");
+    console.log("userData.nama:", userData?.nama);
+    console.log("userData.mhsId:", userData?.mhsId);
+    console.log("userData.username:", userData?.username);
+    console.log("userData.userid:", userData?.userid);
+    console.log("Final modifiedBy:", modifiedBy);
+    
+    if (!modifiedBy) {
+      Toast.error("Data user tidak lengkap. Silakan login ulang.");
+      return null;
+    }
+    
+    return modifiedBy;
+  }, [userData]);
+
+  // Helper function to build submission payload and URL
+  const buildSubmissionPayload = useCallback((id, modifiedBy) => {
+    const basePayload = {
+      DraftId: id,
+      ModifiedBy: modifiedBy,
+      Timestamp: Date.now()
+    };
+
+    if (isProdi) {
+      return {
+        payload: basePayload,
+        url: `${API_LINK}CutiAkademik/prodi/generate-id`
+      };
+    } else {
+      return {
+        payload: basePayload,
+        url: `${API_LINK}CutiAkademik/generate-id`
+      };
+    }
+  }, [isProdi]);
+
+  // Helper function to handle submission errors
+  const handleSubmissionError = useCallback((res, raw) => {
+    console.error("HTTP Error:", res.status, res.statusText);
+    
+    try {
+      const errorData = JSON.parse(raw);
+      let errorMsg = errorData.message || errorData.error || `HTTP ${res.status}: ${res.statusText}`;
+      
+      if (raw.includes("PRIMARY KEY constraint") || raw.includes("duplicate key")) {
+        errorMsg = "ID pengajuan sudah ada. Sistem akan mencoba generate ID baru. Silakan coba lagi.";
+        setTimeout(() => {
+          Toast.success("Mencoba generate ID baru...");
+        }, 1000);
+      } else if (raw.includes("SqlException")) {
+        errorMsg = "Terjadi kesalahan database. Silakan coba lagi atau hubungi admin.";
+      }
+      
+      Toast.error(`Gagal mengajukan: ${errorMsg}`);
+    } catch {
+      if (raw.includes("PRIMARY KEY constraint")) {
+        Toast.error("ID pengajuan sudah ada. Silakan coba lagi dalam beberapa detik.");
+      } else if (raw.includes("SqlException")) {
+        Toast.error("Terjadi kesalahan database. Silakan coba lagi atau hubungi admin.");
+      } else {
+        Toast.error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+    }
+  }, []);
+
+  // Helper function to handle successful submission
+  const handleSubmissionSuccess = useCallback((result, id) => {
+    if (result?.finalId) {
+      Toast.success(`Pengajuan berhasil diajukan dengan ID: ${result.finalId}`);
+      
+      if (isProdi) {
+        const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
+        const updatedApps = prodiCreatedApps.filter(appId => appId !== id);
+        sessionStorage.setItem('prodiCreatedApps', JSON.stringify(updatedApps));
+      }
+      
+      loadData(1);
+    } else {
+      const errorMsg = result?.message || result?.error || "Gagal mengajukan pengajuan.";
+      Toast.error(errorMsg);
+    }
+  }, [isProdi, loadData]);
+
   const handleAjukan = async (id) => {
     const confirm = await SweetAlert({
       title: "Ajukan Pengajuan",
@@ -1234,48 +1055,15 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     setLoading(true);
 
     try {
-      
-      const modifiedBy = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
-      
-      console.log("=== MODIFIED BY MAPPING ===");
-      console.log("userData.nama:", userData?.nama);
-      console.log("userData.mhsId:", userData?.mhsId);
-      console.log("userData.username:", userData?.username);
-      console.log("userData.userid:", userData?.userid);
-      console.log("Final modifiedBy:", modifiedBy);
-      
-      if (!modifiedBy) {
-        Toast.error("Data user tidak lengkap. Silakan login ulang.");
-        return;
-      }
+      const modifiedBy = validateUserForSubmission();
+      if (!modifiedBy) return;
 
-      let payload, url;
-
-      // Check if this is a prodi submission
-      if (isProdi) {
-        payload = {
-          DraftId: id,
-          ModifiedBy: modifiedBy,
-          // Add timestamp to prevent duplicate key issues
-          Timestamp: new Date().getTime()
-        };
-        url = `${API_LINK}CutiAkademik/prodi/generate-id`;
-      } else {
-        // Regular mahasiswa submission
-        payload = {
-          DraftId: id,
-          ModifiedBy: modifiedBy,
-          // Add timestamp to prevent duplicate key issues
-          Timestamp: new Date().getTime()
-        };
-        url = `${API_LINK}CutiAkademik/generate-id`;
-      }
+      const { payload, url } = buildSubmissionPayload(id, modifiedBy);
 
       console.log("=== AJUKAN CUTI AKADEMIK ===");
       console.log("Is Prodi:", isProdi);
       console.log("Payload:", payload);
       console.log("URL:", url);
-      console.log("UserData:", userData);
 
       const res = await fetch(url, {
         method: "PUT",
@@ -1286,40 +1074,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         body: JSON.stringify(payload),
       });
 
-      console.log("Response status:", res.status);
-      console.log("Response headers:", Object.fromEntries(res.headers.entries()));
-
       const raw = await res.text();
       console.log("Raw response:", raw);
       
       if (!res.ok) {
-        console.error("HTTP Error:", res.status, res.statusText);
-        
-        try {
-          const errorData = JSON.parse(raw);
-          let errorMsg = errorData.message || errorData.error || `HTTP ${res.status}: ${res.statusText}`;
-          
-          // Handle specific duplicate key error
-          if (raw.includes("PRIMARY KEY constraint") || raw.includes("duplicate key")) {
-            errorMsg = "ID pengajuan sudah ada. Sistem akan mencoba generate ID baru. Silakan coba lagi.";
-            // Wait a moment and retry once
-            setTimeout(() => {
-              Toast.info("Mencoba generate ID baru...");
-            }, 1000);
-          } else if (raw.includes("SqlException")) {
-            errorMsg = "Terjadi kesalahan database. Silakan coba lagi atau hubungi admin.";
-          }
-          
-          Toast.error(`Gagal mengajukan: ${errorMsg}`);
-        } catch {
-          if (raw.includes("PRIMARY KEY constraint")) {
-            Toast.error("ID pengajuan sudah ada. Silakan coba lagi dalam beberapa detik.");
-          } else if (raw.includes("SqlException")) {
-            Toast.error("Terjadi kesalahan database. Silakan coba lagi atau hubungi admin.");
-          } else {
-            Toast.error(`HTTP ${res.status}: ${res.statusText}`);
-          }
-        }
+        handleSubmissionError(res, raw);
         return;
       }
 
@@ -1333,20 +1092,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         return;
       }
 
-      
-      if (result?.finalId) {
-        Toast.success(`Pengajuan berhasil diajukan dengan ID: ${result.finalId}`);
-        // Clear session storage for prodi created apps
-        if (isProdi) {
-          const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedApps') || '[]');
-          const updatedApps = prodiCreatedApps.filter(appId => appId !== id);
-          sessionStorage.setItem('prodiCreatedApps', JSON.stringify(updatedApps));
-        }
-        loadData(1);
-      } else {
-        const errorMsg = result?.message || result?.error || "Gagal mengajukan pengajuan.";
-        Toast.error(errorMsg);
-      }
+      handleSubmissionSuccess(result, id);
     } catch (err) {
       console.error("Ajukan catch error:", err);
       Toast.error(`Gagal mengajukan: ${err.message}`);
@@ -1354,17 +1100,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       setLoading(false);
     }
   };
-
-  
-  const handleSearch = useCallback(
-    (query) => {
-      console.log("Search query:", query);
-      setSearch(query);
-      setCurrentPage(1); 
-      loadData(1);
-    },
-    [loadData]
-  );
 
   const handleSearchRiwayat = useCallback(
     (query) => {
@@ -1374,16 +1109,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     },
     [loadDataRiwayat]
   );
-
-  const handleFilterApply = useCallback(() => {
-    setSortBy(sortRef.current.value);
-    setSortStatus(statusRef.current.value);
-    loadData(1);
-    // Also reload riwayat data if it's visible to apply sorting
-    if (showRiwayat) {
-      loadDataRiwayat(1);
-    }
-  }, [loadData, loadDataRiwayat, showRiwayat]);
 
   const handleFilterApplyRiwayat = useCallback(() => {
     setSortBy(sortRef.current.value);
@@ -1444,7 +1169,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       const data = await res.json();
 
       
-      if (data.message && data.message.includes("berhasil")) {
+      if (data.message?.includes("berhasil")) {
         Toast.success(data.message);
         loadData(1);
       } else {
@@ -1557,8 +1282,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         result = JSON.parse(raw);
         console.log("Approve result:", result);
       } catch {
-        
-        result = { message: "Pengajuan berhasil disetujui" };
+        // JSON parsing failed, but response was successful
+        console.log("JSON parsing failed for approve response");
       }
 
       
@@ -1572,6 +1297,74 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       setLoading(false);
     }
   };
+
+  // Helper function to validate user for rejection
+  const validateUserForRejection = useCallback(() => {
+    const username = userData?.nama || userData?.username || userData?.userid || "";
+    
+    if (!username) {
+      Toast.error("Data user tidak lengkap. Silakan login ulang.");
+      return null;
+    }
+    
+    return username;
+  }, [userData]);
+
+  // Helper function to handle rejection error response
+  const handleRejectionError = useCallback((res, errorText, payload) => {
+    console.error("=== REJECT ERROR DETAILS ===");
+    console.error("Status:", res.status);
+    console.error("Status Text:", res.statusText);
+    console.error("Error Response:", errorText);
+    console.error("Request Payload:", JSON.stringify(payload, null, 2));
+    
+    let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+    
+    try {
+      const errorData = JSON.parse(errorText);
+      console.error("Parsed Error Data:", errorData);
+      
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData.error) {
+        errorMessage = errorData.error;
+      } else if (errorData.details) {
+        errorMessage = errorData.details;
+      }
+      
+      if (errorData.errors) {
+        const validationErrors = Object.values(errorData.errors).flat();
+        errorMessage = validationErrors.join(', ');
+      }
+      
+    } catch (parseError) {
+      console.error("Failed to parse error response:", parseError);
+      errorMessage = `${errorMessage}\n\nRaw response: ${errorText}`;
+    }
+    
+    Toast.error(`Gagal menolak pengajuan: ${errorMessage}`);
+  }, []);
+
+  // Helper function to handle rejection success
+  const handleRejectionSuccess = useCallback((result) => {
+    if (result && (result.rejected === true || result.success === true || 
+        result.message?.toLowerCase().includes("berhasil"))) {
+      
+      const successMessage = result.message || 
+        `Pengajuan berhasil ditolak oleh ${result.role || 'sistem'}`;
+      
+      Toast.success(successMessage);
+      loadData(1);
+      if (showRiwayat) loadDataRiwayat(1);
+      
+      return true;
+    } else {
+      const errorMessage = result?.message || result?.error || "Gagal menolak pengajuan";
+      console.error("Rejection failed:", result);
+      Toast.error(errorMessage);
+      return false;
+    }
+  }, [loadData, loadDataRiwayat, showRiwayat]);
 
   const handleReject = async (itemId) => {
     const confirm = await SweetAlert({
@@ -1591,37 +1384,23 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     try {
       console.log("=== REJECT CUTI AKADEMIK ===");
       console.log("Item ID:", itemId);
-      console.log("User Data:", userData);
-      console.log("Fixed Role:", fixedRole);
-      console.log("Is Prodi:", isProdi);
-      console.log("Is Finance:", isFinance);
-      console.log("Is Wadir1:", isWadir1);
 
-      // Get username for backend role detection - try multiple fields
-      const username = userData?.nama || userData?.username || userData?.userid || "";
-      
+      const username = validateUserForRejection();
       if (!username) {
-        Toast.error("Data user tidak lengkap. Silakan login ulang.");
         setLoading(false);
         return;
       }
 
-      console.log("Username for rejection:", username);
-
-      // Sesuai dengan backend RejectCutiAkademikRequest DTO
-      // Backend akan auto-detect role berdasarkan username
       const payload = {
         Id: itemId,
         Username: username,
-        Role: "auto-detect", // Backend akan override ini dengan hasil DetectUserRoleAsync
-        Keterangan: null // Optional - backend akan auto-generate berdasarkan detected role
+        Role: "auto-detect",
+        Keterangan: null
       };
 
       console.log("Reject payload:", payload);
 
       const url = `${API_LINK}CutiAkademik/reject`;
-      console.log("API URL:", url);
-
       const res = await fetch(url, {
         method: "PUT",
         headers: { 
@@ -1631,48 +1410,13 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         body: JSON.stringify(payload)
       });
 
-      console.log("Reject response status:", res.status);
-      console.log("Response headers:", [...res.headers.entries()]);
-
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("=== REJECT ERROR DETAILS ===");
-        console.error("Status:", res.status);
-        console.error("Status Text:", res.statusText);
-        console.error("Error Response:", errorText);
-        console.error("Request Payload:", JSON.stringify(payload, null, 2));
-        
-        let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
-        
-        try {
-          const errorData = JSON.parse(errorText);
-          console.error("Parsed Error Data:", errorData);
-          
-          if (errorData.message) {
-            errorMessage = errorData.message;
-          } else if (errorData.error) {
-            errorMessage = errorData.error;
-          } else if (errorData.details) {
-            errorMessage = errorData.details;
-          }
-          
-          // Handle validation errors
-          if (errorData.errors) {
-            const validationErrors = Object.values(errorData.errors).flat();
-            errorMessage = validationErrors.join(', ');
-          }
-          
-        } catch (parseError) {
-          console.error("Failed to parse error response:", parseError);
-          errorMessage = `${errorMessage}\n\nRaw response: ${errorText}`;
-        }
-        
-        Toast.error(`Gagal menolak pengajuan: ${errorMessage}`);
+        handleRejectionError(res, errorText, payload);
         setLoading(false);
         return;
       }
 
-      // Read response
       const responseText = await res.text();
       console.log("Reject raw response:", responseText);
 
@@ -1682,9 +1426,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         console.log("Reject parsed result:", result);
       } catch (parseError) {
         console.error("JSON Parse Error:", parseError);
-        console.error("Raw response was:", responseText);
         
-        // If response is not JSON but request was successful, assume success
         if (res.status === 200) {
           Toast.success("Pengajuan berhasil ditolak!");
           loadData(1);
@@ -1698,22 +1440,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         return;
       }
 
-      // Check result
-      if (result && (result.rejected === true || result.success === true || 
-          (result.message && result.message.toLowerCase().includes("berhasil")))) {
-        
-        const successMessage = result.message || 
-          `Pengajuan berhasil ditolak oleh ${result.role || 'sistem'}`;
-        
-        Toast.success(successMessage);
-        loadData(1); // Reload data
-        if (showRiwayat) loadDataRiwayat(1); // Reload riwayat if visible
-        
-      } else {
-        const errorMessage = result?.message || result?.error || "Gagal menolak pengajuan";
-        console.error("Rejection failed:", result);
-        Toast.error(errorMessage);
-      } 
+      handleRejectionSuccess(result);
     } catch (err) {
       console.error("Reject catch error:", err);
       Toast.error(`Gagal menolak pengajuan: ${err.message}`);
@@ -1966,26 +1693,34 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
   }, [ssoData, userData, loadData, loadDataRiwayat, isProdi, isWadir1, isFinance, isDAAK, isAdmin, router, prodiKonsentrasi, loadingProdiKonsentrasi]);
 
-  const filterContent = (
-    <>
-      <DropDown
-        ref={sortRef}
-        arrData={dataFilterSort}
-        type="pilih"
-        label="Urutkan"
-        forInput="sortBy"
-        defaultValue={sortBy}
-      />
-      <DropDown
-        ref={statusRef}
-        arrData={dataFilterStatus}
-        type="pilih"
-        label="Status"
-        forInput="sortStatus"
-        defaultValue={sortStatus}
-      />
-    </>
-  );
+  // Helper function to get empty state message
+  const getEmptyStateMessage = useCallback(() => {
+    if (isMahasiswa) {
+      return "Anda belum memiliki pengajuan cuti akademik. Klik tombol 'Ajukan Cuti Akademik' untuk membuat pengajuan baru.";
+    }
+    if (isProdi) {
+      return "Tidak ada pengajuan cuti akademik. Anda dapat membuat pengajuan untuk mahasiswa dengan klik tombol 'Ajukan Cuti untuk Mahasiswa'.";
+    }
+    return "Tidak ada pengajuan cuti akademik yang perlu ditinjau saat ini.";
+  }, [isMahasiswa, isProdi]);
+
+  // Helper function to determine if mahasiswa should show add button
+  const shouldShowMahasiswaAddButton = useCallback(() => {
+    return bebasTanggunganStatus === "OK";
+  }, [bebasTanggunganStatus]);
+
+  // Helper function to determine upload button text
+  const getUploadButtonText = useCallback((uploadLoading) => {
+    if (uploadLoading) {
+      return (
+        <>
+          <span className="spinner-border spinner-border-sm me-2"></span>
+          {" "}Mengupload...
+        </>
+      );
+    }
+    return 'Upload SK';
+  }, []);
 
   const filterContentRiwayat = (
     <>
@@ -2034,14 +1769,15 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               <i className="fas fa-exclamation-triangle me-2"></i>
               <strong>Anda belum menyelesaikan administrasi bebas tanggungan</strong>
             </div>
-            <span 
-              className="text-primary text-decoration-underline" 
+            <button 
+              type="button"
+              className="btn btn-link p-0 text-primary text-decoration-underline" 
               style={{ cursor: 'pointer' }}
               onClick={() => router.push('/pages/administrasi-akademik/bebas-tanggungan')}
             >
               <i className="fas fa-eye me-1"></i>
-              Lihat Administrasi Bebas Tanggungan
-            </span>
+              {" "}Lihat Administrasi Bebas Tanggungan
+            </button>
           </div>
         )}
         
@@ -2049,8 +1785,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           {(isMahasiswa || isProdi) && (
             <>
               {isMahasiswa ? (
-                // Mahasiswa: hide button if has tanggungan
-                bebasTanggunganStatus === "OK" && (
+                shouldShowMahasiswaAddButton() && (
                   <Button
                     classType="primary"
                     label="+ Tambah"
@@ -2058,7 +1793,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
                   />
                 )
               ) : (
-                // Prodi: always show button
                 <Button
                   classType="primary"
                   label="+ Tambah"
@@ -2072,52 +1806,55 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
         {loading ? (
           <div className="text-center py-4">
-            <div className="spinner-border" role="status">
+            <div className="spinner-border" aria-live="polite" aria-label="Loading">
               <span className="visually-hidden">Loading...</span>
             </div>
             <p className="mt-2">Memuat data pengajuan...</p>
           </div>
-        ) : dataCutiAkademik.length > 0 ? (
-          <>
-            <Table
-              data={dataCutiAkademik}
-              onDetail={handleDetail}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onAjukan={handleAjukan}
-              onApprove={handleApprove}
-              onReject={handleReject}
-              onUpload={handleUpload}
-              onUploadSK={handleUploadSK}
-              onPrint={handlePrint}
-              onDownloadSK={handleDownloadSK}
-            />
+        ) : (() => {
+          const hasData = dataCutiAkademik.length > 0;
+          
+          if (hasData) {
+            return (
+              <>
+                <Table
+                  data={dataCutiAkademik}
+                  onDetail={handleDetail}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onAjukan={handleAjukan}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                  onUpload={handleUpload}
+                  onUploadSK={handleUploadSK}
+                  onPrint={handlePrint}
+                  onDownloadSK={handleDownloadSK}
+                />
 
-            {totalData > 0 && (
-              <Paging
-                pageSize={pageSize}
-                pageCurrent={currentPage}
-                totalData={totalData}
-                navigation={handleNavigation}
-              />
-            )}
-          </>
-        ) : (
-          <div className="text-center py-5">
-            <div className="mb-3">
-              <i className="fas fa-inbox fa-3x text-muted"></i>
-            </div>
-            <h5 className="text-muted">Tidak ada data pengajuan</h5>
-            <p className="text-muted">
-              {isMahasiswa 
-                ? "Anda belum memiliki pengajuan cuti akademik. Klik tombol 'Ajukan Cuti Akademik' untuk membuat pengajuan baru."
-                : isProdi
-                ? "Tidak ada pengajuan cuti akademik. Anda dapat membuat pengajuan untuk mahasiswa dengan klik tombol 'Ajukan Cuti untuk Mahasiswa'."
-                : "Tidak ada pengajuan cuti akademik yang perlu ditinjau saat ini."
-              }
-            </p>
-          </div>
-        )}
+                {totalData > 0 && (
+                  <Paging
+                    pageSize={pageSize}
+                    pageCurrent={currentPage}
+                    totalData={totalData}
+                    navigation={handleNavigation}
+                  />
+                )}
+              </>
+            );
+          } else {
+            return (
+              <div className="text-center py-5">
+                <div className="mb-3">
+                  <i className="fas fa-inbox fa-3x text-muted"></i>
+                </div>
+                <h5 className="text-muted">Tidak ada data pengajuan</h5>
+                <p className="text-muted">
+                  {getEmptyStateMessage()}
+                </p>
+              </div>
+            );
+          }
+        })()}
       </div>
 
       
@@ -2141,7 +1878,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
                 params.append('userId', userIdentifier);
               }
               
-              const exportUrl = `${API_LINK}CutiAkademik/riwayat/excel${params.toString() ? '?' + params.toString() : ''}`;
+              const queryString = params.toString();
+              const exportUrl = `${API_LINK}CutiAkademik/riwayat/excel${queryString ? '?' + queryString : ''}`;
               console.log("Export URL:", exportUrl);
               window.open(exportUrl, "_blank");
             }}
@@ -2155,37 +1893,45 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
           {loadingRiwayat ? (
             <div className="text-center py-4">
-              <div className="spinner-border" role="status">
+              <div className="spinner-border" aria-live="polite" aria-label="Loading">
                 <span className="visually-hidden">Loading...</span>
               </div>
               <p className="mt-2">Memuat data riwayat...</p>
             </div>
-          ) : dataRiwayat.length > 0 ? (
-            <>
-              <Table
-                data={dataRiwayat}
-                onDetail={handleDetail}
-                onPrint={handlePrint}
-              />
+          ) : (() => {
+            const hasRiwayatData = dataRiwayat.length > 0;
+            
+            if (hasRiwayatData) {
+              return (
+                <>
+                  <Table
+                    data={dataRiwayat}
+                    onDetail={handleDetail}
+                    onPrint={handlePrint}
+                  />
 
-              {totalDataRiwayat > 0 && (
-                <Paging
-                  pageSize={pageSize}
-                  pageCurrent={currentPageRiwayat}
-                  totalData={totalDataRiwayat}
-                  navigation={handleNavigationRiwayat}
-                />
-              )}
-            </>
-          ) : (
-            <div className="text-center py-5">
-              <div className="mb-3">
-                <i className="fas fa-history fa-3x text-muted"></i>
-              </div>
-              <h5 className="text-muted">Tidak ada data riwayat</h5>
-              <p className="text-muted">Belum ada riwayat cuti akademik yang tersedia.</p>
-            </div>
-          )}
+                  {totalDataRiwayat > 0 && (
+                    <Paging
+                      pageSize={pageSize}
+                      pageCurrent={currentPageRiwayat}
+                      totalData={totalDataRiwayat}
+                      navigation={handleNavigationRiwayat}
+                    />
+                  )}
+                </>
+              );
+            } else {
+              return (
+                <div className="text-center py-5">
+                  <div className="mb-3">
+                    <i className="fas fa-history fa-3x text-muted"></i>
+                  </div>
+                  <h5 className="text-muted">Tidak ada data riwayat</h5>
+                  <p className="text-muted">Belum ada riwayat cuti akademik yang tersedia.</p>
+                </div>
+              );
+            }
+          })()}
         </div>
       )}
 
@@ -2225,7 +1971,10 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
                 {skFilePreview && (
                   <div className="mb-3">
-                    <label className="form-label">Preview SK:</label>
+                    <Label
+                      text="Preview SK:"
+                      htmlFor="skPreview"
+                    />
                     <div className="text-center">
                       <img 
                         src={skFilePreview} 
@@ -2252,14 +2001,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
                   onClick={handleUploadConfirm}
                   disabled={!selectedSKFile || uploadLoading}
                 >
-                  {uploadLoading ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2"></span>
-                      Mengupload...
-                    </>
-                  ) : (
-                    'Upload SK'
-                  )}
+                  {getUploadButtonText(uploadLoading)}
                 </button>
               </div>
             </div>
