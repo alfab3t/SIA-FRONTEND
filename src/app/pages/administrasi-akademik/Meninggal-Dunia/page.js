@@ -15,290 +15,320 @@ import { API_LINK } from "@/lib/constant";
 import { encryptIdUrl } from "@/lib/encryptor";
 import SweetAlert from "@/components/common/SweetAlert";
 
-export default function Page_MeninggalDunia() {
-    const ssoData = useMemo(() => getSSOData(), []);
-    const userData = useMemo(() => getUserData(), []);
-    const router = useRouter();
-    
+// Helper function to determine user roles
+function useUserRoles(userData, permission) {
+    const fixedRole = useMemo(() => {
+        let role = (userData?.role || "").toUpperCase();
+        
+        if (permission?.roleName) {
+            role = permission.roleName.toUpperCase();
+        }
+        
+        if (userData?.nama?.toLowerCase()?.includes('prodi')) {
+            role = "NDA_PRODI";
+        }
+        
+        if (userData?.roleId) {
+            const roleMap = {
+                "ROL01": "ROL01", // Wadir1
+                "ROL08": "ROL08", // Finance
+                "ROL21": "ROL21", // DAAK
+                "ROL22": "ROL22", // Prodi
+                "ROL23": "ROL23", // Mahasiswa
+            };
+            role = roleMap[userData.roleId] || role;
+        }
+        
+        return role;
+    }, [userData, permission]);
+
+    const roles = useMemo(() => {
+        const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
+        const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI" || 
+                        (fixedRole === "KARYAWAN" && userData?.nama?.toLowerCase()?.includes('prodi'));
+        
+        const isFinance = (userData?.nama?.toLowerCase()?.includes('finance')) ||
+                          fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE";
+        
+        const isWadir1 = !isFinance && (fixedRole === "ROL01" || fixedRole === "WADIR1");
+        const isDAAK = fixedRole === "ROL21" || fixedRole === "DAAK";
+        const isAdmin = (fixedRole === "ADMIN" || fixedRole === "ADMIN SIA" || 
+                        (fixedRole === "KARYAWAN" && !isFinance && !isWadir1 && !isProdi) ||
+                        isDAAK);
+
+        return { isMahasiswa, isProdi, isFinance, isWadir1, isDAAK, isAdmin, fixedRole };
+    }, [fixedRole, userData]);
+
+    return roles;
+}
+
+// Helper function to load user permissions
+function usePermissions(userData) {
     const [permission, setPermission] = useState(null);
 
     useEffect(() => {
         const loadPermission = async () => {
             try {
-                console.log("=== LOADING PERMISSION DEBUG ===");
-                console.log("userData:", userData);
-                console.log("userData?.username:", userData?.username);
-                console.log("userData?.roleId:", userData?.roleId);
-                
                 const payload = {
                     username: userData?.username || "",
                     appId: "SIA",
                     roleId: userData?.roleId || ""
                 };
 
-                console.log("Permission payload:", payload);
-
                 const res = await fetch(`${API_LINK}Auth/getpermission`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
                 });
-
-                console.log("Permission response status:", res.status);
                 
                 const data = await res.json();
-                console.log("PERMISSION LOADED =", data);
                 
                 if (data?.errorMessage === "") {
-                    console.log("Permission loaded successfully");
                     setPermission(data);
                 } else {
-                    console.error("Permission loading failed:", data.errorMessage || data.message);
                     setPermission(null);
                 }
-            } catch (err) {
-                console.error("Gagal load permission:", err);
+            } catch {
                 setPermission(null);
             }
         };
 
         if (userData?.username) {
-            console.log("Loading permission for user:", userData.username);
             loadPermission();
-        } else {
-            console.log("No username found, skipping permission load");
         }
     }, [userData]);
 
-    // ============= ROLE DETECTION =============
-    let fixedRole = (userData?.role || "").toUpperCase();
-    
-    if (permission?.roleName) {
-        fixedRole = permission.roleName.toUpperCase();
-    }
-    
-    // Additional role detection for specific cases
-    if (userData?.nama && userData.nama.toLowerCase().includes('prodi')) {
-        fixedRole = "NDA_PRODI";
-    }
-    
-    // Use roleId for accurate role detection
-    if (userData?.roleId) {
-        console.log("Checking roleId:", userData.roleId);
-        if (userData.roleId === "ROL01") {
-            fixedRole = "ROL01"; // Wadir1
-            console.log("ROL01 detected - Wadir1 role");
-        }
-        else if (userData.roleId === "ROL08") {
-            fixedRole = "ROL08"; // Finance
-            console.log("ROL08 detected - Finance role");
-        }
-        else if (userData.roleId === "ROL21") {
-            fixedRole = "ROL21"; // DAAK
-            console.log("ROL21 detected - DAAK role");
-        }
-        else if (userData.roleId === "ROL22") {
-            fixedRole = "ROL22"; // Prodi
-            console.log("ROL22 detected - Prodi role");
-        }
-        else if (userData.roleId === "ROL23") {
-            fixedRole = "ROL23"; // Mahasiswa
-            console.log("ROL23 detected - Mahasiswa role");
-        }
-    }
-    
-    const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
-    const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI" || 
-                    fixedRole === "KARYAWAN" && (userData?.nama && userData.nama.toLowerCase().includes('prodi'));
-    
-    // Finance detection - prioritize username check first
-    const isFinance = (userData?.nama && userData.nama.toLowerCase().includes('finance')) ||
-                      fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE";
-    
-    // Wadir1 detection - exclude if already detected as Finance
-    const isWadir1 = !isFinance && (fixedRole === "ROL01" || fixedRole === "WADIR1");
-    
-    const isDAAK = fixedRole === "ROL21" || fixedRole === "DAAK";
-    
-    // Debug role detection
-    console.log("=== MENINGGAL DUNIA ROLE DETECTION DEBUG ===");
-    console.log("userData?.role:", userData?.role);
-    console.log("userData?.roleId:", userData?.roleId);
-    console.log("userData?.nama:", userData?.nama);
-    console.log("permission?.roleName:", permission?.roleName);
-    console.log("fixedRole:", fixedRole);
-    console.log("Username contains 'finance':", userData?.nama && userData.nama.toLowerCase().includes('finance'));
-    console.log("Is Mahasiswa:", isMahasiswa);
-    console.log("Is Prodi:", isProdi);
-    console.log("Is Finance (calculated first):", isFinance);
-    console.log("Is Wadir1 (calculated after Finance):", isWadir1);
-    console.log("Is DAAK:", isDAAK);
-    
-    // Admin should NOT include Finance, Wadir1, or Prodi users who have specific workflows
-    const isAdmin = (fixedRole === "ADMIN" || fixedRole === "ADMIN SIA" || 
-                    (fixedRole === "KARYAWAN" && !isFinance && !isWadir1 && !isProdi) ||
-                    isDAAK);
+    return permission;
+}
 
-    console.log("Is Admin:", isAdmin);
+export default function Page_MeninggalDunia() {
+    const ssoData = useMemo(() => getSSOData(), []);
+    const userData = useMemo(() => getUserData(), []);
+    const router = useRouter();
+    
+    const permission = usePermissions(userData);
+    const { isMahasiswa, isProdi, isFinance, isWadir1, isDAAK, isAdmin, fixedRole } = useUserRoles(userData, permission);
 
-    // Load Prodi's konsentrasi for filtering
-    useEffect(() => {
-        if (!isProdi || !userData) return;
-        
-        const loadProdiKonsentrasi = async () => {
-            try {
-                setLoadingProdiKonsentrasi(true);
-                const username = userData?.nama || userData?.username || "";
-                
-                console.log(`[loadProdiKonsentrasi] Loading konsentrasi for username: ${username}`);
-                
-                if (!username) {
-                    console.warn("[loadProdiKonsentrasi] No username found");
-                    return;
-                }
+    // Helper function to load Prodi konsentrasi
+    const useProdiKonsentrasi = (isProdi, userData) => {
+        const [prodiKonsentrasi, setProdiKonsentrasi] = useState(null);
+        const [loadingProdiKonsentrasi, setLoadingProdiKonsentrasi] = useState(false);
 
-                const response = await fetch(`${API_LINK}Mahasiswa/GetKonsentrasiList?username=${username}`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log(`[loadProdiKonsentrasi] Konsentrasi data:`, data);
+        useEffect(() => {
+            if (!isProdi || !userData) return;
+            
+            const loadProdiKonsentrasi = async () => {
+                try {
+                    setLoadingProdiKonsentrasi(true);
+                    const username = userData?.nama || userData?.username || "";
                     
-                    // Extract konsentrasi name (e.g., "Teknologi Rekayasa Pemeliharaan Alat Berat (TAB)" -> "Teknologi Rekayasa Pemeliharaan Alat Berat")
-                    if (data && data.length > 0) {
-                        const konsentrasiName = data[0].nama || "";
-                        // Remove the abbreviation in parentheses if present
-                        const cleanName = konsentrasiName.replace(/\s*\([^)]*\)\s*$/, '').trim();
-                        setProdiKonsentrasi(cleanName);
-                        console.log(`[loadProdiKonsentrasi] Set konsentrasi to: ${cleanName}`);
+                    if (!username) return;
+
+                    const response = await fetch(`${API_LINK}Mahasiswa/GetKonsentrasiList?username=${username}`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        if (data && data.length > 0) {
+                            const konsentrasiName = data[0].nama || "";
+                            const cleanName = konsentrasiName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                            setProdiKonsentrasi(cleanName);
+                        }
                     }
-                } else {
-                    console.error(`[loadProdiKonsentrasi] API Error: ${response.status}`);
+                } catch {
+                    // Error loading konsentrasi
+                } finally {
+                    setLoadingProdiKonsentrasi(false);
                 }
-            } catch (error) {
-                console.error("[loadProdiKonsentrasi] Network error:", error);
-            } finally {
-                setLoadingProdiKonsentrasi(false);
-            }
-        };
+            };
 
-        loadProdiKonsentrasi();
-    }, [isProdi, userData]);
+            loadProdiKonsentrasi();
+        }, [isProdi, userData]);
+
+        return { prodiKonsentrasi, loadingProdiKonsentrasi };
+    };
+
+    const { prodiKonsentrasi, loadingProdiKonsentrasi } = useProdiKonsentrasi(isProdi, userData);
 
 
-    // ============================================================
-    // ================      TABLE 1 : PENGAJUAN      =============
-    // ============================================================
-
+    // State for pengajuan table
     const [dataPengajuan, setDataPengajuan] = useState([]);
     const [loadingPengajuan, setLoadingPengajuan] = useState(true);
     const [pengajuanPage, setPengajuanPage] = useState(1);
     const [pengajuanTotalData, setPengajuanTotalData] = useState(0);
     const pengajuanPageSize = 10;
-    const [search, setSearch] = useState("");
-    
-    // State for Prodi's konsentrasi filtering
-    const [prodiKonsentrasi, setProdiKonsentrasi] = useState(null);
-    const [loadingProdiKonsentrasi, setLoadingProdiKonsentrasi] = useState(false);
+
+    // Helper function to build API parameters
+    const buildApiParams = useCallback((roles, userData, search, page) => {
+        const { isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, fixedRole } = roles;
+        
+        const params = new URLSearchParams();
+        
+        if (isMahasiswa) {
+            const mhsId = userData?.mhsId || userData?.nama || userData?.username || userData?.userid || "";
+            if (!mhsId) return null;
+            params.append('mhsId', mhsId);
+        } else {
+            params.append('mhsId', '%');
+            
+            // Set status filter based on role
+            if (isWadir1) params.append('status', "Belum Disetujui Wadir 1");
+            else if (isFinance) params.append('status', "Belum Disetujui Finance");
+            else if (isDAAK) params.append('status', "Menunggu Upload SK");
+            
+            // Set userId for Prodi
+            if (isProdi) params.append('userId', userData?.username || "");
+        }
+
+        // Map frontend role to backend role codes
+        const roleMap = {
+            "ADMIN SIA": "ROL21",
+            "ADMIN": "ROL21"
+        };
+        
+        let backendRole = roleMap[fixedRole] || fixedRole;
+        if (isProdi) backendRole = "ROL22";
+        else if (isWadir1) backendRole = "ROL01";
+        else if (isFinance) backendRole = "ROL08";
+
+        if (backendRole) params.append('role', backendRole);
+        if (search) params.append('search', search);
+        params.append('pageNumber', page);
+        params.append('pageSize', pengajuanPageSize);
+
+        return params;
+    }, [pengajuanPageSize]);
+
+    // Helper function to filter data by role
+    const filterDataByRole = useCallback((data, roles, prodiKonsentrasi) => {
+        const { isMahasiswa, isProdi } = roles;
+        
+        return data.filter(item => {
+            const currentStatus = item.status || item.mdu_status || "";
+            
+            if (isMahasiswa) {
+                return currentStatus === "Draft";
+            } else if (isProdi) {
+                return filterProdiData(item, currentStatus, prodiKonsentrasi);
+            } else {
+                return currentStatus !== "Disetujui";
+            }
+        });
+    }, []);
+
+    // Helper function for Prodi data filtering
+    const filterProdiData = useCallback((item, currentStatus, prodiKonsentrasi) => {
+        const itemProdi = item.prodi || item.kon_nama || item.konsentrasi || "";
+        
+        if (prodiKonsentrasi && itemProdi !== prodiKonsentrasi) {
+            return false;
+        }
+        
+        return currentStatus === "Draft" || currentStatus === "Belum Disetujui Wadir 1";
+    }, []);
+
+    // Helper function to determine actions for each item
+    const determineItemActions = useCallback((item, roles, userData) => {
+        const { isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin } = roles;
+        const currentStatus = item.status || item.mdu_status || "";
+        const isDraft = item.status === "Draft" || item.id === "DRAFT" || !item.id?.includes("MDU");
+        const hasUploadedSK = item.srt_no || item.suratNo || item.mdu_srt_no;
+
+        if (isMahasiswa) {
+            return determineMahasiswaActions(item, isDraft, userData);
+        } else if (isProdi) {
+            return determineProdiActions(currentStatus);
+        } else if (isWadir1) {
+            return determineWadir1Actions(currentStatus);
+        } else if (isFinance) {
+            return determineFinanceActions(currentStatus);
+        } else if (isDAAK || isAdmin) {
+            return determineAdminActions(currentStatus, hasUploadedSK);
+        }
+
+        return ["Detail"];
+    }, []);
+
+    // Helper function to check if created by Prodi
+    const isCreatedByProdi = useCallback((item, userData) => {
+        const createdByProdi = item.mdu_created_by && 
+            (item.mdu_created_by.toLowerCase().includes('prodi') ||
+             item.mdu_created_by === userData?.username ||
+             item.mdu_created_by === userData?.nama);
+        
+        const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedMeninggalApps') || '[]');
+        const isProdiCreatedFromSession = prodiCreatedApps.includes(item.mdu_id || item.id);
+        
+        return createdByProdi || isProdiCreatedFromSession;
+    }, []);
+
+    // Helper functions for role-specific actions
+    const determineMahasiswaActions = useCallback((item, isDraft, userData) => {
+        if (isDraft && !isCreatedByProdi(item, userData)) {
+            return ["Detail", "Edit", "Delete", "Ajukan"];
+        }
+        return ["Detail"];
+    }, [isCreatedByProdi]);
+
+    const determineProdiActions = useCallback((currentStatus) => {
+        if (currentStatus === "Draft") {
+            return ["Detail", "Edit", "Delete", "Ajukan"];
+        } else if (currentStatus === "Belum Disetujui Wadir 1") {
+            return ["Detail"];
+        }
+        return ["Detail"];
+    }, []);
+
+    const determineWadir1Actions = useCallback((currentStatus) => {
+        if (currentStatus === "Belum Disetujui Wadir 1") {
+            return ["Detail", "Approve", "Reject"];
+        }
+        return ["Detail"];
+    }, []);
+
+    const determineFinanceActions = useCallback((currentStatus) => {
+        if (currentStatus === "Belum Disetujui Finance") {
+            return ["Detail", "Approve", "Reject"];
+        }
+        return ["Detail"];
+    }, []);
+
+    const determineAdminActions = useCallback((currentStatus, hasUploadedSK) => {
+        const isAllApprovalsComplete = currentStatus && 
+            !currentStatus.includes("Belum Disetujui Prodi") && 
+            !currentStatus.includes("Belum Disetujui Wadir 1") && 
+            !currentStatus.includes("Belum Disetujui Finance") &&
+            !currentStatus.includes("Draft") &&
+            !currentStatus.includes("Ditolak");
+            
+        const isReadyForSK = currentStatus === "Menunggu Upload SK" || 
+                           currentStatus === "Disetujui" ||
+                           isAllApprovalsComplete;
+        
+        if (isReadyForSK) {
+            return hasUploadedSK ? ["Detail", "DownloadSK"] : ["Detail", "UploadSK"];
+        }
+        return ["Detail"];
+    }, []);
 
     const loadPengajuan = useCallback(
         async (page = 1) => {
             try {
                 setLoadingPengajuan(true);
 
-                console.log("=== DEBUG LOAD MENINGGAL DUNIA DATA ===");
-                console.log("User Data:", userData);
-                console.log("Fixed Role:", fixedRole);
-                console.log("User Nama:", userData?.nama);
-                console.log("Is Mahasiswa:", isMahasiswa);
-                console.log("Is Prodi:", isProdi);
-                console.log("Is Wadir1:", isWadir1);
-                console.log("Is Finance:", isFinance);
-                console.log("Is DAAK:", isDAAK);
-                console.log("Is Admin:", isAdmin);
-
-                let mhsId = "%"; 
-                let statusFilter = "";
-                let userId = "";
+                const roles = { isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, fixedRole };
+                const params = buildApiParams(roles, userData, "", page);
                 
-                if (isMahasiswa) {
-                    // Try multiple possible fields for mahasiswa ID
-                    mhsId = userData?.mhsId || userData?.nama || userData?.username || userData?.userid || "";
-                    
-                    console.log("=== MAHASISWA ID MAPPING ===");
-                    console.log("userData.mhsId:", userData?.mhsId);
-                    console.log("userData.nama:", userData?.nama);
-                    console.log("userData.username:", userData?.username);
-                    console.log("userData.userid:", userData?.userid);
-                    console.log("Final mhsId used:", mhsId);
-                    
-                    if (!mhsId) {
-                        console.error("Mahasiswa ID not found in userData");
-                        setDataPengajuan([]);
-                        setPengajuanTotalData(0);
-                        return;
-                    }
-                    statusFilter = ""; 
-                } else if (isProdi) {
-                    // For Prodi users, show:
-                    // 1. Draft applications created by Prodi
-                    // 2. Applications waiting for Prodi approval
-                    statusFilter = ""; // Don't filter by status at API level, we'll filter in frontend
-                    userId = userData?.username || "";
-                    mhsId = "%";
-                    console.log("PRODI - will show drafts created by Prodi and applications needing Prodi approval");
-                } else if (isWadir1) {
-                    statusFilter = "Belum Disetujui Wadir 1";
-                    mhsId = "%";
-                } else if (isFinance) {
-                    statusFilter = "Belum Disetujui Finance";
-                    mhsId = "%";
-                } else if (isDAAK) {
-                    statusFilter = "Menunggu Upload SK";
-                    mhsId = "%";
-                } else if (isAdmin) {
-                    statusFilter = ""; 
-                    mhsId = "%";
-                    userId = "";
+                if (!params) {
+                    setDataPengajuan([]);
+                    setPengajuanTotalData(0);
+                    return;
                 }
-
-                // Map frontend role to backend role codes
-                let backendRole = fixedRole;
-                if (fixedRole === "ADMIN SIA" || fixedRole === "ADMIN") {
-                    backendRole = "ROL21"; // DAAK
-                } else if (isProdi) {
-                    backendRole = "ROL22"; // Prodi
-                } else if (isWadir1) {
-                    backendRole = "ROL01"; // Wadir1
-                } else if (isFinance) {
-                    backendRole = "ROL08"; // Finance
-                }
-
-                console.log("API Parameters:", { mhsId, statusFilter, userId, role: backendRole, search });
-
-                const params = new URLSearchParams();
-                
-                if (isMahasiswa) {
-                    params.append('mhsId', mhsId);
-                    console.log("MAHASISWA FILTER - Using exact mhsId:", mhsId);
-                } else {
-                    params.append('mhsId', mhsId || '%');
-                }
-                
-                if (statusFilter) params.append('status', statusFilter);
-                if (userId) params.append('userId', userId);
-                if (backendRole) params.append('role', backendRole);
-                if (search) params.append('search', search);
-                params.append('pageNumber', page);
-                params.append('pageSize', pengajuanPageSize);
 
                 const url = `${API_LINK}MeninggalDunia/GetAll?${params}`;
-                console.log("API URL:", url);
-
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: {
@@ -307,256 +337,41 @@ export default function Page_MeninggalDunia() {
                     }
                 });
                 
-                console.log("Response Status:", response.status);
-                
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error("API Error Response:", errorText);
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 const responseText = await response.text();
-                console.log("Raw Response:", responseText);
-
                 let data;
                 try {
                     data = JSON.parse(responseText);
-                } catch (parseError) {
-                    console.error("JSON Parse Error:", parseError);
+                } catch {
                     throw new Error("Invalid JSON response from server");
                 }
 
-                console.log("Parsed API Response Data:", data);
-
-                // Handle different response structures
-                let actualData = data;
-                if (data && typeof data === 'object') {
-                    if (data.data && Array.isArray(data.data)) {
-                        actualData = data.data;
-                    } else if (data.items && Array.isArray(data.items)) {
-                        actualData = data.items;
-                    } else if (data.result && Array.isArray(data.result)) {
-                        actualData = data.result;
-                    } else if (!Array.isArray(data)) {
-                        console.log("Response is object but not array, checking properties...");
-                        const arrayProps = Object.keys(data).filter(key => Array.isArray(data[key]));
-                        if (arrayProps.length > 0) {
-                            actualData = data[arrayProps[0]];
-                            console.log(`Using array property: ${arrayProps[0]}`);
-                        }
-                    }
-                }
-
+                // Extract array data from response
+                let actualData = extractArrayFromResponse(data);
                 if (!Array.isArray(actualData)) {
-                    console.log("Data is not array after processing, setting empty array");
-                    console.log("Actual data type:", typeof actualData);
-                    console.log("Actual data:", actualData);
                     setDataPengajuan([]);
                     setPengajuanTotalData(0);
                     return;
                 }
 
-                console.log("Processing array data:", actualData);
-
-                // Frontend filtering for role-specific data
-                const filteredData = actualData.filter((item, filterIndex) => {
-                    const currentStatus = item.status || item.mdu_status || "";
-                    
-                    // Debug logging for first item
-                    if (filterIndex === 0) {
-                        console.log("=== SAMPLE ITEM DEBUG ===");
-                        console.log("Item keys:", Object.keys(item));
-                        console.log("tanggalPengajuan:", item.tanggalPengajuan);
-                        console.log("noPengajuan:", item.noPengajuan);
-                        console.log("nomorSK:", item.nomorSK);
-                        console.log("status:", item.status);
-                        console.log("currentStatus:", currentStatus);
-                    }
-                    
-                    if (isMahasiswa) {
-                        if (currentStatus === "Draft") {
-                            return true; 
-                        }
-                        return false; 
-                    } else if (isProdi) {
-                        // For Prodi users, first filter by konsentrasi
-                        const itemProdi = item.prodi || item.kon_nama || item.konsentrasi || "";
-                        
-                        console.log("=== PRODI KONSENTRASI FILTERING DEBUG ===");
-                        console.log("Item ID:", item.id);
-                        console.log("Item Prodi:", itemProdi);
-                        console.log("Prodi Konsentrasi:", prodiKonsentrasi);
-                        console.log("Match:", itemProdi === prodiKonsentrasi);
-                        
-                        // If Prodi's konsentrasi is loaded, filter by it
-                        if (prodiKonsentrasi && itemProdi !== prodiKonsentrasi) {
-                            console.log("→ FILTERED OUT: Not in Prodi's konsentrasi");
-                            return false;
-                        }
-                        
-                        // Then apply status-based filtering
-                        // For Prodi users, show ONLY:
-                        // 1. Draft status
-                        // 2. Belum Disetujui Wadir 1 status
-                        
-                        console.log("=== PRODI STATUS FILTERING DEBUG ===");
-                        console.log("Current status:", currentStatus);
-                        console.log("Item:", item);
-                        
-                        if (currentStatus === "Draft" || currentStatus === "Belum Disetujui Wadir 1") {
-                            console.log("✓ Showing item with status:", currentStatus);
-                            return true;
-                        }
-                        
-                        console.log("✗ Hiding item with status:", currentStatus);
-                        return false;
-                    } else {
-                        // For other roles, exclude completed applications
-                        if (currentStatus === "Disetujui") {
-                            return false;
-                        }
-                        return true;
-                    }
-                });
-
-                console.log("Filtered data:", filteredData);
-
-                // Apply pagination to filtered data
+                // Filter and format data
+                const filteredData = filterDataByRole(actualData, roles, prodiKonsentrasi);
                 const totalFilteredItems = filteredData.length;
                 const startIndex = (page - 1) * pengajuanPageSize;
                 const endIndex = startIndex + pengajuanPageSize;
                 const paginatedData = filteredData.slice(startIndex, endIndex);
 
-                const formattedData = paginatedData.map((item, index) => {
-                    const isDraft = item.status === "Draft" || item.id === "DRAFT" || !item.id?.includes("MDU");
-
-                    let actions = ["Detail"];
-                    
-                    const currentStatus = item.status || item.mdu_status || "";
-                    const hasUploadedSK = item.srt_no || item.suratNo || item.mdu_srt_no;
-                    
-                    if (isMahasiswa) {
-                        const createdByProdi = item.mdu_created_by && 
-                            (item.mdu_created_by.toLowerCase().includes('prodi') ||
-                             item.mdu_created_by === userData?.username ||
-                             item.mdu_created_by === userData?.nama);
-                        
-                        const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedMeninggalApps') || '[]');
-                        const isProdiCreatedFromSession = prodiCreatedApps.includes(item.mdu_id || item.id);
-                        
-                        const isCreatedByProdi = createdByProdi || isProdiCreatedFromSession;
-                        
-                        if (isDraft && !isCreatedByProdi) {
-                            actions = ["Detail", "Edit", "Delete", "Ajukan"];
-                        } else {
-                            actions = ["Detail"];
-                        }
-                    } else if (isProdi) {
-                        // For Prodi users, simple actions based on status
-                        if (currentStatus === "Draft") {
-                            actions = ["Detail", "Edit", "Delete", "Ajukan"];
-                        } else if (currentStatus === "Belum Disetujui Wadir 1") {
-                            actions = ["Detail"]; // Read-only for submitted applications
-                        } else {
-                            actions = ["Detail"];
-                        }
-                    } else if (isWadir1) {
-                        if (currentStatus === "Belum Disetujui Wadir 1") {
-                            actions = ["Detail", "Approve", "Reject"];
-                        } else {
-                            actions = ["Detail"];
-                        }
-                    } else if (isFinance) {
-                        if (currentStatus === "Belum Disetujui Finance") {
-                            actions = ["Detail", "Approve", "Reject"];
-                        } else {
-                            actions = ["Detail"];
-                        }
-                    } else if (isDAAK || isAdmin) {
-                        const isAllApprovalsComplete = currentStatus && 
-                            !currentStatus.includes("Belum Disetujui Prodi") && 
-                            !currentStatus.includes("Belum Disetujui Wadir 1") && 
-                            !currentStatus.includes("Belum Disetujui Finance") &&
-                            !currentStatus.includes("Draft") &&
-                            !currentStatus.includes("Ditolak");
-                            
-                        const isReadyForSK = currentStatus === "Menunggu Upload SK" || 
-                                           currentStatus === "Disetujui" ||
-                                           isAllApprovalsComplete;
-                        
-                        if (isReadyForSK) {
-                            if (hasUploadedSK) {
-                                actions = ["Detail", "DownloadSK"];
-                            } else {
-                                actions = ["Detail", "UploadSK"];
-                            }
-                        } else {
-                            actions = ["Detail"];
-                        }
-                    }
-
-                    // Function to determine Wadir 1 approval status icon
-                    const getWadir1Icon = (status) => {
-                        if (!status) return "⏳";
-                        
-                        const statusLower = status.toLowerCase();
-                        if (statusLower === "draft" || statusLower === "belum disetujui prodi") {
-                            return "✗"; // Pending - not yet reached Wadir 1
-                        } else if (statusLower === "belum disetujui wadir 1") {
-                            return "✗"; // Waiting for Wadir 1 approval (silang)
-                        } else if (statusLower === "ditolak") {
-                            return "✗"; // Rejected (x)
-                        } else if (statusLower.includes("disetujui") || statusLower.includes("finance") || statusLower.includes("upload sk")) {
-                            return "✓"; // Approved (ceklis)
-                        } else {
-                            return "⏳"; // Default pending
-                        }
-                    };
-
-                    // Determine SK Meninggal Dunia column content for Admin role
-                    let skMeninggalDuniaColumn = "-";
-                    if (isAdmin || isDAAK) {
-                        // Admin can download SK when status is "Menunggu Upload SK"
-                        if (currentStatus === "Menunggu Upload SK") {
-                            skMeninggalDuniaColumn = "DownloadSK";
-                        } else {
-                            // For other statuses, return dash
-                            skMeninggalDuniaColumn = "-";
-                        }
-                    }
-
-                    // Build table data with correct column order
-                    const tableData = {
-                        No: startIndex + index + 1,
-                        id: item.id || item.mdu_id || item.idDisplay,
-                        "No Pengajuan": item.noPengajuan || item.id || item.idDisplay || item.mdu_id || "-",
-                        "Tanggal Pengajuan": item.tanggalPengajuan || item.tanggal || item.mdu_created_date || "-",
-                        "No SK": item.nomorSK || item.srt_no || item.suratNo || item.mdu_srt_no || "-",
-                        "Disetujui Wadir 1": getWadir1Icon(currentStatus),
-                        Status: currentStatus || "-",
-                    };
-
-                    // Add SK Meninggal Dunia column BEFORE Aksi for Admin role
-                    if (isAdmin || isDAAK) {
-                        tableData["SK Meninggal Dunia"] = skMeninggalDuniaColumn;
-                        tableData.Aksi = actions;
-                        tableData.Alignment = Array(9).fill("center"); // Updated to 9 columns for admin
-                    } else {
-                        tableData.Aksi = actions;
-                        tableData.Alignment = Array(8).fill("center"); // Updated to 8 columns for non-admin
-                    }
-
-                    return tableData;
-                });
-
-                console.log("Formatted data:", formattedData);
-                console.log(`Showing ${formattedData.length} items of ${totalFilteredItems} total (page ${page})`);
+                const formattedData = paginatedData.map((item, index) => 
+                    formatTableRow(item, index, startIndex, roles, userData)
+                );
 
                 setDataPengajuan(formattedData);
                 setPengajuanTotalData(totalFilteredItems);
                 setPengajuanPage(page);
             } catch (err) {
-                console.error("Error loading data:", err);
                 Toast.error(`Gagal memuat data pengajuan: ${err.message}`);
                 setDataPengajuan([]);
                 setPengajuanTotalData(0);
@@ -564,8 +379,71 @@ export default function Page_MeninggalDunia() {
                 setLoadingPengajuan(false);
             }
         },
-        [fixedRole, isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData, search, prodiKonsentrasi]
+        [fixedRole, isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData, prodiKonsentrasi, buildApiParams, filterDataByRole, pengajuanPageSize]
     );
+
+    // Helper function to extract array from API response
+    const extractArrayFromResponse = useCallback((data) => {
+        if (!data || typeof data !== 'object') return data;
+        
+        // Check common array properties
+        const arrayProperties = ['data', 'items', 'result'];
+        for (const prop of arrayProperties) {
+            if (data[prop] && Array.isArray(data[prop])) {
+                return data[prop];
+            }
+        }
+        
+        // If data is already an array, return it
+        if (Array.isArray(data)) return data;
+        
+        // Find first array property in the object
+        const firstArrayProp = Object.keys(data).find(key => Array.isArray(data[key]));
+        return firstArrayProp ? data[firstArrayProp] : data;
+    }, []);
+
+    // Helper function to get Wadir1 approval icon
+    const getWadir1Icon = useCallback((status) => {
+        if (!status) return "⏳";
+        
+        const statusLower = status.toLowerCase();
+        if (statusLower === "draft" || statusLower === "belum disetujui prodi") return "✗";
+        if (statusLower === "belum disetujui wadir 1") return "✗";
+        if (statusLower === "ditolak") return "✗";
+        if (statusLower.includes("disetujui") || statusLower.includes("finance") || statusLower.includes("upload sk")) return "✓";
+        return "⏳";
+    }, []);
+
+    // Helper function to format table row
+    const formatTableRow = useCallback((item, index, startIndex, roles, userData) => {
+        const { isAdmin, isDAAK } = roles;
+        const currentStatus = item.status || item.mdu_status || "";
+        const actions = determineItemActions(item, roles, userData);
+
+        // Build base table data
+        const tableData = {
+            No: startIndex + index + 1,
+            id: item.id || item.mdu_id || item.idDisplay,
+            "No Pengajuan": item.noPengajuan || item.id || item.idDisplay || item.mdu_id || "-",
+            "Tanggal Pengajuan": item.tanggalPengajuan || item.tanggal || item.mdu_created_date || "-",
+            "No SK": item.nomorSK || item.srt_no || item.suratNo || item.mdu_srt_no || "-",
+            "Disetujui Wadir 1": getWadir1Icon(currentStatus),
+            Status: currentStatus || "-",
+        };
+
+        // Add SK column for Admin role
+        if (isAdmin || isDAAK) {
+            const skColumn = currentStatus === "Menunggu Upload SK" ? "DownloadSK" : "-";
+            tableData["SK Meninggal Dunia"] = skColumn;
+            tableData.Aksi = actions;
+            tableData.Alignment = new Array(9).fill("center");
+        } else {
+            tableData.Aksi = actions;
+            tableData.Alignment = new Array(8).fill("center");
+        }
+
+        return tableData;
+    }, [determineItemActions, getWadir1Icon]);
 
     // ============================================================
     // =================== TABLE 2 : RIWAYAT =======================
@@ -601,43 +479,31 @@ export default function Page_MeninggalDunia() {
         async (page = 1, keyword = riwayatSearch, sort = filterSort, prodi = filterProdi) => {
             try {
                 setLoadingRiwayat(true);
-                console.log("=== LOADING RIWAYAT MENINGGAL DUNIA ===");
 
-                // Use GetAll endpoint with Status filter for "Disetujui" only
                 const params = new URLSearchParams();
                 
-                // Parameters for Riwayat endpoint
                 if (keyword && keyword.trim() !== "") {
                     params.append('SearchKeyword', keyword.trim());
                 }
                 
-                // Map sort parameter to Riwayat endpoint format
-                let sortParam = sort;
-                if (sort === "tanggal asc") {
-                    sortParam = "tanggal asc";
-                } else if (sort === "tanggal desc") {
-                    sortParam = "tanggal desc";
-                } else if (sort === "nomor asc") {
-                    sortParam = "nomor asc";
-                } else if (sort === "nomor desc") {
-                    sortParam = "nomor desc";
-                } else if (sort === "mdu_created_date asc") {
-                    sortParam = "tanggal asc";
-                } else if (sort === "mdu_created_date desc") {
-                    sortParam = "tanggal desc";
-                } else if (sort === "mdu_id asc") {
-                    sortParam = "nomor asc";
-                } else if (sort === "mdu_id desc") {
-                    sortParam = "nomor desc";
-                }
+                // Map sort parameter to API format
+                const sortMap = {
+                    "tanggal asc": "tanggal asc",
+                    "tanggal desc": "tanggal desc", 
+                    "nomor asc": "nomor asc",
+                    "nomor desc": "nomor desc",
+                    "mdu_created_date asc": "tanggal asc",
+                    "mdu_created_date desc": "tanggal desc",
+                    "mdu_id asc": "nomor asc",
+                    "mdu_id desc": "nomor desc"
+                };
                 
+                const sortParam = sortMap[sort] || sort;
                 if (sortParam) params.append('Sort', sortParam);
                 params.append('PageNumber', page);
                 params.append('PageSize', riwayatPageSize);
 
                 const url = `${API_LINK}MeninggalDunia/Riwayat?${params}`;
-                console.log("Riwayat API URL:", url);
-
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: {
@@ -645,66 +511,29 @@ export default function Page_MeninggalDunia() {
                         'Accept': 'application/json'
                     }
                 });
-                
-                console.log("Riwayat Response Status:", response.status);
 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error("Riwayat API Error Response:", errorText);
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 const responseText = await response.text();
-                console.log("Riwayat Raw Response:", responseText);
-
                 let data;
                 try {
                     data = JSON.parse(responseText);
-                } catch (parseError) {
-                    console.error("Riwayat JSON Parse Error:", parseError);
+                } catch {
                     throw new Error("Invalid JSON response from server");
                 }
 
-                console.log("Riwayat Parsed API Response:", data);
-
-                let actualData = data;
-                if (data && typeof data === 'object') {
-                    if (data.data && Array.isArray(data.data)) {
-                        actualData = data.data;
-                    } else if (data.items && Array.isArray(data.items)) {
-                        actualData = data.items;
-                    } else if (data.result && Array.isArray(data.result)) {
-                        actualData = data.result;
-                    } else if (!Array.isArray(data)) {
-                        const arrayProps = Object.keys(data).filter(key => Array.isArray(data[key]));
-                        if (arrayProps.length > 0) {
-                            actualData = data[arrayProps[0]];
-                        }
-                    }
-                }
-
+                let actualData = extractArrayFromResponse(data);
                 if (!Array.isArray(actualData)) {
-                    console.log("Riwayat data is not array after processing");
                     setDataRiwayat([]);
                     setRiwayatTotal(0);
                     return;
                 }
 
-                console.log("Processing riwayat array data:", actualData);
-
-                // Backend Riwayat endpoint returns all riwayat data (including non-approved)
-                // No need to filter by status since this is riwayat data
-                const riwayatData = actualData;
-
-                console.log("Riwayat data from backend:", riwayatData);
-
-                // Process ALL data first (no pagination yet) - Backend handles pagination
-                // Since backend Riwayat endpoint handles pagination, we just format the data
-                const formattedData = riwayatData.map((item, index) => {
-                    // Determine actions based on status
+                const formattedData = actualData.map((item, index) => {
                     let actions = ["Detail"];
                     if (item.status === "Disetujui") {
-                        // All roles can download SK for approved applications
                         actions = ["Detail", "DownloadSK"];
                     }
 
@@ -719,21 +548,16 @@ export default function Page_MeninggalDunia() {
                         Prodi: item.prodi || "-",
                         Status: item.status || "-",
                         Aksi: actions,
-                        Alignment: Array(9).fill("center"),
+                        Alignment: new Array(9).fill("center"),
                     };
                 });
 
-                console.log("Final riwayat data:", formattedData);
-                console.log(`Showing ${formattedData.length} items from backend (page ${page})`);
-
                 setDataRiwayat(formattedData);
-                // Use totalData from backend response
                 const backendTotalData = data.totalData || 0;
                 setRiwayatTotal(backendTotalData);
                 setRiwayatPage(page);
 
             } catch (err) {
-                console.error("Error loading riwayat:", err);
                 Toast.error(`Gagal memuat data riwayat: ${err.message}`);
                 setDataRiwayat([]);
                 setRiwayatTotal(0);
@@ -741,7 +565,7 @@ export default function Page_MeninggalDunia() {
                 setLoadingRiwayat(false);
             }
         },
-        [userData, riwayatSearch, filterSort, filterProdi, isProdi, isWadir1, isFinance, isDAAK, isAdmin, isMahasiswa, riwayatPageSize]
+        [userData, riwayatSearch, filterSort, filterProdi, riwayatPageSize, extractArrayFromResponse]
     );
 
 
@@ -756,7 +580,6 @@ export default function Page_MeninggalDunia() {
 
     // SK Upload handlers
     const handleUploadSK = (id) => {
-        console.log("Opening upload modal for ID:", id);
         setSelectedMeninggalId(id);
         setShowUploadModal(true);
         setSelectedSKFile(null);
@@ -843,27 +666,16 @@ export default function Page_MeninggalDunia() {
             formData.append('SKPB', selectedSPKBFile);
             formData.append('ModifiedBy', userData?.nama || userData?.username || 'user_admin');
 
-            console.log("=== SK UPLOAD MENINGGAL DUNIA ===");
-            console.log("MduId:", selectedMeninggalId);
-            console.log("SK File:", selectedSKFile.name);
-            console.log("SPKB File:", selectedSPKBFile.name);
-            console.log("ModifiedBy:", userData?.nama || userData?.username || 'user_admin');
-
             const response = await fetch(`${API_LINK}MeninggalDunia/upload-sk`, {
                 method: 'PUT',
                 body: formData
             });
 
-            console.log("Upload response status:", response.status);
-
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error("Upload error:", errorText);
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const result = await response.json();
-            console.log("Upload result:", result);
 
             Toast.success(result.message || "SK berhasil diupload!");
             setShowUploadModal(false);
@@ -880,7 +692,6 @@ export default function Page_MeninggalDunia() {
             }
 
         } catch (error) {
-            console.error("Upload error:", error);
             Toast.error(`Gagal upload SK: ${error.message}`);
         } finally {
             setUploadLoading(false);
@@ -898,11 +709,6 @@ export default function Page_MeninggalDunia() {
 
     const handleDownloadSK = async (id) => {
         try {
-            console.log("=== DOWNLOAD SK MENINGGAL DUNIA ===");
-            console.log("ID:", id);
-            console.log("User Data:", userData);
-
-            // Get username for the API call
             const username = userData?.nama || userData?.username || "";
             
             if (!username) {
@@ -910,18 +716,14 @@ export default function Page_MeninggalDunia() {
                 return;
             }
 
-            console.log("Download SK params:", { id, username });
-
-            // Build the download URL with query parameters
             const params = new URLSearchParams({
                 username: username,
                 format: "pdf"
             });
 
             const downloadUrl = `${API_LINK}MeninggalDunia/cetak-sk/${encodeURIComponent(id)}?${params.toString()}`;
-            console.log("Download URL:", downloadUrl);
 
-            // First, check if user has permission by calling the JSON endpoint
+            // Check permission first
             const checkParams = new URLSearchParams({
                 username: username,
                 format: "json"
@@ -938,9 +740,6 @@ export default function Page_MeninggalDunia() {
             });
 
             if (!checkResponse.ok) {
-                const errorText = await checkResponse.text();
-                console.error("Permission check failed:", errorText);
-                
                 if (checkResponse.status === 403) {
                     Toast.error("Anda tidak memiliki akses untuk download SK ini.");
                 } else {
@@ -950,19 +749,16 @@ export default function Page_MeninggalDunia() {
             }
 
             const checkResult = await checkResponse.json();
-            console.log("Permission check result:", checkResult);
 
             if (!checkResult.canPrint) {
                 Toast.error(checkResult.reason || "Tidak dapat download SK saat ini.");
                 return;
             }
 
-            // If permission check passed, proceed with PDF download
             window.open(downloadUrl, "_blank");
             Toast.success("SK berhasil didownload!");
 
         } catch (error) {
-            console.error("Download SK error:", error);
             Toast.error(`Gagal download SK: ${error.message}`);
         }
     };
@@ -981,13 +777,8 @@ export default function Page_MeninggalDunia() {
         setLoadingPengajuan(true);
 
         try {
-            console.log("=== AJUKAN MENINGGAL DUNIA ===");
-            console.log("Draft ID:", id);
-
-            // Encode the ID for the API call to handle special characters
             const encodedId = encodeURIComponent(id);
             const url = `${API_LINK}MeninggalDunia/finalize/${encodedId}`;
-            console.log("Finalize URL:", url);
 
             const res = await fetch(url, {
                 method: "POST",
@@ -997,11 +788,8 @@ export default function Page_MeninggalDunia() {
                 }
             });
 
-            console.log("Finalize response status:", res.status);
-
             if (!res.ok) {
                 const errorText = await res.text();
-                console.error("API Error Response:", errorText);
                 
                 try {
                     const errorData = JSON.parse(errorText);
@@ -1014,14 +802,10 @@ export default function Page_MeninggalDunia() {
             }
 
             const raw = await res.text();
-            console.log("Finalize raw response:", raw);
-
             let result;
             try {
                 result = JSON.parse(raw);
-                console.log("Finalize result:", result);
-            } catch (parseError) {
-                console.error("JSON Parse error:", parseError);
+            } catch {
                 Toast.error("Response server tidak valid. Periksa console untuk detail.");
                 return;
             }
@@ -1042,22 +826,11 @@ export default function Page_MeninggalDunia() {
                 Toast.error(errorMsg);
             }
         } catch (err) {
-            console.error("Ajukan error:", err);
             Toast.error(`Gagal mengajukan: ${err.message}`);
         } finally {
             setLoadingPengajuan(false);
         }
     };
-
-    const handleSearch = useCallback(
-        (query) => {
-            console.log("Search query:", query);
-            setSearch(query);
-            setPengajuanPage(1); 
-            loadPengajuan(1);
-        },
-        [loadPengajuan]
-    );
 
     const handleAdd = () => {
         router.push("/pages/administrasi-akademik/Meninggal-Dunia/add");
@@ -1104,14 +877,13 @@ export default function Page_MeninggalDunia() {
 
             const data = await res.json();
 
-            if (data.message && data.message.includes("berhasil")) {
+            if (data?.message?.includes("berhasil")) {
                 Toast.success(data.message);
                 loadPengajuan(1);
             } else {
                 throw new Error(data.message || "Gagal menghapus pengajuan");
             }
         } catch (err) {
-            console.error("Delete error:", err);
             Toast.error(err.message);
         } finally {
             setLoadingPengajuan(false);
@@ -1134,37 +906,16 @@ export default function Page_MeninggalDunia() {
         setLoadingPengajuan(true);
 
         try {
-            console.log("=== APPROVE MENINGGAL DUNIA ===");
-            console.log("ID:", itemId);
-
             const approvedBy = userData?.nama || userData?.username || userData?.userid || "";
             
-            let url, payload;
-            
-            // Encode the ID for the API call to handle special characters
-            const encodedItemId = encodeURIComponent(itemId);
-            
-            if (isProdi) {
-                url = `${API_LINK}MeninggalDunia/approve/${encodedItemId}`;
-                payload = {
-                    approvedBy: approvedBy,
-                    role: "prodi"
-                };
-            } else if (isWadir1) {
-                url = `${API_LINK}MeninggalDunia/approve/${encodedItemId}`;
-                payload = {
-                    approvedBy: approvedBy,
-                    role: "wadir1"
-                };
-            } else if (isFinance) {
-                url = `${API_LINK}MeninggalDunia/approve/${encodedItemId}`;
-                payload = {
-                    approvedBy: approvedBy,
-                    role: "finance"
-                };
-            }
+            let role = "";
+            if (isProdi) role = "prodi";
+            else if (isWadir1) role = "wadir1";
+            else if (isFinance) role = "finance";
 
-            console.log("Approve payload:", payload);
+            const payload = { approvedBy, role };
+            const encodedItemId = encodeURIComponent(itemId);
+            const url = `${API_LINK}MeninggalDunia/approve/${encodedItemId}`;
 
             const res = await fetch(url, {
                 method: "PUT",
@@ -1175,11 +926,8 @@ export default function Page_MeninggalDunia() {
                 body: JSON.stringify(payload)
             });
 
-            console.log("Approve response status:", res.status);
-
             if (!res.ok) {
                 const errorText = await res.text();
-                console.error("API Error Response:", errorText);
                 
                 try {
                     const errorData = JSON.parse(errorText);
@@ -1191,22 +939,10 @@ export default function Page_MeninggalDunia() {
                 return;
             }
 
-            const raw = await res.text();
-            console.log("Approve raw response:", raw);
-
-            let result;
-            try {
-                result = JSON.parse(raw);
-                console.log("Approve result:", result);
-            } catch {
-                result = { message: "Pengajuan berhasil disetujui" };
-            }
-
             Toast.success("Pengajuan meninggal dunia berhasil disetujui!");
             loadPengajuan(1); 
             
         } catch (err) {
-            console.error("Approve error:", err);
             Toast.error(`Gagal menyetujui: ${err.message}`);
         } finally {
             setLoadingPengajuan(false);
@@ -1229,10 +965,6 @@ export default function Page_MeninggalDunia() {
         setLoadingPengajuan(true);
 
         try {
-            console.log("=== REJECT MENINGGAL DUNIA ===");
-            console.log("Item ID:", itemId);
-            console.log("User Role:", fixedRole);
-
             let autoReason = "";
             let backendRole = "";
             
@@ -1250,20 +982,13 @@ export default function Page_MeninggalDunia() {
                 backendRole = "prodi";
             }
 
-            console.log("Auto Reason:", autoReason);
-            console.log("Backend Role:", backendRole);
-
             const payload = {
                 keterangan: autoReason,
                 role: backendRole
             };
 
-            console.log("Reject payload:", payload);
-
-            // Encode the ID for the API call to handle special characters
             const encodedItemId = encodeURIComponent(itemId);
             const url = `${API_LINK}MeninggalDunia/reject/${encodedItemId}`;
-            console.log("API URL:", url);
 
             const res = await fetch(url, {
                 method: "PUT",
@@ -1274,36 +999,29 @@ export default function Page_MeninggalDunia() {
                 body: JSON.stringify(payload)
             });
 
-            console.log("Reject response status:", res.status);
-
             if (!res.ok) {
                 const errorText = await res.text();
-                console.error("API Error Response:", errorText);
                 
                 try {
                     const errorData = JSON.parse(errorText);
                     const errorMsg = errorData.message || errorData.error || errorData.details || `HTTP ${res.status}: ${res.statusText}`;
                     Toast.error(`Gagal menolak pengajuan: ${errorMsg}`);
-                } catch (parseError) {
+                } catch {
                     Toast.error(`Gagal menolak pengajuan: HTTP ${res.status}\n\n${errorText}`);
                 }
                 return;
             }
 
             const raw = await res.text();
-            console.log("Reject raw response:", raw);
-
             let result;
             try {
                 result = JSON.parse(raw);
-                console.log("Reject Result:", result);
-            } catch (parseError) {
-                console.error("JSON Parse Error:", parseError);
+            } catch {
                 Toast.error("Response server tidak valid:\n\n" + raw);
                 return;
             }
 
-            if (result?.message && result.message.includes("berhasil")) {
+            if (result?.message?.includes("berhasil")) {
                 Toast.success(result.message);
                 loadPengajuan(1);
                 loadRiwayat(1);
@@ -1312,7 +1030,6 @@ export default function Page_MeninggalDunia() {
             } 
             
         } catch (err) {
-            console.error("Reject error:", err);
             Toast.error(`Gagal menolak: ${err.message}`);
         } finally {
             setLoadingPengajuan(false);
@@ -1379,15 +1096,9 @@ export default function Page_MeninggalDunia() {
 
         // For Prodi users, wait for prodiKonsentrasi to load before calling loadPengajuan
         if (isProdi) {
-            if (loadingProdiKonsentrasi) {
-                console.log("Waiting for prodiKonsentrasi to load...");
+            if (loadingProdiKonsentrasi || !prodiKonsentrasi) {
                 return;
             }
-            if (!prodiKonsentrasi) {
-                console.log("ProdiKonsentrasi not loaded yet, skipping loadPengajuan...");
-                return;
-            }
-            console.log("ProdiKonsentrasi loaded:", prodiKonsentrasi, "- proceeding with loadPengajuan");
         }
 
         loadPengajuan(1);
@@ -1425,52 +1136,63 @@ export default function Page_MeninggalDunia() {
                         <div></div>
                     </div>
 
-                    {loadingPengajuan ? (
-                        <div className="text-center py-4">
-                            <div className="spinner-border" role="status">
-                                <span className="visually-hidden">Loading...</span>
-                            </div>
-                            <p className="mt-2">Memuat data pengajuan...</p>
-                        </div>
-                    ) : dataPengajuan.length > 0 ? (
-                        <>
-                            <Table
-                                data={dataPengajuan}
-                                onDetail={handleDetail}
-                                onEdit={handleEdit}
-                                onDelete={handleDelete}
-                                onAjukan={handleAjukan}
-                                onApprove={handleApprove}
-                                onReject={handleReject}
-                                onUploadSK={handleUploadSK}
-                                onDownloadSK={handleDownloadSK}
-                            />
+                    {(() => {
+                        if (loadingPengajuan) {
+                            return (
+                                <div className="text-center py-4">
+                                    <div className="spinner-border" aria-live="polite">
+                                        <span className="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p className="mt-2">Memuat data pengajuan...</p>
+                                </div>
+                            );
+                        } else if (dataPengajuan.length > 0) {
+                            return (
+                                <>
+                                    <Table
+                                        data={dataPengajuan}
+                                        onDetail={handleDetail}
+                                        onEdit={handleEdit}
+                                        onDelete={handleDelete}
+                                        onAjukan={handleAjukan}
+                                        onApprove={handleApprove}
+                                        onReject={handleReject}
+                                        onUploadSK={handleUploadSK}
+                                        onDownloadSK={handleDownloadSK}
+                                    />
 
-                            {pengajuanTotalData > 0 && (
-                                <Paging
-                                    pageSize={pengajuanPageSize}
-                                    pageCurrent={pengajuanPage}
-                                    totalData={pengajuanTotalData}
-                                    navigation={loadPengajuan}
-                                />
-                            )}
-                        </>
-                    ) : (
-                        <div className="text-center py-5">
-                            <div className="mb-3">
-                                <i className="fas fa-inbox fa-3x text-muted"></i>
-                            </div>
-                            <h5 className="text-muted">Tidak ada data pengajuan</h5>
-                            <p className="text-muted">
-                                {isMahasiswa 
-                                    ? "Anda belum memiliki pengajuan meninggal dunia. Klik tombol 'Ajukan Meninggal Dunia' untuk membuat pengajuan baru."
-                                    : isProdi
-                                    ? "Tidak ada pengajuan meninggal dunia. Anda dapat membuat pengajuan untuk mahasiswa dengan klik tombol 'Ajukan Meninggal Dunia untuk Mahasiswa'."
-                                    : "Tidak ada pengajuan meninggal dunia yang perlu ditinjau saat ini."
-                                }
-                            </p>
-                        </div>
-                    )}
+                                    {pengajuanTotalData > 0 && (
+                                        <Paging
+                                            pageSize={pengajuanPageSize}
+                                            pageCurrent={pengajuanPage}
+                                            totalData={pengajuanTotalData}
+                                            navigation={loadPengajuan}
+                                        />
+                                    )}
+                                </>
+                            );
+                        } else {
+                            return (
+                                <div className="text-center py-5">
+                                    <div className="mb-3">
+                                        <i className="fas fa-inbox fa-3x text-muted"></i>
+                                    </div>
+                                    <h5 className="text-muted">Tidak ada data pengajuan</h5>
+                                    <p className="text-muted">
+                                        {(() => {
+                                            if (isMahasiswa) {
+                                                return "Anda belum memiliki pengajuan meninggal dunia. Klik tombol 'Ajukan Meninggal Dunia' untuk membuat pengajuan baru.";
+                                            } else if (isProdi) {
+                                                return "Tidak ada pengajuan meninggal dunia. Anda dapat membuat pengajuan untuk mahasiswa dengan klik tombol 'Ajukan Meninggal Dunia untuk Mahasiswa'.";
+                                            } else {
+                                                return "Tidak ada pengajuan meninggal dunia yang perlu ditinjau saat ini.";
+                                            }
+                                        })()}
+                                    </p>
+                                </div>
+                            );
+                        }
+                    })()}
                 </div>
             )}
 
@@ -1491,8 +1213,8 @@ export default function Page_MeninggalDunia() {
                                 params.append('Sort', filterSort);
                             }
                             
-                            const exportUrl = `${API_LINK}MeninggalDunia/Riwayat/excel${params.toString() ? '?' + params.toString() : ''}`;
-                            console.log("Export URL:", exportUrl);
+                            const queryString = params.toString();
+                            const exportUrl = `${API_LINK}MeninggalDunia/Riwayat/excel${queryString ? '?' + queryString : ''}`;
                             window.open(exportUrl, "_blank");
                         }}
                         searchPlaceholder="Cari No. Pengajuan, NIM, Nama, atau Prodi"
@@ -1503,39 +1225,47 @@ export default function Page_MeninggalDunia() {
                         filterContent={filterContentRiwayat}
                     />
 
-                    {loadingRiwayat ? (
-                        <div className="text-center py-4">
-                            <div className="spinner-border" role="status">
-                                <span className="visually-hidden">Loading...</span>
-                            </div>
-                            <p className="mt-2">Memuat data riwayat...</p>
-                        </div>
-                    ) : dataRiwayat.length > 0 ? (
-                        <>
-                            <Table
-                                data={dataRiwayat}
-                                onDetail={handleDetail}
-                                onDownloadSK={handleDownloadSK}
-                            />
+                    {(() => {
+                        if (loadingRiwayat) {
+                            return (
+                                <div className="text-center py-4">
+                                    <div className="spinner-border" aria-live="polite">
+                                        <span className="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p className="mt-2">Memuat data riwayat...</p>
+                                </div>
+                            );
+                        } else if (dataRiwayat.length > 0) {
+                            return (
+                                <>
+                                    <Table
+                                        data={dataRiwayat}
+                                        onDetail={handleDetail}
+                                        onDownloadSK={handleDownloadSK}
+                                    />
 
-                            {riwayatTotal > 0 && (
-                                <Paging
-                                    pageSize={riwayatPageSize}
-                                    pageCurrent={riwayatPage}
-                                    totalData={riwayatTotal}
-                                    navigation={(page) => loadRiwayat(page)}
-                                />
-                            )}
-                        </>
-                    ) : (
-                        <div className="text-center py-5">
-                            <div className="mb-3">
-                                <i className="fas fa-history fa-3x text-muted"></i>
-                            </div>
-                            <h5 className="text-muted">Tidak ada data riwayat</h5>
-                            <p className="text-muted">Belum ada riwayat meninggal dunia yang tersedia.</p>
-                        </div>
-                    )}
+                                    {riwayatTotal > 0 && (
+                                        <Paging
+                                            pageSize={riwayatPageSize}
+                                            pageCurrent={riwayatPage}
+                                            totalData={riwayatTotal}
+                                            navigation={(page) => loadRiwayat(page)}
+                                        />
+                                    )}
+                                </>
+                            );
+                        } else {
+                            return (
+                                <div className="text-center py-5">
+                                    <div className="mb-3">
+                                        <i className="fas fa-history fa-3x text-muted"></i>
+                                    </div>
+                                    <h5 className="text-muted">Tidak ada data riwayat</h5>
+                                    <p className="text-muted">Belum ada riwayat meninggal dunia yang tersedia.</p>
+                                </div>
+                            );
+                        }
+                    })()}
                 </div>
             )}
 
@@ -1594,7 +1324,7 @@ export default function Page_MeninggalDunia() {
 
                                 {skFilePreview && (
                                     <div className="mb-3">
-                                        <label className="form-label">Preview SK:</label>
+                                        <h6 className="form-label">Preview SK:</h6>
                                         <div className="text-center">
                                             <img 
                                                 src={skFilePreview} 
@@ -1608,7 +1338,7 @@ export default function Page_MeninggalDunia() {
 
                                 {spkbFilePreview && (
                                     <div className="mb-3">
-                                        <label className="form-label">Preview SPKB:</label>
+                                        <h6 className="form-label">Preview SPKB:</h6>
                                         <div className="text-center">
                                             <img 
                                                 src={spkbFilePreview} 
@@ -1637,8 +1367,8 @@ export default function Page_MeninggalDunia() {
                                 >
                                     {uploadLoading ? (
                                         <>
-                                            <span className="spinner-border spinner-border-sm me-2"></span>
-                                            Mengupload...
+                                            <span className="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                                            <span>Mengupload...</span>
                                         </>
                                     ) : (
                                         'Simpan'
@@ -1652,7 +1382,3 @@ export default function Page_MeninggalDunia() {
         </MainContent>
     );
 }
-
-
-
-
