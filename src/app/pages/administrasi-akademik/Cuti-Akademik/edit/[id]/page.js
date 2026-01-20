@@ -45,8 +45,8 @@ export default function EditCutiAkademikPage() {
 
         const data = await res.json();
         setPermission(data);
-      } catch (err) {
-        console.error("Gagal load permission:", err);
+      } catch {
+        // Permission loading failed, continue with default role
       }
     };
 
@@ -103,21 +103,12 @@ export default function EditCutiAkademikPage() {
     // Use userData.nama as username since that's where the username is stored
     const username = userData?.username || userData?.nama;
     
-    console.log("[loadProdi useEffect] isProdi:", isProdi);
-    console.log("[loadProdi useEffect] userData:", userData);
-    console.log("[loadProdi useEffect] userData.username:", userData?.username);
-    console.log("[loadProdi useEffect] userData.nama:", userData?.nama);
-    console.log("[loadProdi useEffect] Final username to use:", username);
-    
     if (!isProdi || !username) {
-      console.log("[loadProdi useEffect] Skipping - isProdi:", isProdi, "username:", username);
       return;
     }
     
     const loadProdi = async () => {
       try {
-        console.log(`[loadProdi] Loading konsentrasi for username: ${username}`);
-        
         const response = await fetch(`${API_LINK}Mahasiswa/GetKonsentrasiList?username=${username}`, {
           method: 'GET',
           headers: {
@@ -125,26 +116,19 @@ export default function EditCutiAkademikPage() {
           }
         });
         
-        console.log(`[loadProdi] Response status: ${response.status}`);
-        
         if (response.ok) {
           const data = await response.json();
-          console.log(`[loadProdi] Received konsentrasi data:`, data);
           
           const mappedProdi = data.map(item => ({
             Value: item.id,
             Text: item.nama
           }));
           
-          console.log(`[loadProdi] Mapped prodi list:`, mappedProdi);
           setProdiList(mappedProdi);
         } else {
-          const errorText = await response.text();
-          console.error(`[loadProdi] API Error: ${response.status} - ${errorText}`);
           Toast.error("Gagal memuat daftar program studi.");
         }
-      } catch (error) {
-        console.error("[loadProdi] Network error:", error);
+      } catch {
         Toast.error("Terjadi kesalahan saat memuat daftar program studi.");
       }
     };
@@ -184,7 +168,6 @@ export default function EditCutiAkademikPage() {
         return;
       }
       
-      console.log(`File ${name} selected:`, file.name, file.size, file.type);
       setFormData((prev) => ({
         ...prev,
         [name]: file,
@@ -318,8 +301,7 @@ export default function EditCutiAkademikPage() {
         angkatan: angkatan.toString(),
         tahunAjaranOptions
       };
-    } catch (error) {
-      console.warn("Could not fetch student detail:", error);
+    } catch {
       return null;
     }
   };
@@ -356,7 +338,6 @@ export default function EditCutiAkademikPage() {
           Text: item.mhsNama
         })));
         
-        console.log("Found student's konsentrasi:", konsentrasi.nama);
         return true;
       }
     }
@@ -370,20 +351,17 @@ export default function EditCutiAkademikPage() {
     }
 
     const username = userData?.username || userData?.nama;
-    console.log("Loading prodi data for student:", data.mhsId, "using username:", username);
     
     if (!username) {
-      console.warn("No username found for prodi user");
       return;
     }
 
     try {
       const konsentrasiData = await fetchUserKonsentrasiList(username);
-      console.log("User's konsentrasi list:", konsentrasiData);
       
       await findStudentKonsentrasi(data.mhsId, konsentrasiData, username);
-    } catch (error) {
-      console.warn("Could not determine student's konsentrasi:", error);
+    } catch {
+      // Could not determine student's konsentrasi
     }
   };
 
@@ -412,10 +390,8 @@ export default function EditCutiAkademikPage() {
     const loadMahasiswaDataForEdit = async () => {
       try {
         const mhsId = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
-        console.log(`[loadMahasiswaDataForEdit] Loading data for mhsId: ${mhsId}`);
         
         if (!mhsId) {
-          console.warn("[loadMahasiswaDataForEdit] No mhsId found in userData");
           return;
         }
 
@@ -426,12 +402,8 @@ export default function EditCutiAkademikPage() {
           }
         });
         
-        console.log(`[loadMahasiswaDataForEdit] Response status: ${response.status}`);
-        
         if (response.ok) {
           const data = await response.json();
-          console.log(`[loadMahasiswaDataForEdit] Data received:`, data);
-          console.log(`[loadMahasiswaDataForEdit] mhsAngkatan: ${data.mhsAngkatan}`);
           
           // Auto-populate angkatan for mahasiswa (internal use for tahun akademik generation)
           setFormData(prev => {
@@ -439,17 +411,14 @@ export default function EditCutiAkademikPage() {
               ...prev,
               angkatan: data.mhsAngkatan?.toString() || ""
             };
-            console.log(`[loadMahasiswaDataForEdit] Setting formData.angkatan to: ${newFormData.angkatan}`);
             return newFormData;
           });
           
-          console.log(`[loadMahasiswaDataForEdit] Auto-populated angkatan: ${data.mhsAngkatan} for mahasiswa edit`);
         } else {
-          const errorText = await response.text();
-          console.error(`[loadMahasiswaDataForEdit] API Error: ${response.status} - ${errorText}`);
+          // Error response from API
         }
-      } catch (error) {
-        console.error("[loadMahasiswaDataForEdit] Network error:", error);
+      } catch {
+        // Error loading mahasiswa data for edit
       }
     };
 
@@ -459,7 +428,6 @@ export default function EditCutiAkademikPage() {
   // Generate tahun akademik based on angkatan
   const generateTahunAkademik = (angkatan) => {
     if (!angkatan) {
-      console.log("[generateTahunAkademik] No angkatan provided, using default years");
       // Default years if no angkatan
       const currentYear = new Date().getFullYear();
       return [
@@ -473,9 +441,6 @@ export default function EditCutiAkademikPage() {
     const angkatanInt = Number.parseInt(angkatan, 10);
     const tahunAkademikList = [];
 
-    console.log(`[generateTahunAkademik] Generating for angkatan: ${angkatanInt}, tahunSekarang: ${tahunSekarang}`);
-    console.log(`[generateTahunAkademik] Loop will run from ${tahunSekarang} to ${angkatanInt + 3} (inclusive)`);
-
     // Logic: for (int i = tahunSekarang; i <= angkatan + 3; i++) - matching old code
     for (let i = tahunSekarang; i <= angkatanInt + 3; i++) {
       const tahunAkademik = `${i}/${i + 1}`;
@@ -483,10 +448,8 @@ export default function EditCutiAkademikPage() {
         Value: tahunAkademik,
         Text: tahunAkademik
       });
-      console.log(`[generateTahunAkademik] Added: ${tahunAkademik}`);
     }
 
-    console.log(`[generateTahunAkademik] Generated ${tahunAkademikList.length} tahun akademik:`, tahunAkademikList);
     return tahunAkademikList;
   };
 
@@ -496,7 +459,6 @@ export default function EditCutiAkademikPage() {
   // Update tahun akademik when angkatan changes
   useEffect(() => {
     if ((isProdi || isMahasiswa) && formData.angkatan) {
-      console.log(`[useEffect] Angkatan changed to: ${formData.angkatan}, regenerating tahun akademik for ${isProdi ? 'Prodi' : 'Mahasiswa'} edit`);
       const newTahunAkademikData = generateTahunAkademik(formData.angkatan);
       setTahunAjaranData(newTahunAkademikData);
     } else if (!isProdi && !isMahasiswa) {
@@ -509,7 +471,6 @@ export default function EditCutiAkademikPage() {
   // Initialize tahun akademik data on component mount for non-prodi and non-mahasiswa users
   useEffect(() => {
     if (!isProdi && !isMahasiswa) {
-      console.log("[useEffect] Initializing tahun akademik for other user in edit");
       const defaultTahunAkademik = generateTahunAkademik(null);
       setTahunAjaranData(defaultTahunAkademik);
     }
@@ -594,22 +555,19 @@ export default function EditCutiAkademikPage() {
       fd.append("TahunAjaran", formData.tahunAjaran);
       fd.append("Semester", formData.semester);
 
-      // 🔥 HARUS SESUAI DTO BE - Handle file uploads properly
+      // Handle file uploads properly
       if (formData.suratPernyataan && formData.suratPernyataan instanceof File) {
         fd.append("LampiranSuratPengajuan", formData.suratPernyataan, formData.suratPernyataan.name);
-        console.log("Updating Surat Pernyataan file:", formData.suratPernyataan.name, formData.suratPernyataan.size);
       }
 
       if (formData.lampiran && formData.lampiran instanceof File) {
         fd.append("Lampiran", formData.lampiran, formData.lampiran.name);
-        console.log("Updating Lampiran file:", formData.lampiran.name, formData.lampiran.size);
       }
 
       if (isProdi) {
         // Prodi-specific fields
         fd.append("MhsId", formData.mhsId);
         fd.append("Menimbang", formData.menimbang);
-        console.log("Prodi edit - MhsId:", formData.mhsId, "Menimbang length:", formData.menimbang.length);
       }
 
       fd.append(
@@ -617,17 +575,7 @@ export default function EditCutiAkademikPage() {
         userData?.mhsId || userData?.nama || userData?.userid || userData?.username || "SYSTEM"
       );
 
-      console.log("Edit form data being sent:", {
-        TahunAjaran: formData.tahunAjaran,
-        Semester: formData.semester,
-        MhsId: formData.mhsId,
-        HasNewSuratPernyataan: !!(formData.suratPernyataan instanceof File),
-        HasNewLampiran: !!(formData.lampiran instanceof File),
-        IsProdi: isProdi
-      });
-
       const url = `${API_LINK}CutiAkademik/${realId}`;
-      console.log("Updating at URL:", url);
       
       const res = await fetch(url, {
         method: "PUT",
@@ -635,7 +583,6 @@ export default function EditCutiAkademikPage() {
       });
 
       const raw = await res.text();
-      console.log("Edit response:", raw);
       
       let result;
 
@@ -654,7 +601,6 @@ export default function EditCutiAkademikPage() {
         Toast.error(result?.message || "Gagal menyimpan perubahan.");
       }
     } catch (err) {
-      console.error("Edit submit error:", err);
       Toast.error(err.message);
     } finally {
       setSaving(false);

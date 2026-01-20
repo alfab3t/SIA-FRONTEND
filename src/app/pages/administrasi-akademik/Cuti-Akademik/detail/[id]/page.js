@@ -14,9 +14,6 @@ export default function DetailCutiAkademikPage() {
   const params = useParams();
   const userData = useMemo(() => getUserData(), []);
 
-  // ============================
-  // DECRYPT ID
-  // ============================
   const realId = useMemo(() => {
     try {
       return decryptIdUrl(params?.id || "");
@@ -25,9 +22,6 @@ export default function DetailCutiAkademikPage() {
     }
   }, [params]);
 
-  // ============================
-  // HELPER FUNCTIONS
-  // ============================
   const getStatusBadge = (status) => {
     const statusMap = {
       'Menunggu Persetujuan': { class: 'warning', text: 'Menunggu Persetujuan' },
@@ -55,9 +49,6 @@ export default function DetailCutiAkademikPage() {
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
 
-  // ============================
-  // LOAD DETAIL DATA
-  // ============================
   const loadDetail = useCallback(async () => {
     try {
       setLoading(true);
@@ -70,16 +61,12 @@ export default function DetailCutiAkademikPage() {
 
       const url = `${API_LINK}CutiAkademik/detail?id=${encodeURIComponent(realId)}`;
 
-      console.log("DETAIL URL =", url);
-
-      // Add minimum loading time for better UX (but keep it fast - 300ms)
       const [response] = await Promise.all([
         fetch(url),
         new Promise(resolve => setTimeout(resolve, 300))
       ]);
 
       const raw = await response.text();
-      console.log("RAW DETAIL =", raw);
 
       let data;
       try {
@@ -109,9 +96,6 @@ export default function DetailCutiAkademikPage() {
   const handleBack = () =>
     router.push("/pages/administrasi-akademik/Cuti-Akademik");
 
-  // ============================
-  // NAVIGATE TO PROFILE
-  // ============================
   const handleViewProfile = () => {
     if (!detail?.mhsId) {
       Toast.error("ID Mahasiswa tidak tersedia.");
@@ -121,15 +105,11 @@ export default function DetailCutiAkademikPage() {
     try {
       const encryptedMhsId = encryptIdUrl(detail.mhsId);
       router.push(`/pages/Profil_Mahasiswa/${encryptedMhsId}`);
-    } catch (error) {
-      console.error("Error encrypting mhsId:", error);
+    } catch {
       Toast.error("Gagal membuka profil mahasiswa.");
     }
   };
 
-  // ============================
-  // DOWNLOAD FILE (FIX)
-  // ============================
   const handleDownload = (fileName) => {
   if (!fileName) {
     Toast.error("File tidak ditemukan.");
@@ -137,7 +117,6 @@ export default function DetailCutiAkademikPage() {
   }
 
   const downloadUrl = `${API_LINK}CutiAkademik/file/${fileName}`;
-  console.log("DOWNLOAD URL =", downloadUrl);
 
   const link = document.createElement("a");
   link.href = downloadUrl;
@@ -147,8 +126,6 @@ export default function DetailCutiAkademikPage() {
   link.remove();
 };
 
-
-  // Use MainContent loading prop for consistent design
   if (loading) {
     return (
       <MainContent 
@@ -208,10 +185,6 @@ export default function DetailCutiAkademikPage() {
     >
       <div className="card p-4">
 
-        {/* ============================== */}
-        {/* INFORMASI CUTI AKADEMIK        */}
-        {/* ============================== */}
-
         <h4 className="fw-bold">Detail Pengajuan Cuti Akademik</h4>
         <hr />
 
@@ -252,7 +225,6 @@ export default function DetailCutiAkademikPage() {
           )}
         </div>
 
-        {/* Status Persetujuan - Hanya untuk role tertentu */}
         {canViewApprovalStatus() && (
           <>
             <br />
@@ -331,11 +303,6 @@ export default function DetailCutiAkademikPage() {
 
         <br />
 
-        {/* ============================== */}
-        {/* DATA MAHASISWA                */}
-        {/* ============================== */}
-
-
         <div className="row">
           <div className="col-lg-6 mb-3">
             <h6 className="fw-semibold mb-1">NIM</h6>
@@ -368,15 +335,8 @@ export default function DetailCutiAkademikPage() {
           </div>
         </div>
 
-
-        {/* ============================== */}
-        {/* DOWNLOAD FILE                 */}
-        {/* ============================== */}
-   
-
         <div className="row">
 
-          {/* Surat Pernyataan */}
           <div className="col-lg-6 mb-3">
             <h6 className="fw-semibold mb-1">Surat Pernyataan</h6>
             <div>
@@ -393,7 +353,6 @@ export default function DetailCutiAkademikPage() {
             </div>
           </div>
 
-          {/* Lampiran */}
           <div className="col-lg-6 mb-3">
             <h6 className="fw-semibold mb-1">Lampiran</h6>
             <div>

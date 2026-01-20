@@ -38,10 +38,9 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         });
 
         const data = await res.json();
-        console.log("PERMISSION LOADED =", data);
         setPermission(data);
-      } catch (err) {
-        console.error("Gagal load permission:", err);
+      } catch {
+        setPermission(null);
       }
     };
 
@@ -74,7 +73,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const isDAAK = fixedRole === "ROL21" || fixedRole === "DAAK";
   
   
-  // Admin should NOT include Finance, Wadir1, or Prodi users who have specific workflows
   const isAdmin = (fixedRole === "ADMIN" || fixedRole === "ADMIN SIA" || 
                   (fixedRole === "KARYAWAN" && !isFinance && !isWadir1 && !isProdi) ||
                   isDAAK);
@@ -111,14 +109,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const [sortBy, setSortBy] = useState(dataFilterSort[0].Value);
   const [filterProdi, setFilterProdi] = useState(dataFilterProdi[0].Value);
   
-  // State for bebas tanggungan check
   const [bebasTanggunganStatus, setBebasTanggunganStatus] = useState(null);
   
-  // State for Prodi's konsentrasi
   const [prodiKonsentrasi, setProdiKonsentrasi] = useState(null);
   const [loadingProdiKonsentrasi, setLoadingProdiKonsentrasi] = useState(false);
 
-  // Check bebas tanggungan for mahasiswa
   useEffect(() => {
     if (!isMahasiswa || !userData) return;
     
@@ -126,10 +121,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       try {
         const userId = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
         
-        console.log(`[checkBebasTanggungan] Checking for userId: ${userId}`);
-        
         if (!userId) {
-          console.warn("[checkBebasTanggungan] No userId found");
           return;
         }
 
@@ -142,20 +134,16 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         
         if (response.ok) {
           const data = await response.json();
-          console.log(`[checkBebasTanggungan] Status:`, data);
           setBebasTanggunganStatus(data.status);
-        } else {
-          console.error(`[checkBebasTanggungan] API Error: ${response.status}`);
         }
-      } catch (error) {
-        console.error("[checkBebasTanggungan] Network error:", error);
+      } catch {
+        setBebasTanggunganStatus(null);
       }
     };
 
     checkBebasTanggungan();
   }, [isMahasiswa, userData]);
   
-  // Load Prodi's konsentrasi for filtering
   useEffect(() => {
     if (!isProdi || !userData) return;
     
@@ -164,10 +152,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         setLoadingProdiKonsentrasi(true);
         const username = userData?.nama || userData?.username || "";
         
-        console.log(`[loadProdiKonsentrasi] Loading konsentrasi for username: ${username}`);
-        
         if (!username) {
-          console.warn("[loadProdiKonsentrasi] No username found");
           return;
         }
 
@@ -180,21 +165,15 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         
         if (response.ok) {
           const data = await response.json();
-          console.log(`[loadProdiKonsentrasi] Konsentrasi data:`, data);
           
-          // Extract konsentrasi name (e.g., "Manajemen Informatika (MI)" -> "Manajemen Informatika")
           if (data && data.length > 0) {
             const konsentrasiName = data[0].nama || "";
-            // Remove the abbreviation in parentheses if present
             const cleanName = konsentrasiName.replace(/\s*\([^)]*\)\s*$/, '').trim();
             setProdiKonsentrasi(cleanName);
-            console.log(`[loadProdiKonsentrasi] Set konsentrasi to: ${cleanName}`);
           }
-        } else {
-          console.error(`[loadProdiKonsentrasi] API Error: ${response.status}`);
         }
-      } catch (error) {
-        console.error("[loadProdiKonsentrasi] Network error:", error);
+      } catch {
+        setProdiKonsentrasi(null);
       } finally {
         setLoadingProdiKonsentrasi(false);
       }
@@ -203,7 +182,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     loadProdiKonsentrasi();
   }, [isProdi, userData]);
   
-  // Helper function to determine role-based parameters
   const getRoleBasedParams = useCallback(() => {
     let mhsId = "%";
     let statusFilter = "";
@@ -212,7 +190,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     if (isMahasiswa) {
       mhsId = userData?.mhsId || userData?.nama || userData?.username || userData?.userid || "";
       if (!mhsId) {
-        console.error("Mahasiswa ID not found in userData");
         return null;
       }
       // statusFilter remains empty for mahasiswa
@@ -505,7 +482,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   // Helper function to fetch main data from API
   const fetchMainData = useCallback(async (params) => {
     const url = `${API_LINK}CutiAkademik?${params}`;
-    console.log("API URL:", url);
 
     const [response] = await Promise.all([
       fetch(url, {
@@ -519,8 +495,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     ]);
     
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("API Error Response:", errorText);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
@@ -528,8 +502,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     let data;
     try {
       data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error("JSON Parse Error:", parseError);
+    } catch {
       throw new Error("Invalid JSON response from server");
     }
 
@@ -574,7 +547,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
 
     if (!Array.isArray(actualData)) {
-      console.log("Data is not array after processing");
       return [];
     }
 
@@ -585,10 +557,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     async (page = 1) => {
       try {
         setLoading(true);
-
-        console.log("=== DEBUG LOAD DATA ===");
-        console.log("User Data:", userData);
-        console.log("Fixed Role:", fixedRole);
 
         const roleParams = getRoleBasedParams();
         if (!roleParams) {
@@ -603,14 +571,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           backendRole = "ROL21";
         }
 
-        console.log("API Parameters:", { ...roleParams, role: backendRole, search });
-
         const params = buildMainDataParams(roleParams, backendRole);
         const data = await fetchMainData(params);
         const actualData = extractArrayData(data);
 
         if (!Array.isArray(actualData)) {
-          console.log("Data is not array after processing, setting empty array");
           setDataCutiAkademik([]);
           setTotalData(0);
           return;
@@ -618,12 +583,10 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
         const { formattedData, totalPendingItems } = processMainData(actualData, page);
 
-        console.log("Formatted data:", formattedData);
         setDataCutiAkademik(formattedData);
         setTotalData(totalPendingItems); 
         setCurrentPage(page);
       } catch (err) {
-        console.error("Error loading data:", err);
         Toast.error(`Gagal memuat data pengajuan: ${err.message}`);
         setDataCutiAkademik([]);
         setTotalData(0);
@@ -651,7 +614,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   // Helper function to fetch and parse riwayat data
   const fetchRiwayatData = useCallback(async (params) => {
     const url = `${API_LINK}CutiAkademik/riwayat?${params}`;
-    console.log("Riwayat API URL:", url);
 
     const [response] = await Promise.all([
       fetch(url, {
@@ -665,8 +627,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     ]);
     
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Riwayat API Error Response:", errorText);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
@@ -674,8 +634,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     let data;
     try {
       data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error("Riwayat JSON Parse Error:", parseError);
+    } catch {
       throw new Error("Invalid JSON response from server");
     }
 
@@ -727,10 +686,9 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           const sequence = extractSequenceFromId(idStr);
           
           nomorSK = `${sequence}/PA-WADIR-I/SKC/${romanMonth}/${dateInfo.year}`;
-          console.log(`Generated SK for ${idStr}: ${nomorSK}`);
         }
-      } catch (error) {
-        console.warn("Error generating SK number:", error);
+      } catch {
+        // If SK generation fails, keep the original nomorSK value
       }
     }
     
@@ -775,8 +733,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
                    detailData.jurusan || "-";
           }
         }
-      } catch (error) {
-        console.warn("Failed to fetch detail for", item.id, ":", error.message);
+      } catch {
+        // If detail fetch fails, use existing values
       }
     }
     
@@ -895,7 +853,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     async (page = 1) => {
       try {
         setLoadingRiwayat(true);
-        console.log("=== LOADING RIWAYAT DATA ===");
 
         const params = buildRiwayatParams();
         const data = await fetchRiwayatData(params);
@@ -937,13 +894,10 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           No: startIndex + index + 1
         }));
 
-        console.log(`Final paginated data: ${finalData.length} items of ${totalFilteredItems} total (page ${page})`);
-
         setDataRiwayat(finalData);
         setTotalDataRiwayat(totalFilteredItems); 
         setCurrentPageRiwayat(page);
       } catch (err) {
-        console.error("Error loading riwayat:", err);
         Toast.error(`Gagal memuat data riwayat: ${err.message}`);
         setDataRiwayat([]);
         setTotalDataRiwayat(0);
@@ -957,13 +911,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   // Helper function to validate user data for submission
   const validateUserForSubmission = useCallback(() => {
     const modifiedBy = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
-    
-    console.log("=== MODIFIED BY MAPPING ===");
-    console.log("userData.nama:", userData?.nama);
-    console.log("userData.mhsId:", userData?.mhsId);
-    console.log("userData.username:", userData?.username);
-    console.log("userData.userid:", userData?.userid);
-    console.log("Final modifiedBy:", modifiedBy);
     
     if (!modifiedBy) {
       Toast.error("Data user tidak lengkap. Silakan login ulang.");
@@ -996,7 +943,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
   // Helper function to handle submission errors
   const handleSubmissionError = useCallback((res, raw) => {
-    console.error("HTTP Error:", res.status, res.statusText);
     
     try {
       const errorData = JSON.parse(raw);
@@ -1060,11 +1006,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
       const { payload, url } = buildSubmissionPayload(id, modifiedBy);
 
-      console.log("=== AJUKAN CUTI AKADEMIK ===");
-      console.log("Is Prodi:", isProdi);
-      console.log("Payload:", payload);
-      console.log("URL:", url);
-
       const res = await fetch(url, {
         method: "PUT",
         headers: { 
@@ -1075,7 +1016,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       });
 
       const raw = await res.text();
-      console.log("Raw response:", raw);
       
       if (!res.ok) {
         handleSubmissionError(res, raw);
@@ -1085,16 +1025,13 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       let result;
       try {
         result = JSON.parse(raw);
-        console.log("Parsed result:", result);
-      } catch (parseError) {
-        console.error("JSON Parse error:", parseError);
+      } catch {
         Toast.error("Response server tidak valid. Periksa console untuk detail.");
         return;
       }
 
       handleSubmissionSuccess(result, id);
     } catch (err) {
-      console.error("Ajukan catch error:", err);
       Toast.error(`Gagal mengajukan: ${err.message}`);
     } finally {
       setLoading(false);
@@ -1176,7 +1113,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         throw new Error(data.message || "Gagal menghapus pengajuan");
       }
     } catch (err) {
-      console.error("Delete error:", err);
       Toast.error(err.message);
     } finally {
       setLoading(false);
@@ -1200,13 +1136,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     setLoading(true);
 
     try {
-      console.log("=== APPROVE CUTI AKADEMIK ===");
-      console.log("ID:", itemId);
-      console.log("User Role:", fixedRole);
-      console.log("Is Prodi:", isProdi);
-      console.log("Is Finance:", isFinance);
-      console.log("Is Wadir1:", isWadir1);
-
       const approvedBy = userData?.nama || userData?.username || userData?.userid || "";
       
       if (!approvedBy) {
@@ -1228,8 +1157,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           ApprovedBy: approvedBy
         };
         
-        console.log("=== PRODI APPROVAL ===");
-        console.log("Using /approve/prodi endpoint");
       } else if (isFinance || isWadir1) {
         // Use general approval endpoint with auto role detection
         url = `${API_LINK}CutiAkademik/approve`;
@@ -1239,16 +1166,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           Role: "" // Will be auto-detected by backend
         };
         
-        console.log(isFinance ? "=== FINANCE APPROVAL ===" : "=== WADIR1 APPROVAL ===");
-        console.log("Using /approve endpoint with auto role detection");
       } else {
         Toast.error("Role tidak dikenali untuk approval.");
         setLoading(false);
         return;
       }
-
-      console.log("Approve URL:", url);
-      console.log("Approve payload:", payload);
 
       const res = await fetch(url, {
         method: "PUT",
@@ -1259,10 +1181,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         body: JSON.stringify(payload)
       });
 
-      console.log("Approve response status:", res.status);
-
       const raw = await res.text();
-      console.log("Approve raw response:", raw);
 
       if (!res.ok) {
         
@@ -1277,13 +1196,10 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       }
 
       
-      let result;
       try {
-        result = JSON.parse(raw);
-        console.log("Approve result:", result);
+        JSON.parse(raw);
       } catch {
-        // JSON parsing failed, but response was successful
-        console.log("JSON parsing failed for approve response");
+        // JSON parsing failed, but response was successful, continue anyway
       }
 
       
@@ -1291,7 +1207,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       loadData(1); 
       
     } catch (err) {
-      console.error("Approve error:", err);
       Toast.error(`Gagal menyetujui: ${err.message}`);
     } finally {
       setLoading(false);
@@ -1312,17 +1227,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
   // Helper function to handle rejection error response
   const handleRejectionError = useCallback((res, errorText, payload) => {
-    console.error("=== REJECT ERROR DETAILS ===");
-    console.error("Status:", res.status);
-    console.error("Status Text:", res.statusText);
-    console.error("Error Response:", errorText);
-    console.error("Request Payload:", JSON.stringify(payload, null, 2));
     
     let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
     
     try {
       const errorData = JSON.parse(errorText);
-      console.error("Parsed Error Data:", errorData);
       
       if (errorData.message) {
         errorMessage = errorData.message;
@@ -1337,8 +1246,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         errorMessage = validationErrors.join(', ');
       }
       
-    } catch (parseError) {
-      console.error("Failed to parse error response:", parseError);
+    } catch {
       errorMessage = `${errorMessage}\n\nRaw response: ${errorText}`;
     }
     
@@ -1360,7 +1268,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       return true;
     } else {
       const errorMessage = result?.message || result?.error || "Gagal menolak pengajuan";
-      console.error("Rejection failed:", result);
       Toast.error(errorMessage);
       return false;
     }
@@ -1382,9 +1289,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     setLoading(true);
 
     try {
-      console.log("=== REJECT CUTI AKADEMIK ===");
-      console.log("Item ID:", itemId);
-
       const username = validateUserForRejection();
       if (!username) {
         setLoading(false);
@@ -1397,8 +1301,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         Role: "auto-detect",
         Keterangan: null
       };
-
-      console.log("Reject payload:", payload);
 
       const url = `${API_LINK}CutiAkademik/reject`;
       const res = await fetch(url, {
@@ -1418,14 +1320,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       }
 
       const responseText = await res.text();
-      console.log("Reject raw response:", responseText);
 
       let result;
       try {
         result = JSON.parse(responseText);
-        console.log("Reject parsed result:", result);
-      } catch (parseError) {
-        console.error("JSON Parse Error:", parseError);
+      } catch {
         
         if (res.status === 200) {
           Toast.success("Pengajuan berhasil ditolak!");
@@ -1442,7 +1341,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
       handleRejectionSuccess(result);
     } catch (err) {
-      console.error("Reject catch error:", err);
       Toast.error(`Gagal menolak pengajuan: ${err.message}`);
     } finally {
       setLoading(false);
@@ -1466,7 +1364,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
   // SK Upload handlers
   const handleUploadSK = (id) => {
-    console.log("Opening upload modal for ID:", id);
     setSelectedCutiId(id);
     setShowUploadModal(true);
     setSelectedSKFile(null);
@@ -1523,26 +1420,16 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       formData.append('FileSK', selectedSKFile);
       formData.append('UploadBy', userData?.nama || userData?.username || 'user_admin');
 
-      console.log("=== SK UPLOAD CUTI AKADEMIK ===");
-      console.log("ID:", selectedCutiId);
-      console.log("SK File:", selectedSKFile.name);
-      console.log("UploadBy:", userData?.nama || userData?.username || 'user_admin');
-
       const response = await fetch(`${API_LINK}CutiAkademik/upload-sk`, {
         method: 'PUT',
         body: formData
       });
 
-      console.log("Upload response status:", response.status);
-
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Upload error:", errorText);
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const result = await response.json();
-      console.log("Upload result:", result);
 
       Toast.success(result.message || "SK berhasil diupload!");
       setShowUploadModal(false);
@@ -1557,7 +1444,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       }
 
     } catch (error) {
-      console.error("Upload error:", error);
       Toast.error(`Gagal upload SK: ${error.message}`);
     } finally {
       setUploadLoading(false);
@@ -1571,13 +1457,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
   const handleDownloadSK = async (id) => {
     try {
-      console.log("=== DOWNLOAD SK CUTI AKADEMIK ===");
-      console.log("ID:", id);
-      console.log("User Data:", userData);
-      console.log("Is Admin:", isAdmin);
-      console.log("Is Mahasiswa:", isMahasiswa);
-
-      // Get username and role for the API call
       const username = userData?.nama || userData?.username || "";
       let role = "";
       
@@ -1596,9 +1475,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         return;
       }
 
-      console.log("Download SK params:", { id, username, role });
-
-      // Build the download URL with query parameters
       const params = new URLSearchParams({
         username: username,
         role: role,
@@ -1606,9 +1482,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       });
 
       const downloadUrl = `${API_LINK}CutiAkademik/cetak-sk/${encodeURIComponent(id)}?${params.toString()}`;
-      console.log("Download URL:", downloadUrl);
 
-      // First, check if user has permission by calling the JSON endpoint
       const checkParams = new URLSearchParams({
         username: username,
         role: role,
@@ -1626,9 +1500,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       });
 
       if (!checkResponse.ok) {
-        const errorText = await checkResponse.text();
-        console.error("Permission check failed:", errorText);
-        
         if (checkResponse.status === 403) {
           Toast.error("Anda tidak memiliki akses untuk download SK ini.");
         } else {
@@ -1638,7 +1509,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       }
 
       const checkResult = await checkResponse.json();
-      console.log("Permission check result:", checkResult);
 
       if (!checkResult.canPrint) {
         Toast.error(checkResult.reason || "Tidak dapat download SK saat ini.");
@@ -1650,7 +1520,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       Toast.success("SK berhasil didownload!");
 
     } catch (error) {
-      console.error("Download SK error:", error);
       Toast.error(`Gagal download SK: ${error.message}`);
     }
   };
@@ -1669,17 +1538,13 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     if (isProdi) {
       // Only load data after prodiKonsentrasi is ready
       if (prodiKonsentrasi !== null && !loadingProdiKonsentrasi) {
-        console.log("[useEffect] Prodi konsentrasi ready, loading main data with filter:", prodiKonsentrasi);
         loadData(1);
         
         // Load Riwayat data
         setShowRiwayat(true);
         setTimeout(() => loadDataRiwayat(1), 50);
       } else {
-        console.log("[useEffect] Waiting for prodiKonsentrasi to load before loading main data...", {
-          prodiKonsentrasi,
-          loadingProdiKonsentrasi
-        });
+        // Waiting for prodiKonsentrasi to load before loading main data
       }
     } else {
       // For other roles, load immediately
@@ -1880,7 +1745,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               
               const queryString = params.toString();
               const exportUrl = `${API_LINK}CutiAkademik/riwayat/excel${queryString ? '?' + queryString : ''}`;
-              console.log("Export URL:", exportUrl);
               window.open(exportUrl, "_blank");
             }}
             searchPlaceholder="Cari No. Pengajuan, NIM, Nama, atau Prodi"
