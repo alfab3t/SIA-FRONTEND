@@ -8,7 +8,6 @@ import { useRouter, useParams } from "next/navigation";
 import { API_LINK } from "@/lib/constant";
 import { decryptIdUrl, encryptIdUrl } from "@/lib/encryptor";
 import { getUserData } from "@/context/user";
-import { formatDate } from "@/lib/dateFormater";
 
 export default function DetailCutiAkademikPage() {
   const router = useRouter();
@@ -51,12 +50,7 @@ export default function DetailCutiAkademikPage() {
     return ['nda+prodi', 'user_finance', 'admin'].includes(userRole);
   };
 
-  const formatTanggalPengajuan = (tanggal) => {
-    if (!tanggal) {
-      return formatDate(new Date());
-    }
-    return tanggal;
-  };
+
 
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
@@ -169,7 +163,7 @@ export default function DetailCutiAkademikPage() {
         ]}
       >
         <div className="text-center py-4">
-          <div className="spinner-border" role="status">
+          <div className="spinner-border" aria-live="polite">
             <span className="visually-hidden">Loading...</span>
           </div>
           <p className="mt-2">Memuat detail pengajuan...</p>
@@ -223,36 +217,36 @@ export default function DetailCutiAkademikPage() {
 
         <div className="row">
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Nomor SK</label>
+            <h6 className="fw-semibold mb-1">Nomor SK</h6>
             <p>{detail?.id || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Tahun Akademik</label>
+            <h6 className="fw-semibold mb-1">Tahun Akademik</h6>
             <p>{detail?.tahunAjaran || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Mengajukan Cuti untuk Semester</label>
+            <h6 className="fw-semibold mb-1">Mengajukan Cuti untuk Semester</h6>
             <p>{detail?.semester || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Status</label>
+            <h6 className="fw-semibold mb-1">Status</h6>
             <div>{getStatusBadge(detail?.status)}</div>
           </div>
 
           {/* Tambahan field persetujuan di bagian status utama */}
           {detail?.approvalProdi && (
             <div className="col-lg-6 mb-3">
-              <label className="form-label fw-semibold">Persetujuan Prodi oleh</label>
+              <h6 className="fw-semibold mb-1">Persetujuan Prodi oleh</h6>
               <p>{detail.approvalProdi}</p>
             </div>
           )}
 
           {detail?.approvalDir1 && (
             <div className="col-lg-6 mb-3">
-              <label className="form-label fw-semibold">Persetujuan Wakil Direktur 1 oleh</label>
+              <h6 className="fw-semibold mb-1">Persetujuan Wakil Direktur 1 oleh</h6>
               <p>{detail.approvalDir1}</p>
             </div>
           )}
@@ -266,7 +260,7 @@ export default function DetailCutiAkademikPage() {
 
             <div className="row">
               <div className="col-lg-6 mb-3">
-                <label className="form-label fw-semibold">Status Approval Prodi</label>
+                <h6 className="fw-semibold mb-1">Status Approval Prodi</h6>
                 <div>
                   {detail?.approvalProdi && detail?.appProdiDate ? (
                     <span className="badge bg-success">Disetujui</span>
@@ -277,17 +271,17 @@ export default function DetailCutiAkademikPage() {
               </div>
               
               <div className="col-lg-6 mb-3">
-                <label className="form-label fw-semibold">Persetujuan Prodi Oleh</label>
+                <h6 className="fw-semibold mb-1">Persetujuan Prodi Oleh</h6>
                 <p>{detail?.approvalProdi || "Belum disetujui"}</p>
               </div>
               
               <div className="col-lg-6 mb-3">
-                <label className="form-label fw-semibold">Tanggal Persetujuan Prodi</label>
+                <h6 className="fw-semibold mb-1">Tanggal Persetujuan Prodi</h6>
                 <p>{detail?.appProdiDate || "Belum disetujui"}</p>
               </div>
               
               <div className="col-lg-6 mb-3">
-                <label className="form-label fw-semibold">Status Approval Wakil Direktur</label>
+                <h6 className="fw-semibold mb-1">Status Approval Wakil Direktur</h6>
                 <div>
                   {detail?.approvalDir1 && detail?.appDir1Date ? (
                     <span className="badge bg-success">Disetujui</span>
@@ -298,25 +292,25 @@ export default function DetailCutiAkademikPage() {
               </div>
               
               <div className="col-lg-6 mb-3">
-                <label className="form-label fw-semibold">Persetujuan Wakil Direktur Oleh</label>
+                <h6 className="fw-semibold mb-1">Persetujuan Wakil Direktur Oleh</h6>
                 <p>{detail?.approvalDir1 || "Belum disetujui"}</p>
               </div>
               
               <div className="col-lg-6 mb-3">
-                <label className="form-label fw-semibold">Tanggal Persetujuan Wakil Direktur</label>
+                <h6 className="fw-semibold mb-1">Tanggal Persetujuan Wakil Direktur</h6>
                 <p>{detail?.appDir1Date || "Belum disetujui"}</p>
               </div>
               
               {detail?.menimbang && (
                 <div className="col-lg-12 mb-3">
-                  <label className="form-label fw-semibold">Pertimbangan</label>
+                  <h6 className="fw-semibold mb-1">Pertimbangan</h6>
                   <div className="text-muted" dangerouslySetInnerHTML={{ __html: detail.menimbang }} />
                 </div>
               )}
               
               {detail?.sk && (
                 <div className="col-lg-12 mb-3">
-                  <label className="form-label fw-semibold">Surat Keputusan</label>
+                  <h6 className="fw-semibold mb-1">Surat Keputusan</h6>
                   <div>
                     <Button
                       classType="success"
@@ -344,33 +338,33 @@ export default function DetailCutiAkademikPage() {
 
         <div className="row">
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">NIM</label>
+            <h6 className="fw-semibold mb-1">NIM</h6>
             <p>{detail?.mhsId || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Nama Mahasiswa</label>
+            <h6 className="fw-semibold mb-1">Nama Mahasiswa</h6>
             <p>{detail?.mahasiswa || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Program Studi</label>
+            <h6 className="fw-semibold mb-1">Program Studi</h6>
             <p>{detail?.prodiNama || "-"}</p>
           </div>
 
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Konsentrasi</label>
+            <h6 className="fw-semibold mb-1">Konsentrasi</h6>
             <p>{detail?.konsentrasi || "-"}</p>
           </div>
 
           <div className="col-lg-12 mb-3">
-            <span 
-              className="text-primary text-decoration-underline" 
-              style={{ cursor: 'pointer' }}
+            <button
+              type="button"
+              className="btn btn-link text-primary text-decoration-underline p-0"
               onClick={handleViewProfile}
             >
               Lihat Profil Mahasiswa
-            </span>
+            </button>
           </div>
         </div>
 
@@ -384,7 +378,7 @@ export default function DetailCutiAkademikPage() {
 
           {/* Surat Pernyataan */}
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Surat Pernyataan</label>
+            <h6 className="fw-semibold mb-1">Surat Pernyataan</h6>
             <div>
               {detail?.lampiranSP ? (
                 <button
@@ -401,7 +395,7 @@ export default function DetailCutiAkademikPage() {
 
           {/* Lampiran */}
           <div className="col-lg-6 mb-3">
-            <label className="form-label fw-semibold">Lampiran</label>
+            <h6 className="fw-semibold mb-1">Lampiran</h6>
             <div>
               {detail?.lampiran ? (
                 <button
