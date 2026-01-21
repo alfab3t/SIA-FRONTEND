@@ -1402,19 +1402,19 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   );
 
   const handleAdd = () => {
-    router.push("/pages/administrasi-akademik/Cuti-Akademik/add");
+    router.push("/pages/administrasi-akademik/cuti-akademik/add");
   };
 
   const handleDetail = (id) =>
     router.push(
-      `/pages/administrasi-akademik/Cuti-Akademik/detail/${encryptIdUrl(
+      `/pages/administrasi-akademik/cuti-akademik/detail/${encryptIdUrl(
         id
       )}`
     );
 
   const handleEdit = (id) => {
     router.push(
-      `/pages/administrasi-akademik/Cuti-Akademik/edit/${encryptIdUrl(id)}`
+      `/pages/administrasi-akademik/cuti-akademik/edit/${encryptIdUrl(id)}`
     );
   };
 
