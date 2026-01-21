@@ -177,7 +177,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       const currentStatus = item.status || item.cak_status || "";
       
       if (isMahasiswa) {
-        return currentStatus === "Draft" || currentStatus === "Disetujui";
+        // Tampilkan semua status untuk mahasiswa
+        return true;
       }
       
       if (isProdi) {
