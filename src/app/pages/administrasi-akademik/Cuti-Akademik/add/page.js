@@ -125,7 +125,93 @@ export default function AddCutiAkademik() {
   });
 
   const [errors, setErrors] = useState({});
-  const [bebasTanggunganStatus, setBebasTanggunganStatus] = useState(null);           
+  const [bebasTanggunganStatus, setBebasTanggunganStatus] = useState(null);
+  const [existingCutiData, setExistingCutiData] = useState([]);
+
+  // Helper function to extract array data from API response
+  const extractArrayFromResponse = useCallback((data) => {
+    if (Array.isArray(data)) {
+      return data;
+    }
+    
+    if (data && typeof data === 'object') {
+      // Check common array properties
+      const arrayProperties = ['data', 'items', 'result'];
+      for (const prop of arrayProperties) {
+        if (data[prop] && Array.isArray(data[prop])) {
+          return data[prop];
+        }
+      }
+      
+      // Find first array property
+      const firstArrayProp = Object.keys(data).find(key => Array.isArray(data[key]));
+      return firstArrayProp ? data[firstArrayProp] : [];
+    }
+    
+    return [];
+  }, []);
+
+  // Helper function to filter valid cuti data
+  const filterValidCutiData = useCallback((data) => {
+    return data.filter(item => {
+      const status = item.status || item.cak_status || "";
+      return status !== "Ditolak";
+    });
+  }, []);
+
+  // Function to fetch existing cuti akademik data
+  const fetchCutiData = useCallback(async (mhsId) => {
+    const params = new URLSearchParams({
+      mhsId: mhsId,
+      pageNumber: '1',
+      pageSize: '100'
+    });
+
+    const response = await fetch(`${API_LINK}CutiAkademik?${params}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch existing cuti data");
+    }
+
+    return response.json();
+  }, []);
+
+  // Main function to check existing cuti akademik data
+  const checkExistingCutiData = useCallback(async (mhsId) => {
+    if (!mhsId) {
+      setExistingCutiData([]);
+      return;
+    }
+
+    try {
+      const data = await fetchCutiData(mhsId);
+      const actualData = extractArrayFromResponse(data);
+      const validCutiData = filterValidCutiData(actualData);
+      setExistingCutiData(validCutiData);
+    } catch (error) {
+      console.error("Error checking existing cuti data:", error);
+      setExistingCutiData([]);
+    }
+  }, [fetchCutiData, extractArrayFromResponse, filterValidCutiData]);
+
+  // Function to check if tahun akademik is already used
+  const isTahunAkademikUsed = useCallback((tahunAkademik) => {
+    return existingCutiData.some(item => {
+      const existingTahun = item.tahunAjaran || item.cak_tahun_ajaran || "";
+      return existingTahun === tahunAkademik;
+    });
+  }, [existingCutiData]);
+
+  // Function to filter available tahun akademik options
+  const getAvailableTahunAkademik = useCallback((allOptions) => {
+    return allOptions.filter(option => !isTahunAkademikUsed(option.Value));
+  }, [isTahunAkademikUsed]);           
 
   const loadStudentsForKonId = useCallback(async (konId) => {
     if (!konId) {
@@ -239,6 +325,23 @@ export default function AddCutiAkademik() {
 
     loadMahasiswaData();
   }, [isMahasiswa, userData]);
+
+  // Check existing cuti data when student is selected
+  useEffect(() => {
+    let targetMhsId = "";
+    
+    if (isMahasiswa) {
+      // For mahasiswa, use their own ID
+      targetMhsId = userData?.mhsId || userData?.nama || userData?.userid || userData?.username || "";
+    } else if (isProdi && formData.mhsId) {
+      // For prodi, use selected student ID
+      targetMhsId = formData.mhsId;
+    }
+    
+    if (targetMhsId) {
+      checkExistingCutiData(targetMhsId);
+    }
+  }, [isMahasiswa, isProdi, formData.mhsId, userData, checkExistingCutiData]);
 
   const handleProdiChange = async (e) => {
     const konId = e.target.value;
@@ -356,7 +459,12 @@ export default function AddCutiAkademik() {
       }
     }
     
-    if (!formData.tahunAjaran) newErrors.tahunAjaran = "Tahun akademik wajib diisi.";
+    if (!formData.tahunAjaran) {
+      newErrors.tahunAjaran = "Tahun akademik wajib diisi.";
+    } else if (isTahunAkademikUsed(formData.tahunAjaran)) {
+      newErrors.tahunAjaran = `Mahasiswa sudah pernah mengajukan cuti akademik di tahun akademik ${formData.tahunAjaran}. Silakan pilih tahun akademik yang lain.`;
+    }
+    
     if (!formData.semester) newErrors.semester = "Semester wajib diisi.";
     if (!formData.suratPernyataan) newErrors.suratPernyataan = "Surat pernyataan wajib di-upload.";
     
@@ -476,18 +584,22 @@ export default function AddCutiAkademik() {
 
   useEffect(() => {
     if ((isProdi || isMahasiswa) && formData.angkatan) {
-      const newTahunAkademikData = generateTahunAkademikOptions(formData.angkatan);
-      setTahunAjaranData(newTahunAkademikData);
+      const allTahunAkademikData = generateTahunAkademikOptions(formData.angkatan);
+      const availableTahunAkademikData = getAvailableTahunAkademik(allTahunAkademikData);
+      setTahunAjaranData(availableTahunAkademikData);
       
-      setFormData(prev => ({
-        ...prev,
-        tahunAjaran: ""
-      }));
+      // Reset tahun ajaran if current selection is no longer available
+      if (formData.tahunAjaran && !availableTahunAkademikData.some(item => item.Value === formData.tahunAjaran)) {
+        setFormData(prev => ({
+          ...prev,
+          tahunAjaran: ""
+        }));
+      }
     } else if (!isProdi && !isMahasiswa) {
       const defaultTahunAkademik = generateTahunAkademikOptions(null);
       setTahunAjaranData(defaultTahunAkademik);
     }
-  }, [formData.angkatan, isProdi, isMahasiswa]);
+  }, [formData.angkatan, isProdi, isMahasiswa, getAvailableTahunAkademik, formData.tahunAjaran]);
 
   useEffect(() => {
     if (!isProdi && !isMahasiswa) {
@@ -623,9 +735,6 @@ export default function AddCutiAkademik() {
                   <span className="fw-normal text-danger">{errors.tahunAjaran}</span>
                 )}
               </>
-            )}
-            {isMahasiswa && !formData.angkatan && (
-              <small className="text-muted">Memuat opsi tahun akademik...</small>
             )}
           </div>
 
