@@ -18,6 +18,81 @@ const Editor = dynamic(() => import("@/components/common/Editor"), {
   ),
 });
 
+// Helper functions to reduce nesting
+const validateFileSize = (file, maxSize = 10 * 1024 * 1024) => {
+  if (file.size > maxSize) {
+    Toast.error(`File ${file.name} terlalu besar. Maksimal 10MB.`);
+    return false;
+  }
+  return true;
+};
+
+const validateFileType = (file) => {
+  const allowedTypes = [
+    'application/pdf',
+    'application/msword', 
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'image/jpeg',
+    'image/jpg',
+    'image/png'
+  ];
+  
+  if (!allowedTypes.includes(file.type)) {
+    Toast.error(`Format file ${file.name} tidak didukung. Gunakan PDF, DOC, DOCX, JPG, atau PNG.`);
+    return false;
+  }
+  return true;
+};
+
+const mapProdiData = (data) => {
+  const mappedProdi = data.map((item, index) => ({
+    Value: item.id || item.konId || `prodi-${index}`,
+    Text: item.nama || `Program Studi ${index + 1}`
+  }));
+  
+  return mappedProdi.filter((prodi, index, self) => 
+    index === self.findIndex(p => p.Value === prodi.Value)
+  );
+};
+
+const mapStudentData = (data) => {
+  const mappedStudents = data.map((item, index) => ({
+    Value: item.mhsId || `student-${index}`,
+    Text: item.mhsNama || `Mahasiswa ${index + 1}`
+  }));
+  
+  return mappedStudents.filter((student, index, self) => 
+    index === self.findIndex(s => s.Value === student.Value)
+  );
+};
+
+const generateTahunAkademikOptions = (angkatan) => {
+  if (!angkatan) {
+    const currentYear = new Date().getFullYear();
+    return [
+      { Value: `${currentYear-1}/${currentYear}`, Text: `${currentYear-1}/${currentYear}` },
+      { Value: `${currentYear}/${currentYear+1}`, Text: `${currentYear}/${currentYear+1}` },
+      { Value: `${currentYear+1}/${currentYear+2}`, Text: `${currentYear+1}/${currentYear+2}` },
+    ];
+  }
+
+  const tahunSekarang = new Date().getFullYear() - 1;
+  const angkatanInt = Number.parseInt(angkatan, 10);
+  const tahunAkademikList = [];
+
+  for (let i = tahunSekarang; i <= angkatanInt + 3; i++) {
+    const tahunAkademik = `${i}/${i + 1}`;
+    tahunAkademikList.push({
+      Value: tahunAkademik,
+      Text: tahunAkademik
+    });
+  }
+
+  return tahunAkademikList.filter((item, index, self) => 
+    index === self.findIndex(t => t.Value === item.Value)
+  );
+};
+
 export default function AddCutiAkademik() {
   const router = useRouter();
   const userData = useMemo(() => getUserData(), []);
@@ -99,19 +174,7 @@ export default function AddCutiAkademik() {
       
       if (response.ok) {
         const data = await response.json();
-        
-        const mappedStudents = data.map((item, index) => {
-          return {
-            Value: item.mhsId || `student-${index}`,
-            Text: item.mhsNama || `Mahasiswa ${index + 1}`
-          };
-        });
-        
-        // Remove duplicates based on Value
-        const uniqueStudents = mappedStudents.filter((student, index, self) => 
-          index === self.findIndex(s => s.Value === student.Value)
-        );
-        
+        const uniqueStudents = mapStudentData(data);
         setStudentList(uniqueStudents);
       } else {
         Toast.error("Gagal memuat daftar mahasiswa.");
@@ -144,16 +207,7 @@ export default function AddCutiAkademik() {
         
         if (response.ok) {
           const data = await response.json();
-          
-          const mappedProdi = data.map((item, index) => ({
-            Value: item.id || item.konId || `prodi-${index}`,
-            Text: item.nama || `Program Studi ${index + 1}`
-          }));
-          
-          // Remove duplicates based on Value
-          const uniqueProdi = mappedProdi.filter((prodi, index, self) => 
-            index === self.findIndex(p => p.Value === prodi.Value)
-          );
+          const uniqueProdi = mapProdiData(data);
           
           setProdiList(uniqueProdi);
           
@@ -287,24 +341,8 @@ export default function AddCutiAkademik() {
     
     if (files?.[0]) {
       const file = files[0];
-      const maxSize = 10 * 1024 * 1024;
-      const allowedTypes = [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'image/jpeg',
-        'image/jpg',
-        'image/png'
-      ];
       
-      if (file.size > maxSize) {
-        Toast.error(`File ${file.name} terlalu besar. Maksimal 10MB.`);
-        e.target.value = '';
-        return;
-      }
-      
-      if (!allowedTypes.includes(file.type)) {
-        Toast.error(`Format file ${file.name} tidak didukung. Gunakan PDF, DOC, DOCX, JPG, atau PNG.`);
+      if (!validateFileSize(file) || !validateFileType(file)) {
         e.target.value = '';
         return;
       }
@@ -466,34 +504,9 @@ export default function AddCutiAkademik() {
 
   const [tahunAjaranData, setTahunAjaranData] = useState([]);
 
-  const generateTahunAkademik = (angkatan) => {
-    if (!angkatan) {
-      const currentYear = new Date().getFullYear();
-      return [
-        { Value: `${currentYear-1}/${currentYear}`, Text: `${currentYear-1}/${currentYear}` },
-        { Value: `${currentYear}/${currentYear+1}`, Text: `${currentYear}/${currentYear+1}` },
-        { Value: `${currentYear+1}/${currentYear+2}`, Text: `${currentYear+1}/${currentYear+2}` },
-      ];
-    }
-
-    const tahunSekarang = new Date().getFullYear() - 1;
-    const angkatanInt = Number.parseInt(angkatan, 10);
-    const tahunAkademikList = [];
-
-    for (let i = tahunSekarang; i <= angkatanInt + 3; i++) {
-      const tahunAkademik = `${i}/${i + 1}`;
-      tahunAkademikList.push({
-        Value: tahunAkademik,
-        Text: tahunAkademik
-      });
-    }
-
-    return tahunAkademikList;
-  };
-
   useEffect(() => {
     if ((isProdi || isMahasiswa) && formData.angkatan) {
-      const newTahunAkademikData = generateTahunAkademik(formData.angkatan);
+      const newTahunAkademikData = generateTahunAkademikOptions(formData.angkatan);
       setTahunAjaranData(newTahunAkademikData);
       
       setFormData(prev => ({
@@ -501,14 +514,14 @@ export default function AddCutiAkademik() {
         tahunAjaran: ""
       }));
     } else if (!isProdi && !isMahasiswa) {
-      const defaultTahunAkademik = generateTahunAkademik(null);
+      const defaultTahunAkademik = generateTahunAkademikOptions(null);
       setTahunAjaranData(defaultTahunAkademik);
     }
   }, [formData.angkatan, isProdi, isMahasiswa]);
 
   useEffect(() => {
     if (!isProdi && !isMahasiswa) {
-      const defaultTahunAkademik = generateTahunAkademik(null);
+      const defaultTahunAkademik = generateTahunAkademikOptions(null);
       setTahunAjaranData(defaultTahunAkademik);
     }
   }, [isProdi, isMahasiswa]);
