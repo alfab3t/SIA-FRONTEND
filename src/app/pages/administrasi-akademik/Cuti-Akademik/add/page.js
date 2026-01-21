@@ -399,7 +399,7 @@ export default function AddCutiAkademik() {
     } else {
       Toast.success("Pengajuan Cuti berhasil dibuat.");
     }
-    router.push("/pages/administrasi-akademik/Cuti-Akademik");
+    router.push("/pages/administrasi-akademik/cuti-akademik");
   }, [isProdi, router]);
 
   const handleSubmit = async (e) => {

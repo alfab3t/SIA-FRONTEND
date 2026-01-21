@@ -482,7 +482,7 @@ export default function EditCutiAkademikPage() {
   useEffect(() => {
     if (!realId) {
       Toast.error("ID tidak valid.");
-      router.push("/pages/administrasi-akademik/Cuti-Akademik");
+      router.push("/pages/administrasi-akademik/cuti-akademik");
       return;
     }
 
@@ -596,7 +596,7 @@ export default function EditCutiAkademikPage() {
       if (result?.message?.toLowerCase().includes("berhasil")) {
         Toast.success("Perubahan berhasil disimpan.");
         sessionStorage.removeItem("editCutiDraft");
-        router.push("/pages/administrasi-akademik/Cuti-Akademik");
+        router.push("/pages/administrasi-akademik/cuti-akademik");
       } else {
         Toast.error(result?.message || "Gagal menyimpan perubahan.");
       }

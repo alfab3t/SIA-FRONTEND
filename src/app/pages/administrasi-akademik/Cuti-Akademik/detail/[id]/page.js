@@ -55,7 +55,7 @@ export default function DetailCutiAkademikPage() {
 
       if (!realId) {
         Toast.error("ID tidak valid.");
-        router.push("/pages/administrasi-akademik/Cuti-Akademik");
+        router.push("/pages/administrasi-akademik/cuti-akademik");
         return;
       }
 
@@ -94,7 +94,7 @@ export default function DetailCutiAkademikPage() {
   }, [loadDetail]);
 
   const handleBack = () =>
-    router.push("/pages/administrasi-akademik/Cuti-Akademik");
+    router.push("/pages/administrasi-akademik/cuti-akademik");
 
   const handleViewProfile = () => {
     if (!detail?.mhsId) {
