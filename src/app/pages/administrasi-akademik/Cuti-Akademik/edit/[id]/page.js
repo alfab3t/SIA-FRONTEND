@@ -26,40 +26,10 @@ export default function EditCutiAkademikPage() {
   const userData = useMemo(() => getUserData(), []);
 
   // Determine user role
-  const [permission, setPermission] = useState(null);
+  const roleId = userData?.roleId || "";
   
-  useEffect(() => {
-    const loadPermission = async () => {
-      try {
-        const payload = {
-          username: userData?.username || "",
-          appId: "SIA",
-          roleId: userData?.roleId || ""
-        };
-
-        const res = await fetch(`${API_LINK}Auth/getpermission`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        const data = await res.json();
-        setPermission(data);
-      } catch {
-        // Permission loading failed, continue with default role
-      }
-    };
-
-    if (userData?.username) loadPermission();
-  }, [userData]);
-
-  let fixedRole = (userData?.role || "").toUpperCase();
-  if (permission?.roleName) {
-    fixedRole = permission.roleName.toUpperCase();
-  }
-  
-  const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI";
-  const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
+  const isProdi = roleId === "ROL71";
+  const isMahasiswa = roleId === "ROL23";
 
   // ============================
   // REAL ID (cak_id)

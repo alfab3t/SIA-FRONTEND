@@ -19,34 +19,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const ssoData = useMemo(() => getSSOData(), []);
   const userData = useMemo(() => getUserData(), []);
   
-  
-  const [permission, setPermission] = useState(null);
-
-  useEffect(() => {
-    const loadPermission = async () => {
-      try {
-        const payload = {
-          username: userData?.username || "",
-          appId: "SIA",
-          roleId: userData?.roleId || ""
-        };
-
-        const res = await fetch(`${API_LINK}Auth/getpermission`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        const data = await res.json();
-        setPermission(data);
-      } catch {
-        setPermission(null);
-      }
-    };
-
-    if (userData?.username) loadPermission();
-  }, [userData]);
-
   const router = useRouter();
   const [dataCutiAkademik, setDataCutiAkademik] = useState([]);
   const [dataRiwayat, setDataRiwayat] = useState([]);
@@ -58,25 +30,13 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const prodiRef = useRef();
 
 
-  let fixedRole = (userData?.role || "").toUpperCase();
+  const roleId = userData?.roleId || "";
   
-  if (permission?.roleName) {
-    fixedRole = permission.roleName.toUpperCase();
-  }
-
-  
-  const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
-  const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI";
-  const isWadir1 = fixedRole === "ROL01" || fixedRole === "WADIR1";
-  const isFinance = fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE" || 
-                    userData?.nama?.toLowerCase().includes('finance');
-  const isDAAK = fixedRole === "ROL21" || fixedRole === "DAAK";
-  
-  
-  const isAdmin = (fixedRole === "ADMIN" || fixedRole === "ADMIN SIA" || 
-                  (fixedRole === "KARYAWAN" && !isFinance && !isWadir1 && !isProdi) ||
-                  isDAAK);
-
+  const isMahasiswa = roleId === "ROL23";
+  const isProdi = roleId === "ROL71";
+  const isWadir1 = roleId === "ROL999";
+  const isFinance = roleId === "ROL01";
+  const isAdmin = roleId === "ROL21";
 
   const dataFilterSort = [
     { Value: "tanggal_desc", Text: "Tanggal Pengajuan [↓]" },
@@ -203,17 +163,13 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     } else if (isFinance) {
       statusFilter = "Belum Disetujui Finance";
       // mhsId remains "%" for finance
-    } else if (isDAAK) {
-      statusFilter = "Menunggu Upload SK";
-      // mhsId remains "%" for DAAK
     } else if (isAdmin) {
-      // statusFilter remains empty for admin
-      // mhsId remains "%" for admin
-      // userId remains empty for admin
-    }
+      statusFilter = "Menunggu Upload SK";
+      // mhsId remains "%" for Admin
+    } 
 
     return { mhsId, statusFilter, userId };
-  }, [isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData]);
+  }, [isMahasiswa, isProdi, isWadir1, isFinance, isAdmin, userData]);
 
   // Helper function to filter data based on role
   const filterDataByRole = useCallback((actualData) => {
@@ -228,14 +184,14 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         return filterProdiData(item, currentStatus);
       }
       
-      if (isDAAK || isAdmin) {
+      if (isAdmin) {
         return filterAdminData(currentStatus);
       }
       
       // For Wadir1 and Finance
       return currentStatus !== "Disetujui";
     });
-  }, [isMahasiswa, isProdi, isDAAK, isAdmin, prodiKonsentrasi]);
+  }, [isMahasiswa, isProdi, isAdmin, prodiKonsentrasi]);
 
   // Helper function for Prodi data filtering
   const filterProdiData = useCallback((item, currentStatus) => {
@@ -285,12 +241,12 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       return determineFinanceActions(currentStatus);
     }
     
-    if (isDAAK || isAdmin) {
+    if (isAdmin) {
       return determineAdminActions(currentStatus);
     }
     
     return ["Detail"];
-  }, [isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin]);
+  }, [isMahasiswa, isProdi, isWadir1, isFinance, isAdmin]);
 
   // Helper function for Mahasiswa actions
   const determineMahasiswaActions = useCallback((item, currentStatus, isDraft) => {
@@ -397,7 +353,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     };
 
     // Add SK Cuti Akademik column ONLY for Admin role
-    if (isAdmin || isDAAK) {
+    if (isAdmin) {
       rowData["SK Cuti Akademik"] = formatSKCutiAkademikColumn(currentStatus);
       rowData.Aksi = actions;
       rowData.Alignment = new Array(11).fill("center");
@@ -407,15 +363,15 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
 
     return rowData;
-  }, [isAdmin, isDAAK, isMahasiswa]);
+  }, [isAdmin, isMahasiswa]);
 
   // Helper function to format SK Cuti Akademik column
   const formatSKCutiAkademikColumn = useCallback((currentStatus) => {
-    if (isAdmin || isDAAK) {
+    if (isAdmin) {
       return currentStatus === "Menunggu Upload SK" ? "DownloadSK" : "-";
     }
     return "-";
-  }, [isAdmin, isDAAK]);
+  }, [isAdmin]);
 
   // Helper function to determine Prodi approval status icon
   const getProdiIcon = useCallback((status, item) => {
@@ -566,8 +522,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         }
 
         // Map frontend role to backend role codes
-        let backendRole = fixedRole;
-        if (fixedRole === "ADMIN SIA" || fixedRole === "ADMIN") {
+        let backendRole = roleId;
+        if (roleId === "ROL21" || roleId === "ADMIN SIA" || roleId === "ADMIN") {
           backendRole = "ROL21";
         }
 
@@ -594,7 +550,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         setLoading(false);
       }
     },
-    [fixedRole, isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData, search, prodiKonsentrasi, getRoleBasedParams, buildMainDataParams, fetchMainData, extractArrayData, processMainData]
+    [roleId, isMahasiswa, isProdi, isWadir1, isFinance, isAdmin, userData, search, prodiKonsentrasi, getRoleBasedParams, buildMainDataParams, fetchMainData, extractArrayData, processMainData]
   );
 
   // Helper function to build riwayat API parameters
@@ -905,7 +861,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         setLoadingRiwayat(false);
       }
     },
-    [userData, searchRiwayat, sortBy, filterProdi, isProdi, isWadir1, isFinance, isDAAK, isAdmin, isMahasiswa, pageSize, buildRiwayatParams, fetchRiwayatData, extractArrayData, formatRiwayatItem, applySearchFilter, applyProdiFilter, applySorting]
+    [userData, searchRiwayat, sortBy, filterProdi, isProdi, isWadir1, isFinance, isAdmin, isMahasiswa, pageSize, buildRiwayatParams, fetchRiwayatData, extractArrayData, formatRiwayatItem, applySearchFilter, applyProdiFilter, applySorting]
   );
   
   // Helper function to validate user data for submission
@@ -1461,7 +1417,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       let role = "";
       
       // Determine role based on current user
-      if (isAdmin || isDAAK) {
+      if (isAdmin) {
         role = "ROL21"; // Admin Akademik
       } else if (isMahasiswa) {
         role = "ROL23"; // Mahasiswa
@@ -1551,12 +1507,12 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       loadData(1);
       
       // Load Riwayat data immediately for eligible roles
-      if (isWadir1 || isFinance || isDAAK || isAdmin) {
+      if (isWadir1 || isFinance || isAdmin) {
         setShowRiwayat(true);
         setTimeout(() => loadDataRiwayat(1), 50);
       }
     }
-  }, [ssoData, userData, loadData, loadDataRiwayat, isProdi, isWadir1, isFinance, isDAAK, isAdmin, router, prodiKonsentrasi, loadingProdiKonsentrasi]);
+  }, [ssoData, userData, loadData, loadDataRiwayat, isProdi, isWadir1, isFinance, isAdmin, router, prodiKonsentrasi, loadingProdiKonsentrasi]);
 
   // Helper function to get empty state message
   const getEmptyStateMessage = useCallback(() => {
