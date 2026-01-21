@@ -107,7 +107,7 @@ export default function DetailMeninggalDunia() {
 
   const handleBack = () => {
     // Navigate back to main page
-    router.push("/pages/administrasi-akademik/Meninggal-Dunia");
+    router.push("/pages/administrasi-akademik/meninggal-dunia");
   };
 
   // ============================

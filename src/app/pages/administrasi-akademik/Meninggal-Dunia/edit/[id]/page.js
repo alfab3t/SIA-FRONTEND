@@ -83,7 +83,7 @@ export default function EditMeninggalDunia() {
         
       } catch (error) {
         Toast.error(`Gagal memuat data: ${error.message}`);
-        router.push("/pages/administrasi-akademik/Meninggal-Dunia");
+        router.push("/pages/administrasi-akademik/meninggal-dunia");
       } finally {
         setLoading(false);
       }
@@ -182,7 +182,7 @@ export default function EditMeninggalDunia() {
       } catch {
         if (res.ok) {
           Toast.success("Data berhasil diperbarui.");
-          router.push("/pages/administrasi-akademik/Meninggal-Dunia");
+          router.push("/pages/administrasi-akademik/meninggal-dunia");
           return;
         } else {
           Toast.error("Server mengirim response tidak valid:\n\n" + raw);
@@ -192,7 +192,7 @@ export default function EditMeninggalDunia() {
 
       if (res.ok) {
         Toast.success(result?.message || "Data berhasil diperbarui.");
-        router.push("/pages/administrasi-akademik/Meninggal-Dunia");
+        router.push("/pages/administrasi-akademik/meninggal-dunia");
       } else {
         Toast.error(result?.message || "Gagal memperbarui data.");
       }
