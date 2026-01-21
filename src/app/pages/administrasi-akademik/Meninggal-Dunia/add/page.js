@@ -16,25 +16,22 @@ export default function AddMeninggalDunia() {
   const userData = useMemo(() => getUserData(), []);
 
   // Determine user role
-  const [permission, setPermission] = useState(null);
-  
   useEffect(() => {
     const loadPermission = async () => {
       try {
         const payload = {
           username: userData?.username || "",
-          appId: "SIA",
+          appId: "APP08",
           roleId: userData?.roleId || ""
         };
 
-        const res = await fetch(`${API_LINK}Auth/getpermission`, {
+        await fetch(`${API_LINK}Auth/getpermission`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
 
-        const data = await res.json();
-        setPermission(data);
+        // Permission loaded but not used for role determination
       } catch (err) {
         console.error("Error loading permission:", err);
       }
@@ -43,13 +40,9 @@ export default function AddMeninggalDunia() {
     if (userData?.username) loadPermission();
   }, [userData]);
 
-  let fixedRole = (userData?.role || "").toUpperCase();
-  if (permission?.roleName) {
-    fixedRole = permission.roleName.toUpperCase();
-  }
-  
-  const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI";
-  const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
+  const roleId = userData?.roleId || "";
+  const isProdi = roleId === "ROL71";
+  // Note: isMahasiswa removed as students don't have access to Meninggal Dunia
 
   const [mounted, setMounted] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -163,8 +156,10 @@ export default function AddMeninggalDunia() {
       }
     };
 
-    // Load students when konId is available for Prodi, or immediately for non-Prodi
-    if ((isProdi && konId) || (isProdi === false)) {
+    // Load students when conditions are met
+    const shouldLoadStudents = (isProdi && konId) || !isProdi;
+    
+    if (shouldLoadStudents) {
       loadStudents();
     }
   }, [isProdi, konId]);
@@ -249,31 +244,31 @@ export default function AddMeninggalDunia() {
     }
   };
 
-  // For mahasiswa users, auto-populate their data
-  useEffect(() => {
-    if (isMahasiswa && userData) {
-      const mhsId = userData?.mhsId || userData?.nama || userData?.username || "";
-      
-      // Auto-select the mahasiswa in the dropdown
-      setFormData(prev => ({
-        ...prev,
-        mhsId: mhsId
-      }));
+  // For mahasiswa users, auto-populate their data - REMOVED since students don't have access to Meninggal Dunia
+  // useEffect(() => {
+  //   if (isMahasiswa && userData) {
+  //     const mhsId = userData?.mhsId || userData?.nama || userData?.username || "";
+  //     
+  //     // Auto-select the mahasiswa in the dropdown
+  //     setFormData(prev => ({
+  //       ...prev,
+  //       mhsId: mhsId
+  //     }));
 
-      // Trigger the student change handler to populate prodi and angkatan
-      if (mhsId && studentList.length > 0) {
-        const selectedStudent = studentList.find(s => s.Value === mhsId);
-        if (selectedStudent) {
-          setFormData(prev => ({
-            ...prev,
-            mhsId: mhsId,
-            prodi: selectedStudent.Prodi || "",
-            tahunAngkatan: selectedStudent.Angkatan || ""
-          }));
-        }
-      }
-    }
-  }, [isMahasiswa, userData, studentList]);
+  //     // Trigger the student change handler to populate prodi and angkatan
+  //     if (mhsId && studentList.length > 0) {
+  //       const selectedStudent = studentList.find(s => s.Value === mhsId);
+  //       if (selectedStudent) {
+  //         setFormData(prev => ({
+  //           ...prev,
+  //           mhsId: mhsId,
+  //           prodi: selectedStudent.Prodi || "",
+  //           tahunAngkatan: selectedStudent.Angkatan || ""
+  //         }));
+  //       }
+  //     }
+  //   }
+  // }, [isMahasiswa, userData, studentList]);
 
   // -------------------------------------------
   // INPUT HANDLER
@@ -452,15 +447,12 @@ export default function AddMeninggalDunia() {
               value={formData.mhsId}
               onChange={handleStudentChange}
               isRequired={true}
-              isDisabled={loadingStudents || (isMahasiswa && formData.mhsId)}
+              isDisabled={loadingStudents}
               errorMessage={errors.mhsId}
               searchable={isProdi}
             />
             {loadingStudents && (
               <small className="text-muted">Memuat daftar mahasiswa...</small>
-            )}
-            {isMahasiswa && (
-              <small className="text-muted">Data mahasiswa otomatis dipilih berdasarkan login Anda.</small>
             )}
           </div>
         </div>

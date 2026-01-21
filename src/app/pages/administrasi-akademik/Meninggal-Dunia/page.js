@@ -17,47 +17,16 @@ import SweetAlert from "@/components/common/SweetAlert";
 
 // Helper function to determine user roles
 function useUserRoles(userData, permission) {
-    const fixedRole = useMemo(() => {
-        let role = (userData?.role || "").toUpperCase();
-        
-        if (permission?.roleName) {
-            role = permission.roleName.toUpperCase();
-        }
-        
-        if (userData?.nama?.toLowerCase()?.includes('prodi')) {
-            role = "NDA_PRODI";
-        }
-        
-        if (userData?.roleId) {
-            const roleMap = {
-                "ROL01": "ROL01", // Wadir1
-                "ROL08": "ROL08", // Finance
-                "ROL21": "ROL21", // DAAK
-                "ROL22": "ROL22", // Prodi
-                "ROL23": "ROL23", // Mahasiswa
-            };
-            role = roleMap[userData.roleId] || role;
-        }
-        
-        return role;
-    }, [userData, permission]);
-
     const roles = useMemo(() => {
-        const isMahasiswa = fixedRole === "ROL23" || fixedRole === "MAHASISWA";
-        const isProdi = fixedRole === "ROL22" || fixedRole === "PRODI" || fixedRole === "NDA-PRODI" || fixedRole === "NDA_PRODI" || 
-                        (fixedRole === "KARYAWAN" && userData?.nama?.toLowerCase()?.includes('prodi'));
+        const roleId = userData?.roleId || "";
+        const isProdi = roleId === "ROL71";
+        const isWadir1 = roleId === "ROL999";
+        const isFinance = roleId === "ROL01";
+        const isAdmin = roleId === "ROL21";
         
-        const isFinance = (userData?.nama?.toLowerCase()?.includes('finance')) ||
-                          fixedRole === "ROL08" || fixedRole === "FINANCE" || fixedRole === "USER-FINANCE" || fixedRole === "USER_FINANCE";
-        
-        const isWadir1 = !isFinance && (fixedRole === "ROL01" || fixedRole === "WADIR1");
-        const isDAAK = fixedRole === "ROL21" || fixedRole === "DAAK";
-        const isAdmin = (fixedRole === "ADMIN" || fixedRole === "ADMIN SIA" || 
-                        (fixedRole === "KARYAWAN" && !isFinance && !isWadir1 && !isProdi) ||
-                        isDAAK);
-
-        return { isMahasiswa, isProdi, isFinance, isWadir1, isDAAK, isAdmin, fixedRole };
-    }, [fixedRole, userData]);
+        // Note: isMahasiswa removed as students don't have access to Meninggal Dunia
+        return { isProdi, isFinance, isWadir1, isAdmin };
+    }, [userData, permission]);
 
     return roles;
 }
@@ -71,7 +40,7 @@ function usePermissions(userData) {
             try {
                 const payload = {
                     username: userData?.username || "",
-                    appId: "SIA",
+                    appId: "APP08",
                     roleId: userData?.roleId || ""
                 };
 
@@ -106,8 +75,15 @@ export default function Page_MeninggalDunia() {
     const userData = useMemo(() => getUserData(), []);
     const router = useRouter();
     
+    // Add hydration fix
+    const [isClient, setIsClient] = useState(false);
+    
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+    
     const permission = usePermissions(userData);
-    const { isMahasiswa, isProdi, isFinance, isWadir1, isDAAK, isAdmin, fixedRole } = useUserRoles(userData, permission);
+    const { isProdi, isFinance, isWadir1, isAdmin } = useUserRoles(userData, permission);
 
     // Helper function to load Prodi konsentrasi
     const useProdiKonsentrasi = (isProdi, userData) => {
@@ -163,36 +139,27 @@ export default function Page_MeninggalDunia() {
 
     // Helper function to build API parameters
     const buildApiParams = useCallback((roles, userData, search, page) => {
-        const { isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, fixedRole } = roles;
+        const { isProdi, isWadir1, isFinance, isAdmin } = roles;
         
         const params = new URLSearchParams();
         
-        if (isMahasiswa) {
-            const mhsId = userData?.mhsId || userData?.nama || userData?.username || userData?.userid || "";
-            if (!mhsId) return null;
-            params.append('mhsId', mhsId);
-        } else {
-            params.append('mhsId', '%');
-            
-            // Set status filter based on role
-            if (isWadir1) params.append('status', "Belum Disetujui Wadir 1");
-            else if (isFinance) params.append('status', "Belum Disetujui Finance");
-            else if (isDAAK) params.append('status', "Menunggu Upload SK");
-            
-            // Set userId for Prodi
-            if (isProdi) params.append('userId', userData?.username || "");
-        }
-
-        // Map frontend role to backend role codes
-        const roleMap = {
-            "ADMIN SIA": "ROL21",
-            "ADMIN": "ROL21"
-        };
+        // No isMahasiswa for Meninggal Dunia - students don't have access
+        params.append('mhsId', '%');
         
-        let backendRole = roleMap[fixedRole] || fixedRole;
-        if (isProdi) backendRole = "ROL22";
-        else if (isWadir1) backendRole = "ROL01";
-        else if (isFinance) backendRole = "ROL08";
+        // Set status filter based on role
+        if (isWadir1) params.append('status', "Belum Disetujui Wadir 1");
+        else if (isFinance) params.append('status', "Belum Disetujui Finance");
+        else if (isAdmin) params.append('status', "Menunggu Upload SK");
+        
+        // Set userId for Prodi
+        if (isProdi) params.append('userId', userData?.username || "");
+
+        // Map role to backend role codes
+        let backendRole = "";
+        if (isProdi) backendRole = "ROL71";
+        else if (isWadir1) backendRole = "ROL999";
+        else if (isFinance) backendRole = "ROL01";
+        else if (isAdmin) backendRole = "ROL21";
 
         if (backendRole) params.append('role', backendRole);
         if (search) params.append('search', search);
@@ -204,14 +171,13 @@ export default function Page_MeninggalDunia() {
 
     // Helper function to filter data by role
     const filterDataByRole = useCallback((data, roles, prodiKonsentrasi) => {
-        const { isMahasiswa, isProdi } = roles;
+        const { isProdi } = roles;
         
         return data.filter(item => {
             const currentStatus = item.status || item.mdu_status || "";
             
-            if (isMahasiswa) {
-                return currentStatus === "Draft";
-            } else if (isProdi) {
+            // No isMahasiswa filtering for Meninggal Dunia
+            if (isProdi) {
                 return filterProdiData(item, currentStatus, prodiKonsentrasi);
             } else {
                 return currentStatus !== "Disetujui";
@@ -232,47 +198,25 @@ export default function Page_MeninggalDunia() {
 
     // Helper function to determine actions for each item
     const determineItemActions = useCallback((item, roles, userData) => {
-        const { isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin } = roles;
+        const { isProdi, isWadir1, isFinance, isAdmin } = roles;
         const currentStatus = item.status || item.mdu_status || "";
-        const isDraft = item.status === "Draft" || item.id === "DRAFT" || !item.id?.includes("MDU");
         const hasUploadedSK = item.srt_no || item.suratNo || item.mdu_srt_no;
 
-        if (isMahasiswa) {
-            return determineMahasiswaActions(item, isDraft, userData);
-        } else if (isProdi) {
+        // No isMahasiswa actions for Meninggal Dunia
+        if (isProdi) {
             return determineProdiActions(currentStatus);
         } else if (isWadir1) {
             return determineWadir1Actions(currentStatus);
         } else if (isFinance) {
             return determineFinanceActions(currentStatus);
-        } else if (isDAAK || isAdmin) {
+        } else if (isAdmin) {
             return determineAdminActions(currentStatus, hasUploadedSK);
         }
 
         return ["Detail"];
     }, []);
 
-    // Helper function to check if created by Prodi
-    const isCreatedByProdi = useCallback((item, userData) => {
-        const createdByProdi = item.mdu_created_by && 
-            (item.mdu_created_by.toLowerCase().includes('prodi') ||
-             item.mdu_created_by === userData?.username ||
-             item.mdu_created_by === userData?.nama);
-        
-        const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedMeninggalApps') || '[]');
-        const isProdiCreatedFromSession = prodiCreatedApps.includes(item.mdu_id || item.id);
-        
-        return createdByProdi || isProdiCreatedFromSession;
-    }, []);
-
     // Helper functions for role-specific actions
-    const determineMahasiswaActions = useCallback((item, isDraft, userData) => {
-        if (isDraft && !isCreatedByProdi(item, userData)) {
-            return ["Detail", "Edit", "Delete", "Ajukan"];
-        }
-        return ["Detail"];
-    }, [isCreatedByProdi]);
-
     const determineProdiActions = useCallback((currentStatus) => {
         if (currentStatus === "Draft") {
             return ["Detail", "Edit", "Delete", "Ajukan"];
@@ -319,7 +263,7 @@ export default function Page_MeninggalDunia() {
             try {
                 setLoadingPengajuan(true);
 
-                const roles = { isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, fixedRole };
+                const roles = { isProdi, isWadir1, isFinance, isAdmin };
                 const params = buildApiParams(roles, userData, "", page);
                 
                 if (!params) {
@@ -379,7 +323,7 @@ export default function Page_MeninggalDunia() {
                 setLoadingPengajuan(false);
             }
         },
-        [fixedRole, isMahasiswa, isProdi, isWadir1, isFinance, isDAAK, isAdmin, userData, prodiKonsentrasi, buildApiParams, filterDataByRole, pengajuanPageSize]
+        [isProdi, isWadir1, isFinance, isAdmin, userData, prodiKonsentrasi, buildApiParams, filterDataByRole, pengajuanPageSize]
     );
 
     // Helper function to extract array from API response
@@ -416,7 +360,7 @@ export default function Page_MeninggalDunia() {
 
     // Helper function to format table row
     const formatTableRow = useCallback((item, index, startIndex, roles, userData) => {
-        const { isAdmin, isDAAK } = roles;
+        const { isAdmin } = roles;
         const currentStatus = item.status || item.mdu_status || "";
         const actions = determineItemActions(item, roles, userData);
 
@@ -432,7 +376,7 @@ export default function Page_MeninggalDunia() {
         };
 
         // Add SK column for Admin role
-        if (isAdmin || isDAAK) {
+        if (isAdmin) {
             const skColumn = currentStatus === "Menunggu Upload SK" ? "DownloadSK" : "-";
             tableData["SK Meninggal Dunia"] = skColumn;
             tableData.Aksi = actions;
@@ -769,7 +713,6 @@ export default function Page_MeninggalDunia() {
             text: "Setelah diajukan, data tidak dapat diedit kembali. Ajukan sekarang?",
             icon: "warning",
             confirmText: "Ya, Ajukan!",
-            confirmButtonColor: "#1e88e5",
         });
 
         if (!confirm) return;
@@ -858,7 +801,6 @@ export default function Page_MeninggalDunia() {
             text: "Yakin ingin menghapus pengajuan ini?",
             icon: "warning",
             confirmText: "Ya, Hapus!",
-            confirmButtonColor: "#d33",
         });
 
         if (!confirm) return;
@@ -894,11 +836,8 @@ export default function Page_MeninggalDunia() {
         const confirm = await SweetAlert({
             title: "Setujui Pengajuan Meninggal Dunia",
             text: "Yakin ingin menyetujui pengajuan meninggal dunia ini?",
-            icon: "question",
-            showCancelButton: true,
+            icon: "warning",
             confirmText: "Ya, Setujui!",
-            cancelText: "Batal",
-            confirmButtonColor: "#28a745",
         });
 
         if (!confirm) return;
@@ -954,10 +893,7 @@ export default function Page_MeninggalDunia() {
             title: "Tolak Pengajuan Meninggal Dunia",
             text: "Yakin ingin menolak pengajuan meninggal dunia ini?",
             icon: "warning",
-            showCancelButton: true,
             confirmText: "Ya, Tolak!",
-            cancelText: "Batal",
-            confirmButtonColor: "#dc3545",
         });
 
         if (!confirm) return;
@@ -1103,10 +1039,10 @@ export default function Page_MeninggalDunia() {
 
         loadPengajuan(1);
         
-        if (isProdi || isWadir1 || isFinance || isDAAK || isAdmin) {
+        if (isProdi || isWadir1 || isFinance || isAdmin) {
             loadRiwayat(1);
         }
-    }, [ssoData, userData, loadPengajuan, loadRiwayat, isProdi, isWadir1, isFinance, isDAAK, isAdmin, router, prodiKonsentrasi, loadingProdiKonsentrasi]);
+    }, [ssoData, userData, loadPengajuan, loadRiwayat, isProdi, isWadir1, isFinance, isAdmin, router, prodiKonsentrasi, loadingProdiKonsentrasi]);
 
     return (
         <MainContent
@@ -1126,10 +1062,10 @@ export default function Page_MeninggalDunia() {
                     <h5>Daftar Pengajuan Meninggal Dunia</h5>
                     
                     <div className="d-flex justify-content-between align-items-center mb-3">
-                        {(isMahasiswa || isProdi) && (
+                        {isClient && isProdi && (
                             <Button
                                 classType="primary"
-                                label={isProdi ? "+ Tambah" : "Ajukan Meninggal Dunia"}
+                                label="+ Tambah"
                                 onClick={handleAdd}
                             />
                         )}
@@ -1180,10 +1116,8 @@ export default function Page_MeninggalDunia() {
                                     <h5 className="text-muted">Tidak ada data pengajuan</h5>
                                     <p className="text-muted">
                                         {(() => {
-                                            if (isMahasiswa) {
-                                                return "Anda belum memiliki pengajuan meninggal dunia. Klik tombol 'Ajukan Meninggal Dunia' untuk membuat pengajuan baru.";
-                                            } else if (isProdi) {
-                                                return "Tidak ada pengajuan meninggal dunia. Anda dapat membuat pengajuan untuk mahasiswa dengan klik tombol 'Ajukan Meninggal Dunia untuk Mahasiswa'.";
+                                            if (isProdi) {
+                                                return "Tidak ada pengajuan meninggal dunia. Anda dapat membuat pengajuan untuk mahasiswa dengan klik tombol '+ Tambah'.";
                                             } else {
                                                 return "Tidak ada pengajuan meninggal dunia yang perlu ditinjau saat ini.";
                                             }
@@ -1197,7 +1131,7 @@ export default function Page_MeninggalDunia() {
             )}
 
             {/* ======================== TABEL RIWAYAT =========================== */}
-            {(isProdi || isWadir1 || isFinance || isDAAK || isAdmin) && (
+            {(isProdi || isWadir1 || isFinance || isAdmin) && (
                 <div className="mt-5">
                     <h5>Daftar Riwayat Meninggal Dunia</h5>
                     

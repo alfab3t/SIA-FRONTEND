@@ -949,7 +949,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       text: "Setelah diajukan, data tidak dapat diedit kembali. Ajukan sekarang?",
       icon: "warning",
       confirmText: "Ya, Ajukan!",
-      confirmButtonColor: "#1e88e5",
     });
 
     if (!confirm) return;
@@ -1042,7 +1041,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       text: "Yakin ingin menghapus pengajuan ini?",
       icon: "warning",
       confirmText: "Ya, Hapus!",
-      confirmButtonColor: "#d33",
     });
 
     if (!confirm) return;
@@ -1081,10 +1079,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       title: "Setujui Pengajuan Cuti Akademik",
       text: "Yakin ingin menyetujui pengajuan cuti akademik ini?",
       icon: "warning",
-      showCancelButton: true,
       confirmText: "Ya, Setujui!",
-      cancelText: "Batal",
-      confirmButtonColor: "#28a745",
     });
 
     if (!confirm) return;
@@ -1234,10 +1229,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       title: "Tolak Pengajuan Cuti Akademik",
       text: "Yakin ingin menolak pengajuan cuti akademik ini?",
       icon: "warning",
-      showCancelButton: true,
       confirmText: "Ya, Tolak!",
-      cancelText: "Batal",
-      confirmButtonColor: "#dc3545",
     });
 
     if (!confirm) return;
