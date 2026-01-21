@@ -100,14 +100,19 @@ export default function AddCutiAkademik() {
       if (response.ok) {
         const data = await response.json();
         
-        const mappedStudents = data.map(item => {
+        const mappedStudents = data.map((item, index) => {
           return {
-            Value: item.mhsId,
-            Text: item.mhsNama
+            Value: item.mhsId || `student-${index}`,
+            Text: item.mhsNama || `Mahasiswa ${index + 1}`
           };
         });
         
-        setStudentList(mappedStudents);
+        // Remove duplicates based on Value
+        const uniqueStudents = mappedStudents.filter((student, index, self) => 
+          index === self.findIndex(s => s.Value === student.Value)
+        );
+        
+        setStudentList(uniqueStudents);
       } else {
         Toast.error("Gagal memuat daftar mahasiswa.");
         setStudentList([]);
@@ -140,20 +145,25 @@ export default function AddCutiAkademik() {
         if (response.ok) {
           const data = await response.json();
           
-          const mappedProdi = data.map(item => ({
-            Value: item.konId,
-            Text: item.nama
+          const mappedProdi = data.map((item, index) => ({
+            Value: item.id || item.konId || `prodi-${index}`,
+            Text: item.nama || `Program Studi ${index + 1}`
           }));
           
-          setProdiList(mappedProdi);
+          // Remove duplicates based on Value
+          const uniqueProdi = mappedProdi.filter((prodi, index, self) => 
+            index === self.findIndex(p => p.Value === prodi.Value)
+          );
           
-          if (mappedProdi.length === 1) {
+          setProdiList(uniqueProdi);
+          
+          if (uniqueProdi.length === 1) {
             setFormData(prev => ({
               ...prev,
-              konId: mappedProdi[0].Value
+              konId: uniqueProdi[0].Value
             }));
             
-            loadStudentsForKonId(mappedProdi[0].Value);
+            loadStudentsForKonId(uniqueProdi[0].Value);
           }
         } else {
           Toast.error("Gagal memuat daftar program studi.");
