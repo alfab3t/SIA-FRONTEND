@@ -25,15 +25,12 @@ export default function EditCutiAkademikPage() {
   const params = useParams();
   const userData = useMemo(() => getUserData(), []);
 
-  // Determine user role
   const roleId = userData?.roleId || "";
   
   const isProdi = roleId === "ROL71";
   const isMahasiswa = roleId === "ROL23";
 
-  // ============================
-  // REAL ID (cak_id)
-  // ============================
+  
   const realId = useMemo(() => {
     try {
       return decryptIdUrl(params?.id || "");
@@ -51,26 +48,22 @@ export default function EditCutiAkademikPage() {
   const semesterRef = useRef();
 
   const [formData, setFormData] = useState({
-    // Common fields
     tahunAjaran: "",
     semester: "",
     suratPernyataan: null,
     lampiran: null,
     oldSurat: "",
     oldLampiran: "",
-    // Prodi-specific fields
     konId: "",
     mhsId: "",
     angkatan: "",
     menimbang: "",
-    tahunAjaranOptions: [], // Dynamic options based on student's angkatan
+    tahunAjaranOptions: [], 
   });
 
   const [errors, setErrors] = useState({});
 
-  // Load prodi list for prodi users based on their username
   useEffect(() => {
-    // Use userData.nama as username since that's where the username is stored
     const username = userData?.username || userData?.nama;
     
     if (!isProdi || !username) {
@@ -106,15 +99,13 @@ export default function EditCutiAkademikPage() {
     loadProdi();
   }, [isProdi, userData?.username, userData?.nama]);
 
-  // ============================
-  // HANDLE INPUT
-  // ============================
+  
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     
     if (files?.[0]) {
       const file = files[0];
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      const maxSize = 10 * 1024 * 1024; 
       const allowedTypes = [
         'application/pdf',
         'application/msword',
@@ -124,17 +115,17 @@ export default function EditCutiAkademikPage() {
         'image/png'
       ];
       
-      // Validate file size
+      
       if (file.size > maxSize) {
         Toast.error(`File ${file.name} terlalu besar. Maksimal 10MB.`);
-        e.target.value = ''; // Clear the input
+        e.target.value = ''; 
         return;
       }
       
-      // Validate file type
+      
       if (!allowedTypes.includes(file.type)) {
-        Toast.error(`Format file ${file.name} tidak didukung. Gunakan PDF, DOC, DOCX, JPG, atau PNG.`);
-        e.target.value = ''; // Clear the input
+        Toast.error(`Format file ${file.name} tidak didukung. Gunakan PDF, JPG, atau PNG.`);
+        e.target.value = ''; 
         return;
       }
       
@@ -149,7 +140,7 @@ export default function EditCutiAkademikPage() {
       }));
     }
     
-    // Clear error when user types/selects
+    
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
     }
@@ -162,13 +153,13 @@ export default function EditCutiAkademikPage() {
       [name]: value
     }));
     
-    // Clear error when user types
+    
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
     }
   }, [errors]);
 
-  // Helper function to fetch and parse API data
+  
   const fetchDetailData = async (realId) => {
     const url = `${API_LINK}CutiAkademik/detail?id=${encodeURIComponent(realId)}`;
     const res = await fetch(url);
@@ -184,7 +175,7 @@ export default function EditCutiAkademikPage() {
     return data?.id ? data : null;
   };
 
-  // Helper function to update form data with API response
+  
   const updateFormDataFromApi = (data) => {
     setFormData(prev => ({
       ...prev,
@@ -194,13 +185,11 @@ export default function EditCutiAkademikPage() {
       oldLampiran: data.lampiran || "",
       suratPernyataan: null,
       lampiran: null,
-      // Prodi-specific fields
       mhsId: data.mhsId || "",
       menimbang: data.menimbang || "",
     }));
   };
 
-  // Helper function to fetch user's konsentrasi list
   const fetchUserKonsentrasiList = async (username) => {
     const konsentrasiResponse = await fetch(`${API_LINK}Mahasiswa/GetKonsentrasiList?username=${username}`);
     if (!konsentrasiResponse.ok) {
@@ -209,7 +198,6 @@ export default function EditCutiAkademikPage() {
     return await konsentrasiResponse.json();
   };
 
-  // Helper function to fetch students for a konsentrasi
   const fetchStudentsForKonsentrasi = async (konsentrasiId) => {
     const studentsResponse = await fetch(`${API_LINK}Mahasiswa/GetByKonsentrasi?konId=${konsentrasiId}`);
     if (!studentsResponse.ok) {
@@ -218,7 +206,6 @@ export default function EditCutiAkademikPage() {
     return await studentsResponse.json();
   };
 
-  // Helper function to filter active students
   const filterActiveStudents = (students) => {
     return students.filter(item => {
       const status = (item.mhsStatusKuliah || 
@@ -241,7 +228,6 @@ export default function EditCutiAkademikPage() {
     });
   };
 
-  // Helper function to fetch student detail and generate tahun akademik options
   const fetchStudentDetailAndGenerateOptions = async (mhsId) => {
     try {
       const detailResponse = await fetch(`${API_LINK}Mahasiswa/GetDetail?mhsId=${mhsId}`);
@@ -256,7 +242,6 @@ export default function EditCutiAkademikPage() {
         return null;
       }
       
-      // Generate tahun akademik options based on angkatan
       const tahunSekarang = new Date().getFullYear() - 1;
       const tahunAjaranOptions = [];
       
@@ -276,7 +261,6 @@ export default function EditCutiAkademikPage() {
     }
   };
 
-  // Helper function to find student's konsentrasi
   const findStudentKonsentrasi = async (mhsId, konsentrasiList, username) => {
     for (const konsentrasi of konsentrasiList) {
       const students = await fetchStudentsForKonsentrasi(konsentrasi.id);
@@ -294,7 +278,6 @@ export default function EditCutiAkademikPage() {
             tahunAjaranOptions: studentDetail.tahunAjaranOptions
           }));
         } else {
-          // Fallback if GetDetail fails
           setFormData(prev => ({
             ...prev,
             konId: konsentrasi.id,
@@ -302,7 +285,6 @@ export default function EditCutiAkademikPage() {
           }));
         }
         
-        // Load students for this konsentrasi
         setStudentList(activeStudents.map(item => ({
           Value: item.mhsId,
           Text: item.mhsNama
@@ -314,7 +296,6 @@ export default function EditCutiAkademikPage() {
     return false;
   };
 
-  // Helper function to handle prodi-specific data loading
   const handleProdiDataLoading = async (data) => {
     if (!data.mhsId || !isProdi) {
       return;
@@ -331,13 +312,10 @@ export default function EditCutiAkademikPage() {
       
       await findStudentKonsentrasi(data.mhsId, konsentrasiData, username);
     } catch {
-      // Could not determine student's konsentrasi
+      
     }
   };
 
-  // ============================
-  // LOAD DETAIL DARI API (FALLBACK)
-  // ============================
   const loadDetailFromApi = useCallback(async () => {
     try {
       if (!realId) return;
@@ -353,7 +331,6 @@ export default function EditCutiAkademikPage() {
     }
   }, [realId, isProdi, userData]);
 
-  // Load mahasiswa data using GetDetail for mahasiswa users in edit mode
   useEffect(() => {
     if (!isMahasiswa || !userData || !realId) return;
     
@@ -374,8 +351,7 @@ export default function EditCutiAkademikPage() {
         
         if (response.ok) {
           const data = await response.json();
-          
-          // Auto-populate angkatan for mahasiswa (internal use for tahun akademik generation)
+
           setFormData(prev => {
             const newFormData = {
               ...prev,
@@ -388,17 +364,16 @@ export default function EditCutiAkademikPage() {
           // Error response from API
         }
       } catch {
-        // Error loading mahasiswa data for edit
+        
       }
     };
 
     loadMahasiswaDataForEdit();
   }, [isMahasiswa, userData, realId]);
 
-  // Generate tahun akademik based on angkatan
+  
   const generateTahunAkademik = (angkatan) => {
     if (!angkatan) {
-      // Default years if no angkatan
       const currentYear = new Date().getFullYear();
       return [
         { Value: `${currentYear-1}/${currentYear}`, Text: `${currentYear-1}/${currentYear}` },
@@ -411,7 +386,6 @@ export default function EditCutiAkademikPage() {
     const angkatanInt = Number.parseInt(angkatan, 10);
     const tahunAkademikList = [];
 
-    // Logic: for (int i = tahunSekarang; i <= angkatan + 3; i++) - matching old code
     for (let i = tahunSekarang; i <= angkatanInt + 3; i++) {
       const tahunAkademik = `${i}/${i + 1}`;
       tahunAkademikList.push({
@@ -423,22 +397,18 @@ export default function EditCutiAkademikPage() {
     return tahunAkademikList;
   };
 
-  // State for dynamic tahun akademik data
   const [tahunAjaranData, setTahunAjaranData] = useState([]);
 
-  // Update tahun akademik when angkatan changes
   useEffect(() => {
     if ((isProdi || isMahasiswa) && formData.angkatan) {
       const newTahunAkademikData = generateTahunAkademik(formData.angkatan);
       setTahunAjaranData(newTahunAkademikData);
     } else if (!isProdi && !isMahasiswa) {
-      // For other users, use default years
       const defaultTahunAkademik = generateTahunAkademik(null);
       setTahunAjaranData(defaultTahunAkademik);
     }
   }, [formData.angkatan, isProdi, isMahasiswa]);
 
-  // Initialize tahun akademik data on component mount for non-prodi and non-mahasiswa users
   useEffect(() => {
     if (!isProdi && !isMahasiswa) {
       const defaultTahunAkademik = generateTahunAkademik(null);
@@ -446,9 +416,6 @@ export default function EditCutiAkademikPage() {
     }
   }, [isProdi, isMahasiswa]);
 
-  // ============================
-  // INIT LOAD (SESSION FIRST)
-  // ============================
   useEffect(() => {
     if (!realId) {
       Toast.error("ID tidak valid.");
@@ -469,7 +436,6 @@ export default function EditCutiAkademikPage() {
         oldLampiran: data.lampiran || "",
         suratPernyataan: null,
         lampiran: null,
-        // Prodi-specific fields
         mhsId: data.mhsId || "",
         menimbang: data.menimbang || "",
       }));
@@ -480,14 +446,10 @@ export default function EditCutiAkademikPage() {
     }
   }, [realId, loadDetailFromApi, router]);
 
-  // ============================
-  // VALIDATION
-  // ============================
   const validate = () => {
     const newErrors = {};
     
     if (isProdi) {
-      // Prodi validation
       if (!formData.konId) newErrors.konId = "Program studi harus dipilih.";
       if (!formData.mhsId) newErrors.mhsId = "Mahasiswa harus dipilih.";
       if (!formData.menimbang || formData.menimbang.trim() === "" || formData.menimbang === "<p></p>") {
@@ -495,7 +457,6 @@ export default function EditCutiAkademikPage() {
       }
     }
     
-    // Common validation
     if (!formData.tahunAjaran) newErrors.tahunAjaran = "Tahun akademik wajib diisi.";
     if (!formData.semester) newErrors.semester = "Semester wajib diisi.";
     
@@ -509,9 +470,6 @@ export default function EditCutiAkademikPage() {
     return true;
   };
 
-  // ============================
-  // SUBMIT UPDATE
-  // ============================
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (saving) return;
@@ -525,7 +483,6 @@ export default function EditCutiAkademikPage() {
       fd.append("TahunAjaran", formData.tahunAjaran);
       fd.append("Semester", formData.semester);
 
-      // Handle file uploads properly
       if (formData.suratPernyataan && formData.suratPernyataan instanceof File) {
         fd.append("LampiranSuratPengajuan", formData.suratPernyataan, formData.suratPernyataan.name);
       }
@@ -535,7 +492,6 @@ export default function EditCutiAkademikPage() {
       }
 
       if (isProdi) {
-        // Prodi-specific fields
         fd.append("MhsId", formData.mhsId);
         fd.append("Menimbang", formData.menimbang);
       }
@@ -579,14 +535,12 @@ export default function EditCutiAkademikPage() {
 
   const handleCancel = () => router.back();
 
-  // Helper function to get page title
   const getPageTitle = () => {
     if (isProdi) return "Edit Pengajuan Cuti Akademik (Prodi)";
     if (isMahasiswa) return "Edit Pengajuan Cuti Akademik (Mahasiswa)";
     return "Edit Pengajuan Cuti Akademik";
   };
 
-  // Helper function to get breadcrumb label
   const getBreadcrumbLabel = () => {
     if (isProdi) return "Edit Pengajuan (Prodi)";
     if (isMahasiswa) return "Edit Pengajuan (Mahasiswa)";
@@ -598,9 +552,7 @@ export default function EditCutiAkademikPage() {
     { Value: "Genap", Text: "Genap" },
   ];
 
-  // ============================
-  // VIEW
-  // ============================
+
   return (
     <MainContent
       layout="Admin"

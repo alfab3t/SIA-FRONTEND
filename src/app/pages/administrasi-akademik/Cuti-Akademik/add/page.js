@@ -18,7 +18,6 @@ const Editor = dynamic(() => import("@/components/common/Editor"), {
   ),
 });
 
-// Helper functions to reduce nesting
 const validateFileSize = (file, maxSize = 10 * 1024 * 1024) => {
   if (file.size > maxSize) {
     Toast.error(`File ${file.name} terlalu besar. Maksimal 10MB.`);
@@ -38,7 +37,7 @@ const validateFileType = (file) => {
   ];
   
   if (!allowedTypes.includes(file.type)) {
-    Toast.error(`Format file ${file.name} tidak didukung. Gunakan PDF, DOC, DOCX, JPG, atau PNG.`);
+    Toast.error(`Format file ${file.name} tidak didukung. Gunakan PDF, JPG, atau PNG.`);
     return false;
   }
   return true;
@@ -128,14 +127,12 @@ export default function AddCutiAkademik() {
   const [bebasTanggunganStatus, setBebasTanggunganStatus] = useState(null);
   const [existingCutiData, setExistingCutiData] = useState([]);
 
-  // Helper function to extract array data from API response
   const extractArrayFromResponse = useCallback((data) => {
     if (Array.isArray(data)) {
       return data;
     }
     
     if (data && typeof data === 'object') {
-      // Check common array properties
       const arrayProperties = ['data', 'items', 'result'];
       for (const prop of arrayProperties) {
         if (data[prop] && Array.isArray(data[prop])) {
@@ -143,7 +140,6 @@ export default function AddCutiAkademik() {
         }
       }
       
-      // Find first array property
       const firstArrayProp = Object.keys(data).find(key => Array.isArray(data[key]));
       return firstArrayProp ? data[firstArrayProp] : [];
     }
@@ -151,7 +147,6 @@ export default function AddCutiAkademik() {
     return [];
   }, []);
 
-  // Helper function to filter valid cuti data
   const filterValidCutiData = useCallback((data) => {
     return data.filter(item => {
       const status = item.status || item.cak_status || "";
@@ -159,7 +154,6 @@ export default function AddCutiAkademik() {
     });
   }, []);
 
-  // Function to fetch existing cuti akademik data
   const fetchCutiData = useCallback(async (mhsId) => {
     const params = new URLSearchParams({
       mhsId: mhsId,
@@ -182,7 +176,6 @@ export default function AddCutiAkademik() {
     return response.json();
   }, []);
 
-  // Main function to check existing cuti akademik data
   const checkExistingCutiData = useCallback(async (mhsId) => {
     if (!mhsId) {
       setExistingCutiData([]);
@@ -200,7 +193,6 @@ export default function AddCutiAkademik() {
     }
   }, [fetchCutiData, extractArrayFromResponse, filterValidCutiData]);
 
-  // Function to check if tahun akademik is already used
   const isTahunAkademikUsed = useCallback((tahunAkademik) => {
     return existingCutiData.some(item => {
       const existingTahun = item.tahunAjaran || item.cak_tahun_ajaran || "";
@@ -208,7 +200,6 @@ export default function AddCutiAkademik() {
     });
   }, [existingCutiData]);
 
-  // Function to filter available tahun akademik options
   const getAvailableTahunAkademik = useCallback((allOptions) => {
     return allOptions.filter(option => !isTahunAkademikUsed(option.Value));
   }, [isTahunAkademikUsed]);           
@@ -326,15 +317,12 @@ export default function AddCutiAkademik() {
     loadMahasiswaData();
   }, [isMahasiswa, userData]);
 
-  // Check existing cuti data when student is selected
   useEffect(() => {
     let targetMhsId = "";
     
     if (isMahasiswa) {
-      // For mahasiswa, use their own ID
       targetMhsId = userData?.mhsId || userData?.nama || userData?.userid || userData?.username || "";
     } else if (isProdi && formData.mhsId) {
-      // For prodi, use selected student ID
       targetMhsId = formData.mhsId;
     }
     
@@ -588,7 +576,6 @@ export default function AddCutiAkademik() {
       const availableTahunAkademikData = getAvailableTahunAkademik(allTahunAkademikData);
       setTahunAjaranData(availableTahunAkademikData);
       
-      // Reset tahun ajaran if current selection is no longer available
       if (formData.tahunAjaran && !availableTahunAkademikData.some(item => item.Value === formData.tahunAjaran)) {
         setFormData(prev => ({
           ...prev,

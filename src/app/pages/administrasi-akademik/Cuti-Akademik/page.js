@@ -152,32 +152,30 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       if (!mhsId) {
         return null;
       }
-      // statusFilter remains empty for mahasiswa
+
     } else if (isProdi) {
-      // statusFilter remains empty for prodi
       userId = userData?.username || "";
-      // mhsId remains "%" for prodi
+      
     } else if (isWadir1) {
       statusFilter = "Belum Disetujui Wadir 1";
-      // mhsId remains "%" for wadir1
+      
     } else if (isFinance) {
       statusFilter = "Belum Disetujui Finance";
-      // mhsId remains "%" for finance
+      
     } else if (isAdmin) {
       statusFilter = "Menunggu Upload SK";
-      // mhsId remains "%" for Admin
+      
     } 
 
     return { mhsId, statusFilter, userId };
   }, [isMahasiswa, isProdi, isWadir1, isFinance, isAdmin, userData]);
 
-  // Helper function to filter data based on role
+
   const filterDataByRole = useCallback((actualData) => {
     return actualData.filter(item => {
       const currentStatus = item.status || item.cak_status || "";
       
       if (isMahasiswa) {
-        // Tampilkan semua status untuk mahasiswa
         return true;
       }
       
@@ -188,13 +186,10 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       if (isAdmin) {
         return filterAdminData(currentStatus);
       }
-      
-      // For Wadir1 and Finance
       return currentStatus !== "Disetujui";
     });
   }, [isMahasiswa, isProdi, isAdmin, prodiKonsentrasi]);
 
-  // Helper function for Prodi data filtering
   const filterProdiData = useCallback((item, currentStatus) => {
     const itemProdi = item.prodi || item.kon_nama || item.konsentrasi || "";
     const normalizeProdiName = (name) => {
@@ -217,14 +212,12 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return currentStatus === "Belum Disetujui Prodi" || currentStatus === "Belum Disetujui Wadir 1";
   }, [prodiKonsentrasi]);
 
-  // Helper function for Admin data filtering
   const filterAdminData = useCallback((currentStatus) => {
     return currentStatus === "Belum Disetujui Prodi" ||
            currentStatus === "Belum Disetujui Wadir 1" ||
            currentStatus === "Menunggu Upload SK";
   }, []);
 
-  // Helper function to determine actions for each role
   const determineActions = useCallback((item, currentStatus, isDraft) => {
     if (isMahasiswa) {
       return determineMahasiswaActions(item, currentStatus, isDraft);
@@ -249,7 +242,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return ["Detail"];
   }, [isMahasiswa, isProdi, isWadir1, isFinance, isAdmin]);
 
-  // Helper function for Mahasiswa actions
   const determineMahasiswaActions = useCallback((item, currentStatus, isDraft) => {
     const approveProdiValue = item.approveProdi || item.cak_approve_prodi || "";
     
@@ -268,7 +260,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return ["Detail"];
   }, []);
 
-  // Helper function for Prodi actions
   const determineProdiActions = useCallback((currentStatus) => {
     if (currentStatus === "Draft") {
       return ["Detail", "Edit", "Delete", "Ajukan"];
@@ -281,7 +272,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return ["Detail"];
   }, []);
 
-  // Helper function for Wadir1 actions
   const determineWadir1Actions = useCallback((currentStatus) => {
     if (currentStatus === "Belum Disetujui Wadir 1") {
       return ["Detail", "Approve", "Reject"];
@@ -289,7 +279,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return ["Detail"];
   }, []);
 
-  // Helper function for Finance actions
   const determineFinanceActions = useCallback((currentStatus) => {
     if (currentStatus === "Belum Disetujui Finance") {
       return ["Detail", "Approve", "Reject"];
@@ -297,7 +286,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return ["Detail"];
   }, []);
 
-  // Helper function for Admin actions
   const determineAdminActions = useCallback((currentStatus) => {
     const isAllApprovalsComplete = currentStatus && 
       !currentStatus.includes("Belum Disetujui Prodi") && 
@@ -313,20 +301,16 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return isReadyForSK ? ["Detail", "UploadSK"] : ["Detail"];
   }, []);
 
-  // Helper function to format table row
   const formatTableRow = useCallback((item, index, startIndex, currentStatus, actions) => {
     const isDraft = item.status === "Draft" || item.id === "DRAFT" || !item.id?.includes("PMA");
     const noSK = item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no || "";
     
-    // Extract nama mahasiswa and prodi from backend data
     let namaMahasiswa = item.NamaMahasiswa || item.namaMahasiswa || item.mhs_nama || item.nama_mahasiswa || "";
     let prodi = item.Prodi || item.prodi || item.kon_nama || item.kon_singkatan || "";
     
-    // Set defaults if empty
     if (!namaMahasiswa || namaMahasiswa === "") namaMahasiswa = "-";
     if (!prodi || prodi === "") prodi = "-";
 
-    // Determine No Pengajuan display
     const approveProdiValue = item.approveProdi || item.cak_approve_prodi || "";
     const isCreatedByProdi = approveProdiValue && approveProdiValue !== "";
     
@@ -339,7 +323,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       noPengajuan = item.id || item.idDisplay || item.cak_id || "-";
     }
 
-    // Base row data
     const rowData = {
       No: startIndex + index + 1, 
       id: item.cak_id || item.id || item.idDisplay, 
@@ -353,7 +336,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       Status: currentStatus || "-",
     };
 
-    // Add SK Cuti Akademik column ONLY for Admin role
     if (isAdmin) {
       rowData["SK Cuti Akademik"] = formatSKCutiAkademikColumn(currentStatus);
       rowData.Aksi = actions;
@@ -366,7 +348,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return rowData;
   }, [isAdmin, isMahasiswa]);
 
-  // Helper function to format SK Cuti Akademik column
   const formatSKCutiAkademikColumn = useCallback((currentStatus) => {
     if (isAdmin) {
       return currentStatus === "Menunggu Upload SK" ? "DownloadSK" : "-";
@@ -374,7 +355,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return "-";
   }, [isAdmin]);
 
-  // Helper function to determine Prodi approval status icon
   const getProdiIcon = useCallback((status, item) => {
     if (!status) return "⏳";
     
@@ -396,7 +376,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
   }, []);
 
-  // Helper function to determine Wadir 1 approval status icon
   const getWadir1Icon = useCallback((status) => {
     if (!status) return "⏳";
     
@@ -436,7 +415,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return params;
   }, [isMahasiswa, search]);
 
-  // Helper function to fetch main data from API
   const fetchMainData = useCallback(async (params) => {
     const url = `${API_LINK}CutiAkademik?${params}`;
 
@@ -466,7 +444,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return data;
   }, []);
 
-  // Helper function to process and format main data
   const processMainData = useCallback((actualData, page) => {
     const pendingData = filterDataByRole(actualData);
     const totalPendingItems = pendingData.length;
@@ -485,7 +462,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return { formattedData, totalPendingItems };
   }, [filterDataByRole, determineActions, formatTableRow, pageSize]);
 
-  // Helper function to extract array data from response
   const extractArrayData = useCallback((data) => {
     let actualData = data;
     if (data && typeof data === 'object') {
@@ -522,9 +498,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           return;
         }
 
-        // Map frontend role to backend role codes
         let backendRole = roleId;
-        if (roleId === "ROL21" || roleId === "ADMIN SIA" || roleId === "ADMIN") {
+        if (roleId === "ROL21") {
           backendRole = "ROL21";
         }
 
@@ -554,7 +529,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     [roleId, isMahasiswa, isProdi, isWadir1, isFinance, isAdmin, userData, search, prodiKonsentrasi, getRoleBasedParams, buildMainDataParams, fetchMainData, extractArrayData, processMainData]
   );
 
-  // Helper function to build riwayat API parameters
   const buildRiwayatParams = useCallback(() => {
     const params = new URLSearchParams();
     
@@ -568,7 +542,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return params;
   }, [isAdmin, isMahasiswa, userData]);
 
-  // Helper function to fetch and parse riwayat data
   const fetchRiwayatData = useCallback(async (params) => {
     const url = `${API_LINK}CutiAkademik/riwayat?${params}`;
 
@@ -598,7 +571,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return data;
   }, []);
 
-  // Helper function to parse date from string
   const parseDateFromString = useCallback((tanggalStr) => {
     if (!tanggalStr) return null;
     
@@ -615,20 +587,17 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return month ? { month, year } : null;
   }, []);
 
-  // Helper function to convert month to Roman numerals
   const convertToRomanMonth = useCallback((month) => {
     const romanMonths = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
     return romanMonths[month] || '';
   }, []);
 
-  // Helper function to extract sequence from ID
   const extractSequenceFromId = useCallback((idStr) => {
     if (!idStr) return "001";
     const sequenceMatch = idStr.match(/^(\d{3})/);
     return sequenceMatch ? sequenceMatch[1] : "001";
   }, []);
 
-  // Helper function to generate SK number
   const generateSKNumber = useCallback((item) => {
     let nomorSK = item.SuratNo || item.suratNo || item.srt_no || item.cak_srt_no || "";
     
@@ -645,14 +614,12 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           nomorSK = `${sequence}/PA-WADIR-I/SKC/${romanMonth}/${dateInfo.year}`;
         }
       } catch {
-        // If SK generation fails, keep the original nomorSK value
       }
     }
     
     return nomorSK;
   }, [parseDateFromString, convertToRomanMonth, extractSequenceFromId]);
 
-  // Helper function to fetch missing data from detail API
   const fetchMissingData = useCallback(async (item, namaMahasiswa, prodi) => {
     if (!namaMahasiswa || !prodi || namaMahasiswa === "" || prodi === "") {
       try {
@@ -691,7 +658,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           }
         }
       } catch {
-        // If detail fetch fails, use existing values
       }
     }
     
@@ -701,7 +667,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     };
   }, []);
 
-  // Helper function to format riwayat item
   const formatRiwayatItem = useCallback(async (item, index) => {
     let namaMahasiswa = item.NamaMahasiswa || item.namaMahasiswa || item.mhs_nama || 
                        item.nama_mahasiswa || item.mahasiswaNama || item.mahasiswa || 
@@ -731,7 +696,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     };
   }, [fetchMissingData, generateSKNumber]);
 
-  // Helper function to apply search filter
   const applySearchFilter = useCallback((data, searchTerm) => {
     if (!searchTerm || searchTerm.trim() === "") return data;
     
@@ -762,7 +726,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     });
   }, []);
 
-  // Helper function to apply prodi filter
   const applyProdiFilter = useCallback((data, prodiFilter) => {
     if (!prodiFilter || prodiFilter.trim() === "") return data;
     
@@ -772,7 +735,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     });
   }, []);
 
-  // Helper function to apply sorting
   const applySorting = useCallback((data, sortBy) => {
     if (!sortBy || sortBy === "") return data;
     
@@ -821,31 +783,26 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
           return;
         }
 
-        // Filter for "Disetujui" status only
         const completedData = actualData.filter(item => {
           const currentStatus = item.status || item.cak_status || "";
           return currentStatus === "Disetujui";
         });
 
-        // Format all data with fallback API calls
         const formattedDataPromises = completedData.map((item, index) => 
           formatRiwayatItem(item, index)
         );
         
         let allFormattedData = await Promise.all(formattedDataPromises);
 
-        // Apply filters and sorting
         allFormattedData = applySearchFilter(allFormattedData, searchRiwayat);
         allFormattedData = applyProdiFilter(allFormattedData, filterProdi);
         allFormattedData = applySorting(allFormattedData, sortBy);
 
-        // Apply pagination
         const totalFilteredItems = allFormattedData.length;
         const startIndex = (page - 1) * pageSize;
         const endIndex = startIndex + pageSize;
         const paginatedData = allFormattedData.slice(startIndex, endIndex);
 
-        // Update row numbers for paginated data
         const finalData = paginatedData.map((item, index) => ({
           ...item,
           No: startIndex + index + 1
