@@ -559,8 +559,8 @@ export default function AddCutiAkademik() {
       } else {
         Toast.error(result?.message || "Gagal membuat pengajuan.");
       }
-    } catch (err) {
-      Toast.error(err.message);
+    } catch {
+      Toast.error("Gagal mengambil data Cuti Akademik");
     } finally {
       setSaving(false);
     }
