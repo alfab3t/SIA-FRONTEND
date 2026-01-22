@@ -1401,74 +1401,121 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
   const handlePrint = (id) => {
     
-    window.open(`${API_LINK}CutiAkademik/file/${id}`, "_blank");
+    globalThis.open(`${API_LINK}CutiAkademik/file/${id}`, "_blank");
   };
+
+  // Helper function to determine user role for download
+  const determineDownloadRole = useCallback(() => {
+    if (isAdmin) return "ROL21";
+    if (isMahasiswa) return "ROL23";
+    return null;
+  }, [isAdmin, isMahasiswa]);
+
+  // Helper function to validate download prerequisites
+  const validateDownloadPrerequisites = useCallback((username, role) => {
+    if (!role) {
+      Toast.error("Role tidak dikenali untuk download SK.");
+      return false;
+    }
+    if (!username) {
+      Toast.error("Data user tidak lengkap. Silakan login ulang.");
+      return false;
+    }
+    return true;
+  }, []);
+
+  // Helper function to handle download error response
+  const handleDownloadError = useCallback(async (response) => {
+    let errorMessage = "Gagal download SK.";
+    
+    try {
+      const errorData = await response.json();
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      }
+    } catch {
+      // If response is not JSON, use default message
+    }
+    
+    if (response.status === 403) {
+      Toast.warning(errorMessage);
+    } else if (response.status === 404) {
+      Toast.error("Data tidak ditemukan.");
+    } else {
+      Toast.error(errorMessage);
+    }
+  }, []);
+
+  // Helper function to handle PDF download
+  const handlePdfDownload = useCallback(async (response, id) => {
+    const blob = await response.blob();
+    const url = globalThis.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `SK_Cuti_Akademik_${id}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    globalThis.URL.revokeObjectURL(url);
+    Toast.success("SK berhasil didownload!");
+  }, []);
+
+  // Helper function to handle JSON response
+  const handleJsonResponse = useCallback(async (response) => {
+    const result = await response.json();
+    if (result.message) {
+      Toast.info(result.message);
+    } else {
+      Toast.success("Operasi berhasil.");
+    }
+  }, []);
+
+  // Helper function to process successful response
+  const processSuccessfulResponse = useCallback(async (response, id) => {
+    const contentType = response.headers.get('content-type');
+    
+    if (contentType && contentType.includes('application/pdf')) {
+      await handlePdfDownload(response, id);
+    } else if (contentType && contentType.includes('application/json')) {
+      await handleJsonResponse(response);
+    } else {
+      Toast.error("Format response tidak dikenali.");
+    }
+  }, [handlePdfDownload, handleJsonResponse]);
 
   const handleDownloadSK = async (id) => {
     try {
       const username = userData?.nama || userData?.username || "";
-      let role = "";
-      
-      // Determine role based on current user
-      if (isAdmin) {
-        role = "ROL21"; // Admin Akademik
-      } else if (isMahasiswa) {
-        role = "ROL23"; // Mahasiswa
-      } else {
-        Toast.error("Role tidak dikenali untuk download SK.");
-        return;
-      }
+      const role = determineDownloadRole();
 
-      if (!username) {
-        Toast.error("Data user tidak lengkap. Silakan login ulang.");
+      if (!validateDownloadPrerequisites(username, role)) {
         return;
       }
 
       const params = new URLSearchParams({
         username: username,
-        role: role,
-        format: "pdf"
+        role: role
       });
 
-      const downloadUrl = `${API_LINK}CutiAkademik/cetak-sk/${encodeURIComponent(id)}?${params.toString()}`;
-
-      const checkParams = new URLSearchParams({
-        username: username,
-        role: role,
-        format: "json"
-      });
+      const downloadUrl = `${API_LINK}CutiAkademik/DownloadPdf/${encodeURIComponent(id)}?${params.toString()}`;
       
-      const checkUrl = `${API_LINK}CutiAkademik/cetak-sk/${encodeURIComponent(id)}?${checkParams.toString()}`;
-      
-      const checkResponse = await fetch(checkUrl, {
-        method: 'GET',
+      const response = await fetch(downloadUrl, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/pdf, application/json'
         }
       });
 
-      if (!checkResponse.ok) {
-        if (checkResponse.status === 403) {
-          Toast.error("Anda tidak memiliki akses untuk download SK ini.");
-        } else {
-          Toast.error(`Gagal mengakses SK: HTTP ${checkResponse.status}`);
-        }
+      if (!response.ok) {
+        await handleDownloadError(response);
         return;
       }
 
-      const checkResult = await checkResponse.json();
-
-      if (!checkResult.canPrint) {
-        Toast.error(checkResult.reason || "Tidak dapat download SK saat ini.");
-        return;
-      }
-
-      // If permission check passed, proceed with PDF download
-      window.open(downloadUrl, "_blank");
-      Toast.success("SK berhasil didownload!");
+      await processSuccessfulResponse(response, id);
 
     } catch (error) {
+      console.error("Error downloading SK:", error);
       Toast.error(`Gagal download SK: ${error.message}`);
     }
   };
@@ -1694,7 +1741,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
               
               const queryString = params.toString();
               const exportUrl = `${API_LINK}CutiAkademik/riwayat/excel${queryString ? '?' + queryString : ''}`;
-              window.open(exportUrl, "_blank");
+              globalThis.open(exportUrl, "_blank");
             }}
             searchPlaceholder="Cari No. Pengajuan, NIM, Nama, atau Prodi"
             showAddButton={false}
