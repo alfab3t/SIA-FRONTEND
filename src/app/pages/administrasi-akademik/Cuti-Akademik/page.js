@@ -396,7 +396,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
   }, []);
 
-  // Helper function to build API parameters for main data loading
   const buildMainDataParams = useCallback((roleParams, backendRole) => {
     const { mhsId, statusFilter, userId } = roleParams;
     const params = new URLSearchParams();
@@ -822,7 +821,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     [userData, searchRiwayat, sortBy, filterProdi, isProdi, isWadir1, isFinance, isAdmin, isMahasiswa, pageSize, buildRiwayatParams, fetchRiwayatData, extractArrayData, formatRiwayatItem, applySearchFilter, applyProdiFilter, applySorting]
   );
   
-  // Helper function to validate user data for submission
   const validateUserForSubmission = useCallback(() => {
     const modifiedBy = userData?.nama || userData?.mhsId || userData?.userid || userData?.username || "";
     
@@ -834,7 +832,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return modifiedBy;
   }, [userData]);
 
-  // Helper function to build submission payload and URL
   const buildSubmissionPayload = useCallback((id, modifiedBy) => {
     const basePayload = {
       DraftId: id,
@@ -855,7 +852,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
   }, [isProdi]);
 
-  // Helper function to handle submission errors
   const handleSubmissionError = useCallback((res, raw) => {
     
     try {
@@ -883,7 +879,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
   }, []);
 
-  // Helper function to handle successful submission
   const handleSubmissionSuccess = useCallback((result, id) => {
     if (result?.finalId) {
       Toast.success(`Pengajuan berhasil diajukan dengan ID: ${result.finalId}`);
@@ -1056,7 +1051,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       let url, payload;
 
       if (isProdi) {
-        // Use specific Prodi approval endpoint
         const menimbang = "Pengajuan cuti akademik telah memenuhi persyaratan dan disetujui oleh program studi.";
         
         url = `${API_LINK}CutiAkademik/approve/prodi`;
@@ -1067,12 +1061,11 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         };
         
       } else if (isFinance || isWadir1) {
-        // Use general approval endpoint with auto role detection
         url = `${API_LINK}CutiAkademik/approve`;
         payload = {
           Id: itemId,
           ApprovedBy: approvedBy,
-          Role: "" // Will be auto-detected by backend
+          Role: "" 
         };
         
       } else {
@@ -1108,7 +1101,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       try {
         JSON.parse(raw);
       } catch {
-        // JSON parsing failed, but response was successful, continue anyway
+        
       }
 
       
@@ -1122,7 +1115,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
   };
 
-  // Helper function to validate user for rejection
   const validateUserForRejection = useCallback(() => {
     const username = userData?.nama || userData?.username || userData?.userid || "";
     
@@ -1134,7 +1126,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return username;
   }, [userData]);
 
-  // Helper function to handle rejection error response
   const handleRejectionError = useCallback((res, errorText, payload) => {
     
     let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
@@ -1162,7 +1153,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     Toast.error(`Gagal menolak pengajuan: ${errorMessage}`);
   }, []);
 
-  // Helper function to handle rejection success
   const handleRejectionSuccess = useCallback((result) => {
     if (result && (result.rejected === true || result.success === true || 
         result.message?.toLowerCase().includes("berhasil"))) {
@@ -1261,14 +1251,14 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     );
   };
 
-  // State for SK upload modal
+
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedCutiId, setSelectedCutiId] = useState(null);
   const [selectedSKFile, setSelectedSKFile] = useState(null);
   const [skFilePreview, setSKFilePreview] = useState(null);
   const [uploadLoading, setUploadLoading] = useState(false);
 
-  // SK Upload handlers
+  
   const handleUploadSK = (id) => {
     setSelectedCutiId(id);
     setShowUploadModal(true);
@@ -1280,14 +1270,12 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validate file type
     const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/jpg', 'image/png'];
     if (!allowedTypes.includes(file.type)) {
-      Toast.error("Format file tidak didukung. Gunakan PDF, DOC, DOCX, JPG, JPEG, atau PNG.");
+      Toast.error("Format file tidak didukung. Gunakan PDF, JPG, JPEG, atau PNG.");
       return;
     }
 
-    // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       Toast.error("Ukuran file maksimal 10MB.");
       return;
@@ -1295,7 +1283,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
     setSelectedSKFile(file);
     
-    // Create preview for images
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => setSKFilePreview(e.target.result);
@@ -1343,7 +1330,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
       setSKFilePreview(null);
       setSelectedCutiId(null);
       
-      // Reload data to reflect changes
       await loadData(currentPage);
       if (showRiwayat) {
         await loadDataRiwayat(currentPageRiwayat);
@@ -1361,14 +1347,12 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     globalThis.open(`${API_LINK}CutiAkademik/file/${id}`, "_blank");
   };
 
-  // Helper function to determine user role for download
   const determineDownloadRole = useCallback(() => {
     if (isAdmin) return "ROL21";
     if (isMahasiswa) return "ROL23";
     return null;
   }, [isAdmin, isMahasiswa]);
 
-  // Helper function to validate download prerequisites
   const validateDownloadPrerequisites = useCallback((username, role) => {
     if (!role) {
       Toast.error("Role tidak dikenali untuk download SK.");
@@ -1381,7 +1365,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return true;
   }, []);
 
-  // Helper function to handle download error response
   const handleDownloadError = useCallback(async (response) => {
     let errorMessage = "Gagal download SK.";
     
@@ -1391,7 +1374,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         errorMessage = errorData.message;
       }
     } catch {
-      // If response is not JSON, use default message
     }
     
     if (response.status === 403) {
@@ -1403,7 +1385,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
   }, []);
 
-  // Helper function to handle PDF download
   const handlePdfDownload = useCallback(async (response, id) => {
     const blob = await response.blob();
     const url = globalThis.URL.createObjectURL(blob);
@@ -1417,7 +1398,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     Toast.success("SK berhasil didownload!");
   }, []);
 
-  // Helper function to handle JSON response
   const handleJsonResponse = useCallback(async (response) => {
     const result = await response.json();
     if (result.message) {
@@ -1427,7 +1407,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
   }, []);
 
-  // Helper function to process successful response
   const processSuccessfulResponse = useCallback(async (response, id) => {
     const contentType = response.headers.get('content-type');
     
@@ -1487,23 +1466,17 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
 
     if (!userData) return;
 
-    // For Prodi users, wait for prodiKonsentrasi to load first before loading data
     if (isProdi) {
-      // Only load data after prodiKonsentrasi is ready
       if (prodiKonsentrasi !== null && !loadingProdiKonsentrasi) {
-        loadData(1);
-        
-        // Load Riwayat data
+        loadData(1);       
         setShowRiwayat(true);
         setTimeout(() => loadDataRiwayat(1), 50);
       } else {
         // Waiting for prodiKonsentrasi to load before loading main data
       }
     } else {
-      // For other roles, load immediately
       loadData(1);
       
-      // Load Riwayat data immediately for eligible roles
       if (isWadir1 || isFinance || isAdmin) {
         setShowRiwayat(true);
         setTimeout(() => loadDataRiwayat(1), 50);
@@ -1511,7 +1484,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     }
   }, [ssoData, userData, loadData, loadDataRiwayat, isProdi, isWadir1, isFinance, isAdmin, router, prodiKonsentrasi, loadingProdiKonsentrasi]);
 
-  // Helper function to get empty state message
   const getEmptyStateMessage = useCallback(() => {
     if (isMahasiswa) {
       return "Anda belum memiliki pengajuan cuti akademik. Klik tombol 'Ajukan Cuti Akademik' untuk membuat pengajuan baru.";
@@ -1522,12 +1494,10 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
     return "Tidak ada pengajuan cuti akademik yang perlu ditinjau saat ini.";
   }, [isMahasiswa, isProdi]);
 
-  // Helper function to determine if mahasiswa should show add button
   const shouldShowMahasiswaAddButton = useCallback(() => {
     return bebasTanggunganStatus === "OK";
   }, [bebasTanggunganStatus]);
 
-  // Helper function to determine upload button text
   const getUploadButtonText = useCallback((uploadLoading) => {
     if (uploadLoading) {
       return (
@@ -1684,7 +1654,6 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
             onSearch={handleSearchRiwayat}
             onFilter={handleFilterApplyRiwayat}
             onExport={() => {
-              // Build export URL with current search parameter
               const params = new URLSearchParams();
               if (searchRiwayat && searchRiwayat.trim() !== "") {
                 params.append('search', searchRiwayat.trim());
