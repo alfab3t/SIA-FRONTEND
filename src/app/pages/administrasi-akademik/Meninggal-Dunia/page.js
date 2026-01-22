@@ -15,7 +15,6 @@ import { API_LINK } from "@/lib/constant";
 import { encryptIdUrl } from "@/lib/encryptor";
 import SweetAlert from "@/components/common/SweetAlert";
 
-// Helper function to determine user roles
 function useUserRoles(userData, permission) {
     const roles = useMemo(() => {
         const roleId = userData?.roleId || "";
@@ -24,14 +23,12 @@ function useUserRoles(userData, permission) {
         const isFinance = roleId === "ROL01";
         const isAdmin = roleId === "ROL21";
         
-        // Note: isMahasiswa removed as students don't have access to Meninggal Dunia
         return { isProdi, isFinance, isWadir1, isAdmin };
     }, [userData, permission]);
 
     return roles;
 }
 
-// Helper function to load user permissions
 function usePermissions(userData) {
     const [permission, setPermission] = useState(null);
 
@@ -75,7 +72,6 @@ export default function Page_MeninggalDunia() {
     const userData = useMemo(() => getUserData(), []);
     const router = useRouter();
     
-    // Add hydration fix
     const [isClient, setIsClient] = useState(false);
     
     useEffect(() => {
@@ -85,7 +81,6 @@ export default function Page_MeninggalDunia() {
     const permission = usePermissions(userData);
     const { isProdi, isFinance, isWadir1, isAdmin } = useUserRoles(userData, permission);
 
-    // Helper function to load Prodi konsentrasi
     const useProdiKonsentrasi = (isProdi, userData) => {
         const [prodiKonsentrasi, setProdiKonsentrasi] = useState(null);
         const [loadingProdiKonsentrasi, setLoadingProdiKonsentrasi] = useState(false);
@@ -115,7 +110,6 @@ export default function Page_MeninggalDunia() {
                         }
                     }
                 } catch {
-                    // Error loading konsentrasi
                 } finally {
                     setLoadingProdiKonsentrasi(false);
                 }
@@ -130,31 +124,25 @@ export default function Page_MeninggalDunia() {
     const { prodiKonsentrasi, loadingProdiKonsentrasi } = useProdiKonsentrasi(isProdi, userData);
 
 
-    // State for pengajuan table
     const [dataPengajuan, setDataPengajuan] = useState([]);
     const [loadingPengajuan, setLoadingPengajuan] = useState(true);
     const [pengajuanPage, setPengajuanPage] = useState(1);
     const [pengajuanTotalData, setPengajuanTotalData] = useState(0);
     const pengajuanPageSize = 10;
 
-    // Helper function to build API parameters
     const buildApiParams = useCallback((roles, userData, search, page) => {
         const { isProdi, isWadir1, isFinance, isAdmin } = roles;
         
         const params = new URLSearchParams();
         
-        // No isMahasiswa for Meninggal Dunia - students don't have access
         params.append('mhsId', '%');
         
-        // Set status filter based on role
         if (isWadir1) params.append('status', "Belum Disetujui Wadir 1");
         else if (isFinance) params.append('status', "Belum Disetujui Finance");
         else if (isAdmin) params.append('status', "Menunggu Upload SK");
         
-        // Set userId for Prodi
         if (isProdi) params.append('userId', userData?.username || "");
 
-        // Map role to backend role codes
         let backendRole = "";
         if (isProdi) backendRole = "ROL71";
         else if (isWadir1) backendRole = "ROL999";
@@ -169,14 +157,12 @@ export default function Page_MeninggalDunia() {
         return params;
     }, [pengajuanPageSize]);
 
-    // Helper function to filter data by role
     const filterDataByRole = useCallback((data, roles, prodiKonsentrasi) => {
         const { isProdi } = roles;
         
         return data.filter(item => {
             const currentStatus = item.status || item.mdu_status || "";
             
-            // No isMahasiswa filtering for Meninggal Dunia
             if (isProdi) {
                 return filterProdiData(item, currentStatus, prodiKonsentrasi);
             } else {
@@ -185,7 +171,6 @@ export default function Page_MeninggalDunia() {
         });
     }, []);
 
-    // Helper function for Prodi data filtering
     const filterProdiData = useCallback((item, currentStatus, prodiKonsentrasi) => {
         const itemProdi = item.prodi || item.kon_nama || item.konsentrasi || "";
         
@@ -196,13 +181,11 @@ export default function Page_MeninggalDunia() {
         return currentStatus === "Draft" || currentStatus === "Belum Disetujui Wadir 1";
     }, []);
 
-    // Helper function to determine actions for each item
     const determineItemActions = useCallback((item, roles, userData) => {
         const { isProdi, isWadir1, isFinance, isAdmin } = roles;
         const currentStatus = item.status || item.mdu_status || "";
         const hasUploadedSK = item.srt_no || item.suratNo || item.mdu_srt_no;
 
-        // No isMahasiswa actions for Meninggal Dunia
         if (isProdi) {
             return determineProdiActions(currentStatus);
         } else if (isWadir1) {
@@ -216,7 +199,6 @@ export default function Page_MeninggalDunia() {
         return ["Detail"];
     }, []);
 
-    // Helper functions for role-specific actions
     const determineProdiActions = useCallback((currentStatus) => {
         if (currentStatus === "Draft") {
             return ["Detail", "Edit", "Delete", "Ajukan"];
@@ -293,7 +275,6 @@ export default function Page_MeninggalDunia() {
                     throw new Error("Invalid JSON response from server");
                 }
 
-                // Extract array data from response
                 let actualData = extractArrayFromResponse(data);
                 if (!Array.isArray(actualData)) {
                     setDataPengajuan([]);
@@ -301,7 +282,6 @@ export default function Page_MeninggalDunia() {
                     return;
                 }
 
-                // Filter and format data
                 const filteredData = filterDataByRole(actualData, roles, prodiKonsentrasi);
                 const totalFilteredItems = filteredData.length;
                 const startIndex = (page - 1) * pengajuanPageSize;
@@ -326,11 +306,9 @@ export default function Page_MeninggalDunia() {
         [isProdi, isWadir1, isFinance, isAdmin, userData, prodiKonsentrasi, buildApiParams, filterDataByRole, pengajuanPageSize]
     );
 
-    // Helper function to extract array from API response
     const extractArrayFromResponse = useCallback((data) => {
         if (!data || typeof data !== 'object') return data;
         
-        // Check common array properties
         const arrayProperties = ['data', 'items', 'result'];
         for (const prop of arrayProperties) {
             if (data[prop] && Array.isArray(data[prop])) {
@@ -338,15 +316,12 @@ export default function Page_MeninggalDunia() {
             }
         }
         
-        // If data is already an array, return it
         if (Array.isArray(data)) return data;
         
-        // Find first array property in the object
         const firstArrayProp = Object.keys(data).find(key => Array.isArray(data[key]));
         return firstArrayProp ? data[firstArrayProp] : data;
     }, []);
 
-    // Helper function to get Wadir1 approval icon
     const getWadir1Icon = useCallback((status) => {
         if (!status) return "⏳";
         
@@ -358,13 +333,11 @@ export default function Page_MeninggalDunia() {
         return "⏳";
     }, []);
 
-    // Helper function to format table row
     const formatTableRow = useCallback((item, index, startIndex, roles, userData) => {
         const { isAdmin } = roles;
         const currentStatus = item.status || item.mdu_status || "";
         const actions = determineItemActions(item, roles, userData);
 
-        // Build base table data
         const tableData = {
             No: startIndex + index + 1,
             id: item.id || item.mdu_id || item.idDisplay,
@@ -375,7 +348,6 @@ export default function Page_MeninggalDunia() {
             Status: currentStatus || "-",
         };
 
-        // Add SK column for Admin role
         if (isAdmin) {
             const skColumn = currentStatus === "Menunggu Upload SK" ? "DownloadSK" : "-";
             tableData["SK Meninggal Dunia"] = skColumn;
@@ -389,9 +361,6 @@ export default function Page_MeninggalDunia() {
         return tableData;
     }, [determineItemActions, getWadir1Icon]);
 
-    // ============================================================
-    // =================== TABLE 2 : RIWAYAT =======================
-    // ============================================================
 
     const [dataRiwayat, setDataRiwayat] = useState([]);
     const [loadingRiwayat, setLoadingRiwayat] = useState(true);
@@ -430,7 +399,6 @@ export default function Page_MeninggalDunia() {
                     params.append('SearchKeyword', keyword.trim());
                 }
                 
-                // Map sort parameter to API format
                 const sortMap = {
                     "tanggal asc": "tanggal asc",
                     "tanggal desc": "tanggal desc", 
@@ -513,7 +481,6 @@ export default function Page_MeninggalDunia() {
     );
 
 
-    // State for SK upload modal
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [selectedMeninggalId, setSelectedMeninggalId] = useState(null);
     const [selectedSKFile, setSelectedSKFile] = useState(null);
@@ -522,7 +489,6 @@ export default function Page_MeninggalDunia() {
     const [spkbFilePreview, setSPKBFilePreview] = useState(null);
     const [uploadLoading, setUploadLoading] = useState(false);
 
-    // SK Upload handlers
     const handleUploadSK = (id) => {
         setSelectedMeninggalId(id);
         setShowUploadModal(true);
@@ -536,14 +502,12 @@ export default function Page_MeninggalDunia() {
         const file = event.target.files[0];
         if (!file) return;
 
-        // Validate file type
-        const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/jpg', 'image/png'];
+        const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/jpg', 'image/png'];
         if (!allowedTypes.includes(file.type)) {
-            Toast.error("Format file tidak didukung. Gunakan PDF, DOC, DOCX, JPG, JPEG, atau PNG.");
+            Toast.error("Format file tidak didukung. Gunakan PDF, JPG, JPEG, atau PNG.");
             return;
         }
 
-        // Validate file size (max 10MB)
         if (file.size > 10 * 1024 * 1024) {
             Toast.error("Ukuran file maksimal 10MB.");
             return;
@@ -551,7 +515,6 @@ export default function Page_MeninggalDunia() {
 
         setSelectedSKFile(file);
         
-        // Create preview for images
         if (file.type.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = (e) => setSKFilePreview(e.target.result);
@@ -565,14 +528,12 @@ export default function Page_MeninggalDunia() {
         const file = event.target.files[0];
         if (!file) return;
 
-        // Validate file type
         const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/jpg', 'image/png'];
         if (!allowedTypes.includes(file.type)) {
             Toast.error("Format file tidak didukung. Gunakan PDF, DOC, DOCX, JPG, JPEG, atau PNG.");
             return;
         }
 
-        // Validate file size (max 10MB)
         if (file.size > 10 * 1024 * 1024) {
             Toast.error("Ukuran file maksimal 10MB.");
             return;
@@ -580,7 +541,6 @@ export default function Page_MeninggalDunia() {
 
         setSelectedSPKBFile(file);
         
-        // Create preview for images
         if (file.type.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = (e) => setSPKBFilePreview(e.target.result);
@@ -629,7 +589,6 @@ export default function Page_MeninggalDunia() {
             setSPKBFilePreview(null);
             setSelectedMeninggalId(null);
             
-            // Reload data to reflect changes
             await loadPengajuan(pengajuanPage);
             if (isProdi || isWadir1 || isFinance || isDAAK || isAdmin) {
                 await loadRiwayat(riwayatPage);
@@ -667,7 +626,6 @@ export default function Page_MeninggalDunia() {
 
             const downloadUrl = `${API_LINK}MeninggalDunia/cetak-sk/${encodeURIComponent(id)}?${params.toString()}`;
 
-            // Check permission first
             const checkParams = new URLSearchParams({
                 username: username,
                 format: "json"
@@ -756,7 +714,6 @@ export default function Page_MeninggalDunia() {
             if (result?.officialId) {
                 Toast.success(`Pengajuan berhasil diajukan dengan ID: ${result.officialId}`);
                 
-                // Clear session storage for prodi created apps
                 if (isProdi) {
                     const prodiCreatedApps = JSON.parse(sessionStorage.getItem('prodiCreatedMeninggalApps') || '[]');
                     const updatedApps = prodiCreatedApps.filter(appId => appId !== id);
@@ -780,7 +737,6 @@ export default function Page_MeninggalDunia() {
     };
 
     const handleDetail = (id) => {
-        // Double encode the ID to handle special characters like forward slashes
         const encodedId = encodeURIComponent(encryptIdUrl(id));
         router.push(
             `/pages/administrasi-akademik/meninggal-dunia/detail/${encodedId}`
@@ -788,7 +744,6 @@ export default function Page_MeninggalDunia() {
     };
 
     const handleEdit = (id) => {
-        // Double encode the ID to handle special characters like forward slashes
         const encodedId = encodeURIComponent(encryptIdUrl(id));
         router.push(
             `/pages/administrasi-akademik/meninggal-dunia/edit/${encodedId}`
@@ -808,7 +763,6 @@ export default function Page_MeninggalDunia() {
         setLoadingPengajuan(true);
 
         try {
-            // Encode the ID for the API call to handle special characters
             const encodedId = encodeURIComponent(id);
             const url = `${API_LINK}MeninggalDunia/${encodedId}`;
             const res = await fetch(url, { method: "DELETE" });
@@ -1017,9 +971,6 @@ export default function Page_MeninggalDunia() {
         </>
     );
 
-    // ============================================================
-    // ======================= USE EFFECT ==========================
-    // ============================================================
 
     useEffect(() => {
         if (!ssoData) {
@@ -1030,7 +981,6 @@ export default function Page_MeninggalDunia() {
 
         if (!userData) return;
 
-        // For Prodi users, wait for prodiKonsentrasi to load before calling loadPengajuan
         if (isProdi) {
             if (loadingProdiKonsentrasi || !prodiKonsentrasi) {
                 return;

@@ -20,8 +20,8 @@ export default function EditMeninggalDunia() {
 
   const [formData, setFormData] = useState({
     lampiranMeninggal: null,
-    existingLampiran: "", // To store existing file name
-    mhsId: "", // Keep for backend submission
+    existingLampiran: "", 
+    mhsId: "", 
   });
 
   const [errors, setErrors] = useState({});

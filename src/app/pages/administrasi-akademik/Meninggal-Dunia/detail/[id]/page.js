@@ -19,12 +19,10 @@ export default function DetailMeninggalDunia() {
   const [detailData, setDetailData] = useState(null);
   const [error, setError] = useState(null);
 
-  // Handle hydration
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Get the ID from URL params with proper URL encoding handling
   const recordId = useMemo(() => {
     if (!params?.id) return null;
     
@@ -42,7 +40,6 @@ export default function DetailMeninggalDunia() {
     }
   }, [params?.id]);
 
-  // Load record data with comprehensive error handling
   useEffect(() => {
     if (!recordId) {
       setLoading(false);
@@ -73,7 +70,6 @@ export default function DetailMeninggalDunia() {
             const errorData = JSON.parse(errorText);
             errorMessage = errorData.message || errorMessage;
           } catch {
-            // Could not parse error response as JSON, use default message
           }
           
           throw new Error(errorMessage);
@@ -106,13 +102,9 @@ export default function DetailMeninggalDunia() {
   }, [recordId]);
 
   const handleBack = () => {
-    // Navigate back to main page
     router.push("/pages/administrasi-akademik/meninggal-dunia");
   };
 
-  // ============================
-  // NAVIGATE TO PROFILE
-  // ============================
   const handleViewProfile = () => {
     if (!detailData?.mhsId) {
       Toast.error("ID Mahasiswa tidak tersedia.");
@@ -127,46 +119,39 @@ export default function DetailMeninggalDunia() {
     }
   };
 
-  // Handle file downloads using backend file endpoint
   const handleDownloadReport = () => {
     if (!recordId || !detailData?.lampiran) {
       Toast.error("File lampiran tidak tersedia untuk didownload.");
       return;
     }
     
-    // Use backend file endpoint for downloading lampiran
     const filename = detailData.lampiran;
     const downloadUrl = `${API_LINK}MeninggalDunia/file/${filename}`;
     window.open(downloadUrl, "_blank");
   };
 
-  // Handle SK file download
   const handleDownloadSK = () => {
     if (!recordId || !detailData?.sk) {
       Toast.error("File SK tidak tersedia untuk didownload.");
       return;
     }
     
-    // Use backend file endpoint for downloading SK
     const filename = detailData.sk;
     const downloadUrl = `${API_LINK}MeninggalDunia/file/${filename}`;
     window.open(downloadUrl, "_blank");
   };
 
-  // Handle SPKB file download  
   const handleDownloadSPKB = () => {
     if (!recordId || !detailData?.spkb) {
       Toast.error("File SPKB tidak tersedia untuk didownload.");
       return;
     }
     
-    // Use backend file endpoint for downloading SPKB
     const filename = detailData.spkb;
     const downloadUrl = `${API_LINK}MeninggalDunia/file/${filename}`;
     window.open(downloadUrl, "_blank");
   };
 
-  // Status badge styling
   const getStatusBadgeClass = (status) => {
     if (!status) return 'badge bg-light text-dark';
     
@@ -350,25 +335,20 @@ export default function DetailMeninggalDunia() {
                 {(() => {
                   const createdBy = detailData.createdBy || '';
                   
-                  // Jika createdBy adalah 'system', coba ambil dari userData
                   if (createdBy.toLowerCase() === 'system') {
-                    // Tampilkan username user yang sedang login jika tersedia
                     if (userData?.username) {
                       return userData.username;
                     }
-                    // Atau tampilkan nama user jika username tidak ada
                     if (userData?.nama) {
                       return userData.nama;
                     }
                     return 'System';
                   }
                   
-                  // Tampilkan createdBy asli jika ada dan bukan kosong
                   if (createdBy && createdBy !== '-') {
                     return createdBy;
                   }
                   
-                  // Fallback ke username user saat ini jika tersedia
                   if (userData?.username) {
                     return userData.username;
                   }
