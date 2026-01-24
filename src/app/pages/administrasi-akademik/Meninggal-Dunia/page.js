@@ -21,7 +21,7 @@ function useUserRoles(userData, permission) {
         const isProdi = roleId === "ROL71";
         const isWadir1 = roleId === "ROL999";
         const isFinance = roleId === "ROL01";
-        const isAdmin = roleId === "ROL21";
+        const isAdmin = roleId === "ROL74";
         
         return { isProdi, isFinance, isWadir1, isAdmin };
     }, [userData, permission]);
@@ -147,7 +147,7 @@ export default function Page_MeninggalDunia() {
         if (isProdi) backendRole = "ROL71";
         else if (isWadir1) backendRole = "ROL999";
         else if (isFinance) backendRole = "ROL01";
-        else if (isAdmin) backendRole = "ROL21";
+        else if (isAdmin) backendRole = "ROL74";
 
         if (backendRole) params.append('role', backendRole);
         if (search) params.append('search', search);
@@ -590,7 +590,7 @@ export default function Page_MeninggalDunia() {
             setSelectedMeninggalId(null);
             
             await loadPengajuan(pengajuanPage);
-            if (isProdi || isWadir1 || isFinance || isDAAK || isAdmin) {
+            if (isProdi || isWadir1 || isFinance || isAdmin) {
                 await loadRiwayat(riwayatPage);
             }
 

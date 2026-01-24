@@ -36,7 +36,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   const isProdi = roleId === "ROL71";
   const isWadir1 = roleId === "ROL999";
   const isFinance = roleId === "ROL01";
-  const isAdmin = roleId === "ROL21";
+  const isAdmin = roleId === "ROL74";
 
   const dataFilterSort = [
     { Value: "tanggal_desc", Text: "Tanggal Pengajuan [↓]" },
@@ -498,8 +498,8 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
         }
 
         let backendRole = roleId;
-        if (roleId === "ROL21") {
-          backendRole = "ROL21";
+        if (roleId === "ROL74") {
+          backendRole = "ROL74";
         }
 
         const params = buildMainDataParams(roleParams, backendRole);
@@ -1348,7 +1348,7 @@ export default function Page_Administrasi_Pengajuan_Cuti_Akademik() {
   };
 
   const determineDownloadRole = useCallback(() => {
-    if (isAdmin) return "ROL21";
+    if (isAdmin) return "ROL74";
     if (isMahasiswa) return "ROL23";
     return null;
   }, [isAdmin, isMahasiswa]);
