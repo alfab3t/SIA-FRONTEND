@@ -53,10 +53,6 @@ export const getUserData = () => {
 
   // Ambil permission dari cookie permissionData
   const permissionData = getDecryptedCookie("permissionData");
-  console.log("🔍 getUserData - Debug Permission:");
-  console.log("Raw permissionData cookie:", permissionData);
-  console.log("Type of permissionData:", typeof permissionData);
-  console.log("permissionData keys:", permissionData ? Object.keys(permissionData) : "null");
   
   // Coba berbagai kemungkinan struktur data
   let permissions = [];
@@ -68,8 +64,6 @@ export const getUserData = () => {
                   (Array.isArray(permissionData) ? permissionData : []);
   }
   
-  console.log("Extracted permissions:", permissions);
-  console.log("Permissions length:", permissions.length);
 
   const result = {
     ...data,
@@ -87,7 +81,6 @@ export const getUserData = () => {
     permission: permissions
   };
   
-  console.log("🔍 getUserData - Final result.permission:", result.permission);
 
   return result;
 };

@@ -288,9 +288,6 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
           
           allData = extractArrayFromResponse(pengajuanResponse);
           riwayatDataFromApi = extractArrayFromResponse(riwayatResponse);
-          
-          console.log("🔍 Wadir - Pengajuan data:", allData);
-          console.log("🔍 Wadir - Riwayat data:", riwayatDataFromApi);
         } else {
           allData = await fetchDataForNonAdmin(nim, username, isMahasiswa, isProdi, userData);
         }
@@ -315,22 +312,13 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
             return actions;
           }
           if (itemStatusLower === "belum disetujui wadir 1" && isWadir1) {
-            console.log("✅ Wadir PD approval detected!");
-            console.log("🔍 userData:", userData);
-            console.log("🔍 userData.permission:", userData?.permission);
-            console.log("🔍 hasPermission result:", hasPermission(userData, "pengunduran_diri.approve_reject"));
-            
             const actions = ["Detail"];
             
-            // Jika permission kosong atau tidak ada, tetap tampilkan untuk Wadir (fallback ke role-based)
             const hasApprovePermission = hasPermission(userData, "pengunduran_diri.approve_reject");
             const isPermissionEmpty = !userData?.permission || userData.permission.length === 0;
             
             if (hasApprovePermission || isPermissionEmpty) {
-              console.log("✅ Adding Approve/Reject buttons (hasPermission:", hasApprovePermission, "isPermissionEmpty:", isPermissionEmpty, ")");
               actions.push("Approve", "Reject");
-            } else {
-              console.log("❌ NOT adding Approve/Reject buttons");
             }
             return actions;
           }
@@ -504,14 +492,12 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
           return { draftData, riwayatData };
         };
         const separateDataForMahasiswa = (allData, currentNim) => {
-          // Mahasiswa hanya melihat daftar pengajuan (semua status kecuali yang sudah selesai)
+          // Mahasiswa hanya melihat daftar pengajuan (semua status)
           const draftData = allData
             .filter(item => {
-              const status = (item.status || "").toLowerCase().trim();
               const itemNim = item.mhsId || item.nim || "";
               const itemCreatedBy = (item.createdBy || "").toLowerCase().trim();
               const isMyData = itemNim.toLowerCase() === currentNim || itemCreatedBy === currentNim;
-              // Tampilkan semua status untuk mahasiswa di daftar pengajuan
               return isMyData;
             })
             .map((item, idx) => mapItem(item, idx));
@@ -522,42 +508,19 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
           return { draftData, riwayatData };
         };
         const separateDataForProdi = (allData, currentUsername) => {
-          console.log("🔍 separateDataForProdi - Input:");
-          console.log("allData length:", allData.length);
-          console.log("currentUsername:", currentUsername);
-          console.log("Sample data:", allData.slice(0, 2));
-          
           const draftData = allData
             .filter(item => {
               const status = (item.status || "").toLowerCase().trim();
               const itemCreatedBy = (item.createdBy || "").toLowerCase().trim();
               
-              console.log("🔍 Filtering item:", {
-                status,
-                itemCreatedBy,
-                currentUsername,
-                isMatch: itemCreatedBy === currentUsername
-              });
-              
               if (status === "belum disetujui prodi") {
-                console.log("✅ Item dengan status 'belum disetujui prodi' - INCLUDED");
                 return true;
               }
               const isMyData = itemCreatedBy === currentUsername;
               const validStatuses = ["draft", "belum disetujui wadir 1", "menunggu upload sk"];
-              const result = isMyData && validStatuses.includes(status);
-              
-              if (result) {
-                console.log("✅ Item created by me with valid status - INCLUDED");
-              } else {
-                console.log("❌ Item EXCLUDED - isMyData:", isMyData, "validStatus:", validStatuses.includes(status));
-              }
-              
-              return result;
+              return isMyData && validStatuses.includes(status);
             })
             .map((item, idx) => mapItem(item, idx));
-            
-          console.log("🔍 separateDataForProdi - Draft data length:", draftData.length);
           
           const riwayatData = allData
             .filter(item => {
@@ -566,14 +529,10 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
               return validStatuses.includes(status) || status.includes("ditolak");
             })
             .map((item, idx) => mapItem(item, idx));
-            
-          console.log("🔍 separateDataForProdi - Riwayat data length:", riwayatData.length);
           
           return { draftData, riwayatData };
         };
         const separateDataForWadir = (allData, riwayatDataFromApi) => {
-          console.log("🔍 separateDataForWadir - Pengajuan data:", allData);
-          console.log("🔍 separateDataForWadir - Riwayat data:", riwayatDataFromApi);
           
           // Data pengajuan (Belum Disetujui Wadir 1) - gunakan mapItem
           const draftData = allData.map((item, idx) => mapItem(item, idx));
@@ -586,7 +545,6 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
             })
             .map((item, idx) => mapItemAdminRiwayat(item, idx));
           
-          console.log("📊 separateDataForWadir - Draft:", draftData.length, "Riwayat:", riwayatData.length);
           
           return { draftData, riwayatData };
         };
@@ -782,8 +740,6 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
       } else {
         endpoint = API_LINK + `PengunduranDiri/submit/${encodeURIComponent(id)}`;
       }
-      console.log("📤 Ajukan endpoint:", endpoint);
-      console.log("📤 Is Prodi:", isProdi);
       const response = await fetchData(endpoint, {}, "PUT");
       if (response && !response.error) {
         const newId = response.pdiId || response.id || response.pdId || response.newId || response.data?.pdiId || response.data?.id || "Berhasil";
@@ -943,11 +899,6 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
   useEffect(() => {
     setIsClient(true);
     
-    console.log("🔍 PENGUNDURAN DIRI - Debug Permission System:");
-    console.log("userData:", userData);
-    console.log("userData.permission:", userData?.permission);
-    console.log("roleId:", userData?.roleId);
-    console.log("isWadir1:", isWadir1);
     
     if (!ssoData) {
       Toast.error("Sesi anda habis. Silakan login kembali.");

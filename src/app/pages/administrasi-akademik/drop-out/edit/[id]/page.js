@@ -161,7 +161,6 @@ SearchableDropdown.propTypes = {
 export default function Page_Edit_DropOut() {
   const router = useRouter();
   const params = useParams();
-  const userData = useMemo(() => getUserData(), []);
   const ssoData = useMemo(() => getSSOData(), []);
 
   const [prodiList, setProdiList] = useState([]);

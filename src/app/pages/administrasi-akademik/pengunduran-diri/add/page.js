@@ -6,7 +6,6 @@ import PropTypes from "prop-types";
 import MainContent from "@/components/layout/MainContent";
 import Card from "@/components/common/Card";
 import Button from "@/components/common/Button";
-import Input from "@/components/common/Input";
 import Toast from "@/components/common/Toast";
 import SweetAlert from "@/components/common/SweetAlert";
 import { API_LINK } from "@/lib/constant";

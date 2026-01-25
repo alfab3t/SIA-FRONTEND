@@ -111,7 +111,6 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     const isWadir1Role = roleId === "ROL999";
     const isDirekturRole = roleId === "ROL02";
     const result = isFinanceRole || isWadir1Role || isDirekturRole;
-    console.log("✅ canApprove - roleId:", roleId, "result:", result);
     return result;
   }, [isClient, roleId]);
 
@@ -167,7 +166,6 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
 
   // Helper function untuk determine actions
   const getActionsForDropOut = (statusLower, itemId) => {
-    console.log("🔍 getActionsForDropOut - Status:", statusLower, "isWadir1:", isWadir1, "canApprove:", canApprove, "roleId:", roleId);
     
     if (statusLower === "draft") {
       if (isMahasiswa) return ["Detail"];
@@ -202,10 +200,6 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     
     // Hardcode check untuk Wadir dengan status "belum disetujui wadir 1"
     if (isWadir1 && statusLower === "belum disetujui wadir 1") {
-      console.log("✅ Wadir approval detected!");
-      console.log("🔍 userData:", userData);
-      console.log("🔍 userData.permission:", userData?.permission);
-      console.log("🔍 hasPermission result:", hasPermission(userData, "drop_out.approve_reject"));
       
       const actions = ["Detail"];
       
@@ -214,16 +208,12 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
       const isPermissionEmpty = !userData?.permission || userData.permission.length === 0;
       
       if (hasApprovePermission || isPermissionEmpty) {
-        console.log("✅ Adding Approve/Reject buttons (hasPermission:", hasApprovePermission, "isPermissionEmpty:", isPermissionEmpty, ")");
         actions.push("Approve", "Reject");
-      } else {
-        console.log("❌ NOT adding Approve/Reject buttons");
       }
       return actions;
     }
     
     const approvalCheck = checkApprovalStatus(statusLower);
-    console.log("🔍 checkApprovalStatus result:", approvalCheck);
     
     if (approvalCheck) {
       const actions = ["Detail"];
@@ -280,8 +270,6 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
           pengajuanList = extractArrayFromResponse(pengajuanResponse);
           riwayatList = extractArrayFromResponse(riwayatResponse);
           
-          console.log("🔍 Wadir DO - Pengajuan data:", pengajuanList);
-          console.log("🔍 Wadir DO - Riwayat data:", riwayatList);
         } else {
           // Fetch data pengajuan dan riwayat secara PARALLEL untuk role lain
           let pengajuanParams = {
@@ -540,8 +528,6 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
   };
 
   const processDataForWadir = (pengajuanList, riwayatList, draftData, riwayatData, mapItem, mapItemRiwayat) => {
-    console.log("🔍 processDataForWadir - Pengajuan:", pengajuanList);
-    console.log("🔍 processDataForWadir - Riwayat:", riwayatList);
     
     // Data pengajuan - hanya yang Belum Disetujui Wadir 1
     pengajuanList.forEach((item) => {
@@ -561,7 +547,6 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
       }
     });
     
-    console.log("📊 processDataForWadir - Draft:", draftData.length, "Riwayat:", riwayatData.length);
   };
 
   /* ================= HANDLER ================= */
@@ -997,11 +982,6 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
   useEffect(() => {
     setIsClient(true);
     
-    console.log("🔍 DROP OUT - Debug Permission System:");
-    console.log("userData:", userData);
-    console.log("userData.permission:", userData?.permission);
-    console.log("roleId:", userData?.roleId);
-    console.log("isWadir1:", isWadir1);
     
     if (!ssoData) {
       Toast.error("Sesi anda habis. Silakan login kembali.");
