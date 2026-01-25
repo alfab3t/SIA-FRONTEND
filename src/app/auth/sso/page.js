@@ -125,9 +125,6 @@ const SsoPage = () => {
           roleId: selectedRole.roleId,
         };
         
-        console.log("🔧 Setting userData for user:", ssoData.username);
-        console.log("🔧 UserData object:", userData);
-        
         Cookies.set("userData", encryptId(JSON.stringify(userData)));
         Cookies.set("permissionData", JSON.stringify(data.listPermission));
         Toast.success(

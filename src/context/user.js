@@ -31,7 +31,6 @@ function getDecryptedCookie(name) {
 export const getUserData = () => {
   const data = getDecryptedCookie(COOKIE_USER_DATA);
   if (!data) {
-    console.log("❌ getUserData: No user data found");
     return null;
   }
 
@@ -46,13 +45,31 @@ export const getUserData = () => {
 
   // Jika masih kosong, coba ambil dari ssoData
   if (!normalizedUsername) {
-    console.log("⚠️ Username kosong, mencoba ambil dari ssoData");
     const ssoData = getDecryptedCookie(COOKIE_SSO_DATA);
-    if (ssoData && ssoData.username) {
+    if (ssoData?.username) {
       normalizedUsername = ssoData.username;
-      console.log("✅ Username diambil dari ssoData:", normalizedUsername);
     }
   }
+
+  // Ambil permission dari cookie permissionData
+  const permissionData = getDecryptedCookie("permissionData");
+  console.log("🔍 getUserData - Debug Permission:");
+  console.log("Raw permissionData cookie:", permissionData);
+  console.log("Type of permissionData:", typeof permissionData);
+  console.log("permissionData keys:", permissionData ? Object.keys(permissionData) : "null");
+  
+  // Coba berbagai kemungkinan struktur data
+  let permissions = [];
+  if (permissionData) {
+    permissions = permissionData.listPermission || 
+                  permissionData.permissions || 
+                  permissionData.permission ||
+                  permissionData.list ||
+                  (Array.isArray(permissionData) ? permissionData : []);
+  }
+  
+  console.log("Extracted permissions:", permissions);
+  console.log("Permissions length:", permissions.length);
 
   const result = {
     ...data,
@@ -64,16 +81,13 @@ export const getUserData = () => {
       data.displayName ||
       data.fullName ||
       data.nama ||
-      ""
+      "",
+    
+    // 🔑 TAMBAHKAN PERMISSION
+    permission: permissions
   };
-
-  console.log("✅ getUserData result:", {
-    username: result.username,
-    displayName: result.displayName,
-    appId: result.appId,
-    roleId: result.roleId,
-    role: result.role
-  });
+  
+  console.log("🔍 getUserData - Final result.permission:", result.permission);
 
   return result;
 };

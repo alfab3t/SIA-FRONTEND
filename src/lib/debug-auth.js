@@ -1,6 +1,8 @@
 import Cookies from "js-cookie";
 
 export function debugAuthState() {
+  if (process.env.NODE_ENV !== 'development') return;
+  
   console.log("=== DEBUG AUTH STATE ===");
   
   const cookies = {

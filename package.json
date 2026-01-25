@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack -p 3000",
     "build": "next build --turbopack",
     "start": "next start -p 3000",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sonar": "sonar-scanner"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-react": "^10.0.0",
@@ -29,6 +30,7 @@
     "react-tooltip": "^5.30.0",
     "sass": "^1.95.1",
     "sweetalert": "^2.1.2",
+    "xlsx": "^0.18.5",
     "yarn": "^1.22.22",
     "yup": "^1.7.1"
   },

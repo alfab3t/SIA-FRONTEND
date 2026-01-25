@@ -86,13 +86,13 @@ export default function TestAuthPage() {
           <div className="mt-3">
             <button 
               className="btn btn-primary me-2"
-              onClick={() => window.location.href = "/pages/Page_Administrasi_Pengajuan_Cuti_Akademik"}
+              onClick={() => globalThis.location.href = "/pages/administrasi-akademik/Page_Administrasi_Pengajuan_Cuti_Akademik"}
             >
               Go to Cuti Akademik
             </button>
             <button 
               className="btn btn-secondary"
-              onClick={() => window.location.reload()}
+              onClick={() => globalThis.location.reload()}
             >
               Refresh
             </button>

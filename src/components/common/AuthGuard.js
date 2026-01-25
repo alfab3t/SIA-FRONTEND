@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { checkAuthStatus, clearAuthCookies } from "@/lib/auth-utils";
 import MainContent from "@/components/layout/MainContent";
 
-export default function AuthGuard({ children, requiredPermissions = [] }) {
+import PropTypes from "prop-types";
+
+export default function AuthGuard({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [authData, setAuthData] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -16,10 +17,14 @@ export default function AuthGuard({ children, requiredPermissions = [] }) {
       try {
         const authStatus = checkAuthStatus();
         
-        console.log("AuthGuard - Auth Status:", authStatus);
+        if (process.env.NODE_ENV === 'development') {
+          console.log("AuthGuard - Auth Status:", authStatus);
+        }
         
         if (!authStatus.isAuthenticated) {
-          console.log("AuthGuard - Not authenticated:", authStatus.reason);
+          if (process.env.NODE_ENV === 'development') {
+            console.log("AuthGuard - Not authenticated:", authStatus.reason);
+          }
           clearAuthCookies();
           router.push("/auth/login");
           return;
@@ -27,13 +32,16 @@ export default function AuthGuard({ children, requiredPermissions = [] }) {
 
         // For now, skip permission checking to allow access
         // This is a temporary fix while we debug the permission system
-        console.log("AuthGuard - Authentication successful, allowing access");
-        console.log("AuthGuard - User permissions:", authStatus.permissions);
+        if (process.env.NODE_ENV === 'development') {
+          console.log("AuthGuard - Authentication successful, allowing access");
+          console.log("AuthGuard - User permissions:", authStatus.permissions);
+        }
 
-        setAuthData(authStatus);
         setIsAuthenticated(true);
       } catch (error) {
-        console.error("AuthGuard - Error:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("AuthGuard - Error:", error);
+        }
         clearAuthCookies();
         router.push("/auth/login");
       } finally {
@@ -42,7 +50,7 @@ export default function AuthGuard({ children, requiredPermissions = [] }) {
     };
 
     checkAuth();
-  }, [router, requiredPermissions]);
+  }, [router]);
 
   if (isLoading) {
     return (
@@ -53,9 +61,9 @@ export default function AuthGuard({ children, requiredPermissions = [] }) {
         breadcrumb={[]}
       >
         <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
+          <output className="spinner-border text-primary">
             <span className="visually-hidden">Loading...</span>
-          </div>
+          </output>
           <p className="mt-3 text-muted">Memverifikasi autentikasi...</p>
         </div>
       </MainContent>
@@ -68,3 +76,8 @@ export default function AuthGuard({ children, requiredPermissions = [] }) {
 
   return children;
 }
+
+
+AuthGuard.propTypes = {
+  children: PropTypes.node.isRequired
+};

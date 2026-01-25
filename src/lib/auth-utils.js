@@ -8,11 +8,13 @@ export function checkAuthStatus() {
     const userData = Cookies.get("userData");
     const permissionData = Cookies.get("permissionData");
 
-    console.log("Auth Status Check:");
-    console.log("JWT Token exists:", !!jwtToken);
-    console.log("SSO Data exists:", !!ssoData);
-    console.log("User Data exists:", !!userData);
-    console.log("Permission Data exists:", !!permissionData);
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Auth Status Check:");
+      console.log("JWT Token exists:", !!jwtToken);
+      console.log("SSO Data exists:", !!ssoData);
+      console.log("User Data exists:", !!userData);
+      console.log("Permission Data exists:", !!permissionData);
+    }
 
     if (!jwtToken || !ssoData || !userData) {
       return {
@@ -36,7 +38,9 @@ export function checkAuthStatus() {
         parsedSsoData = JSON.parse(decryptedSsoData);
       }
     } catch (error) {
-      console.error("Error parsing user/sso data:", error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Error parsing user/sso data:", error);
+      }
       return {
         isAuthenticated: false,
         reason: "Invalid cookie data"
@@ -50,7 +54,9 @@ export function checkAuthStatus() {
       permissions: permissionData ? JSON.parse(permissionData) : []
     };
   } catch (error) {
-    console.error("Auth check error:", error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error("Auth check error:", error);
+    }
     return {
       isAuthenticated: false,
       reason: "Auth check failed"

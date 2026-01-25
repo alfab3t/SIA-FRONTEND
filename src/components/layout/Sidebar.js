@@ -39,7 +39,6 @@ export default function Sidebar({
   const [searchTerm, setSearchTerm] = useState("");
   const [openMenu, setOpenMenu] = useState(null);
   const [dynamicMenu, setDynamicMenu] = useState([]);
-  const [isLoadingMenu, setIsLoadingMenu] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const pathname = usePathname();
   const [ssoData, setSsoData] = useState(null);
@@ -54,9 +53,11 @@ export default function Sidebar({
       const sso = getSSOData();
       const user = getUserData();
       
-      console.log("🔍 Loading user data, attempt:", retryCount + 1);
-      console.log("🔍 ssoData:", sso);
-      console.log("🔍 userData:", user);
+      if (process.env.NODE_ENV === 'development') {
+        console.log("🔍 Loading user data, attempt:", retryCount + 1);
+        console.log("🔍 ssoData:", sso);
+        console.log("🔍 userData:", user);
+      }
       
       if (sso && user) {
         setSsoData(sso);
@@ -68,13 +69,17 @@ export default function Sidebar({
       // Jika data belum ada dan masih bisa retry
       if (retryCount < maxRetries) {
         retryCount++;
-        console.log(`🔄 Data belum tersedia, retry ${retryCount}/${maxRetries} dalam 500ms...`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`🔄 Data belum tersedia, retry ${retryCount}/${maxRetries} dalam 500ms...`);
+        }
         setTimeout(loadUserData, 500);
         return false;
       }
       
       // Setelah max retries, set initialized dan biarkan useEffect berikutnya handle redirect
-      console.log("❌ Max retries reached, data masih tidak tersedia");
+      if (process.env.NODE_ENV === 'development') {
+        console.log("❌ Max retries reached, data masih tidak tersedia");
+      }
       setSsoData(sso);
       setUserData(user);
       setIsInitialized(true);
@@ -94,19 +99,27 @@ export default function Sidebar({
   useEffect(() => {
     // Tunggu sampai initialized
     if (!isInitialized) {
-      console.log("⏳ Waiting for initialization...");
+      if (process.env.NODE_ENV === 'development') {
+        console.log("⏳ Waiting for initialization...");
+      }
       return;
     }
     
-    console.log("🔍 Debug Sidebar - ssoData:", ssoData);
-    console.log("🔍 Debug Sidebar - userData:", userData);
+    if (process.env.NODE_ENV === 'development') {
+      console.log("🔍 Debug Sidebar - ssoData:", ssoData);
+      console.log("🔍 Debug Sidebar - userData:", userData);
+    }
     
     if (!ssoData || !userData) {
-      console.log("❌ Data tidak tersedia - ssoData:", !!ssoData, "userData:", !!userData);
+      if (process.env.NODE_ENV === 'development') {
+        console.log("❌ Data tidak tersedia - ssoData:", !!ssoData, "userData:", !!userData);
+      }
       
       // Jika ssoData ada tapi userData tidak ada, redirect ke SSO (bukan login)
       if (ssoData && !userData) {
-        console.log("🔄 SSO data exists but user data missing, redirecting to SSO");
+        if (process.env.NODE_ENV === 'development') {
+          console.log("🔄 SSO data exists but user data missing, redirecting to SSO");
+        }
         Toast.warn("Silakan pilih role Anda kembali.");
         router.push("/auth/sso");
         return;
