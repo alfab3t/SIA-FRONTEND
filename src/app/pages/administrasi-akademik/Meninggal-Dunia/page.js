@@ -855,28 +855,14 @@ export default function Page_MeninggalDunia() {
         setLoadingPengajuan(true);
 
         try {
-            let autoReason = "";
-            let backendRole = "";
+            const username = userData?.nama || userData?.username || userData?.userid || "";
             
-            if (isProdi) {
-                autoReason = "Ditolak oleh Program Studi";
-                backendRole = "prodi";
-            } else if (isWadir1) {
-                autoReason = "Ditolak oleh Wakil Direktur 1";
-                backendRole = "wadir1";
-            } else if (isFinance) {
-                autoReason = "Ditolak oleh Bagian Keuangan";
-                backendRole = "finance";
-            } else {
-                autoReason = "Pengajuan ditolak";
-                backendRole = "prodi";
-            }
+            let role = "";
+            if (isProdi) role = "ROL71";
+            else if (isWadir1) role = "ROL999";
+            else if (isFinance) role = "ROL01";
 
-            const payload = {
-                keterangan: autoReason,
-                role: backendRole
-            };
-
+            const payload = { username, role };
             const encodedItemId = encodeURIComponent(itemId);
             const url = `${API_LINK}MeninggalDunia/reject/${encodedItemId}`;
 
@@ -894,30 +880,16 @@ export default function Page_MeninggalDunia() {
                 
                 try {
                     const errorData = JSON.parse(errorText);
-                    const errorMsg = errorData.message || errorData.error || errorData.details || `HTTP ${res.status}: ${res.statusText}`;
-                    Toast.error(`Gagal menolak pengajuan: ${errorMsg}`);
+                    const errorMsg = errorData.message || errorData.error || `HTTP ${res.status}`;
+                    Toast.error(`Gagal menolak: ${errorMsg}`);
                 } catch {
-                    Toast.error(`Gagal menolak pengajuan: HTTP ${res.status}\n\n${errorText}`);
+                    Toast.error(`HTTP ${res.status}: ${res.statusText}`);
                 }
                 return;
             }
 
-            const raw = await res.text();
-            let result;
-            try {
-                result = JSON.parse(raw);
-            } catch {
-                Toast.error("Response server tidak valid:\n\n" + raw);
-                return;
-            }
-
-            if (result?.message?.includes("berhasil")) {
-                Toast.success(result.message);
-                loadPengajuan(1);
-                loadRiwayat(1);
-            } else {
-                throw new Error(result?.message || "Gagal menolak pengajuan");
-            } 
+            Toast.success("Pengajuan meninggal dunia berhasil ditolak!");
+            loadPengajuan(1);
             
         } catch (err) {
             Toast.error(`Gagal menolak: ${err.message}`);
