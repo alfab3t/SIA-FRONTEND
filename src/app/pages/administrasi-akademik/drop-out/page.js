@@ -1,20 +1,40 @@
 "use client";
 
 /**
- * Halaman Drop Out - Administrasi Akademik
+ * ============================================================================
+ * HALAMAN DROP OUT - ADMINISTRASI AKADEMIK
+ * ============================================================================
  * 
- * Logika Filter Data (sesuai SP sia_getDataRiwayatDO):
- * 1. Mahasiswa (ROL23): Hanya melihat data DO mereka sendiri (WHERE mhs_id = @username)
- * 2. Struktur 1 atau 2: Melihat semua data kecuali Draft/Revisi
- * 3. Struktur 14, 54, 26: Melihat data dengan status tertentu (Menunggu Upload SK, Disetujui, Draft, Belum Disetujui Wadir 1)
- * 4. Struktur 27, 23, 28: Hanya melihat data yang Disetujui
- * 5. Prodi: Filter berdasarkan kon_sekprodi = @display_name
+ * KONFIGURASI ROLE SISTEM:
+ * Anda bisa mengganti roleId sesuai kebutuhan di bagian ROLE_CONFIG di bawah
  * 
- * Backend akan handle filter berdasarkan:
- * - username (NIM untuk mahasiswa)
- * - roleId (untuk identifikasi role)
- * - displayName (untuk filter Prodi)
- * - struktur organisasi (str_main_id)
+ * ┌─────────────┬──────────┬────────────────────────────────────────────────┐
+ * │ ROLE        │ ROLE ID  │ HAK AKSES                                      │
+ * ├─────────────┼──────────┼────────────────────────────────────────────────┤
+ * │ MAHASISWA   │ ROL23    │ - Lihat data sendiri yang diajukan Prodi/Admin│
+ * │             │          │ - TIDAK BISA tambah/edit data                  │
+ * ├─────────────┼──────────┼────────────────────────────────────────────────┤
+ * │ PRODI       │ ROL71    │ - Buat pengajuan untuk mahasiswa               │
+ * │             │          │ - Lihat pengajuan yang dibuat sendiri          │
+ * │             │          │ - Edit/hapus draft sendiri                     │
+ * ├─────────────┼──────────┼────────────────────────────────────────────────┤
+ * │ WADIR 1     │ ROL999   │ - Lihat pengajuan "Belum Disetujui Wadir 1"   │
+ * │             │          │   (dari siapa saja)                            │
+ * │             │          │ - Approve/Reject untuk ubah status             │
+ * │             │          │ - Lihat SEMUA riwayat                          │
+ * ├─────────────┼──────────┼────────────────────────────────────────────────┤
+ * │ ADMIN       │ ROL21    │ - Buat pengajuan untuk mahasiswa               │
+ * │             │ ROL74    │ - Lihat pengajuan yang dibuat sendiri          │
+ * │             │          │ - Upload SK untuk "Menunggu Upload SK"         │
+ * │             │          │ - Cetak SK                                     │
+ * │             │          │ - Export data                                  │
+ * ├─────────────┼──────────┼────────────────────────────────────────────────┤
+ * │ FINANCE     │ ROL01    │ - Lihat riwayat saja (yang sudah disetujui)    │
+ * │             │          │ - Download berkas                              │
+ * └─────────────┴──────────┴────────────────────────────────────────────────┘
+ * 
+ * CARA MENGGANTI ROLE ID:
+ * Edit bagian ROLE_CONFIG di bawah, ubah nilai roleId sesuai kebutuhan
  */
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
@@ -31,6 +51,19 @@ import { getSSOData, getUserData } from "@/context/user";
 import SweetAlert from "@/components/common/SweetAlert";
 import * as XLSX from "xlsx";
 import { hasPermission } from "@/lib/permission-utils";
+
+// ============================================================================
+// KONFIGURASI ROLE - EDIT DI SINI UNTUK MENGGANTI ROLE ID
+// ============================================================================
+const ROLE_CONFIG = {
+  MAHASISWA: "ROL23",
+  PRODI: "ROL71",
+  WADIR1: "ROL999",
+  ADMIN: "ROL21",
+  ADMIN_ALT: "ROL74",  // Role admin alternatif
+  DIREKTUR: "ROL02",
+  FINANCE: "ROL01"
+};
 
 export default function Page_Administrasi_Pengajuan_Drop_Out() {
   const router = useRouter();
@@ -91,34 +124,74 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
   const [sortBy, setSortBy] = useState(dataFilterSort[0].Value);
   const [sortStatus, setSortStatus] = useState("");
 
-  // Role-based access menggunakan roleId
+  // ============================================================================
+  // DETEKSI ROLE USER - Menggunakan ROLE_CONFIG di atas
+  // ============================================================================
   const roleId = userData?.roleId || "";
-  const isMahasiswa = roleId === "ROL23";
-  const isProdi = roleId === "ROL71";
-  const isWadir1 = roleId === "ROL999";
-  const isFinance = roleId === "ROL01";
-  const isAdmin = roleId === "ROL21";
-  const isDirektur = roleId === "ROL02"; // Tambahkan jika ada
+  const isMahasiswa = roleId === ROLE_CONFIG.MAHASISWA;
+  const isProdi = roleId === ROLE_CONFIG.PRODI;
+  const isWadir1 = roleId === ROLE_CONFIG.WADIR1;
+  const isFinance = roleId === ROLE_CONFIG.FINANCE;
+  const isAdmin = roleId === ROLE_CONFIG.ADMIN || roleId === ROLE_CONFIG.ADMIN_ALT;
+  const isDirektur = roleId === ROLE_CONFIG.DIREKTUR;
 
+  // ============================================================================
+  // HAK AKSES BERDASARKAN ROLE
+  // ============================================================================
+  
+  // Permission checks untuk fitur-fitur
+  const hasViewPermission = useMemo(() => {
+    return hasPermission(userData, "drop_out.view");
+  }, [userData]);
+
+  const hasCreatePermission = useMemo(() => {
+    return hasPermission(userData, "drop_out.create");
+  }, [userData]);
+
+  const hasEditPermission = useMemo(() => {
+    return hasPermission(userData, "drop_out.edit");
+  }, [userData]);
+
+  const hasDeletePermission = useMemo(() => {
+    return hasPermission(userData, "drop_out.delete");
+  }, [userData]);
+
+  const hasApproveRejectPermission = useMemo(() => {
+    return hasPermission(userData, "drop_out.approve_reject");
+  }, [userData]);
+
+  const hasExportPermission = useMemo(() => {
+    return hasPermission(userData, "drop_out.export");
+  }, [userData]);
+
+  // Hak akses berdasarkan ROLE (untuk tampilan berbeda per user)
+  // Permission digunakan sebagai validasi tambahan
   const canCreate = useMemo(() => {
-    if (!isClient || !roleId) return false;
-    return isMahasiswa || isProdi || isAdmin;
-  }, [isClient, roleId, isMahasiswa, isProdi, isAdmin]);
+    if (!isClient) return false;
+    // Hanya Prodi dan Admin yang bisa tambah (berdasarkan ROLE)
+    // Permission sebagai validasi tambahan
+    return (isProdi || isAdmin) && (hasCreatePermission || !userData?.permission || userData.permission.length === 0);
+  }, [isClient, isProdi, isAdmin, hasCreatePermission, userData]);
 
   const canApprove = useMemo(() => {
-    if (!isClient || !roleId) return false;
-    const isFinanceRole = roleId === "ROL01";
-    const isWadir1Role = roleId === "ROL999";
-    const isDirekturRole = roleId === "ROL02";
-    const result = isFinanceRole || isWadir1Role || isDirekturRole;
-    return result;
-  }, [isClient, roleId]);
+    if (!isClient) return false;
+    // Wadir bisa approve (berdasarkan ROLE)
+    // Permission sebagai validasi tambahan
+    return isWadir1 && (hasApproveRejectPermission || !userData?.permission || userData.permission.length === 0);
+  }, [isClient, isWadir1, hasApproveRejectPermission, userData]);
 
-  // Hanya Prodi/Admin yang bisa melihat Daftar Pengajuan (Draft)
   const canSeeDraft = useMemo(() => {
-    if (!isClient || !roleId) return false;
+    if (!isClient) return false;
+    // Prodi dan Admin bisa lihat draft (berdasarkan ROLE)
     return isProdi || isAdmin;
-  }, [isClient, roleId, isProdi, isAdmin]);
+  }, [isClient, isProdi, isAdmin]);
+
+  const canExport = useMemo(() => {
+    if (!isClient) return false;
+    // Admin dan Prodi bisa export (berdasarkan ROLE)
+    // Permission sebagai validasi tambahan
+    return (isAdmin || isProdi) && (hasExportPermission || !userData?.permission || userData.permission.length === 0);
+  }, [isClient, isAdmin, isProdi, hasExportPermission, userData]);
 
   // Helper functions untuk extract dan parse response
   const extractArrayFromResponse = (response) => {
@@ -170,18 +243,7 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     if (statusLower === "draft") {
       if (isMahasiswa) return ["Detail"];
       
-      const actions = ["Detail"];
-      
-      const hasEditPermission = hasPermission(userData, "drop_out.edit");
-      const hasDeletePermission = hasPermission(userData, "drop_out.delete");
-      const isPermissionEmpty = !userData?.permission || userData.permission.length === 0;
-      
-      if (hasEditPermission || isPermissionEmpty) {
-        actions.push("Edit");
-      }
-      if (hasDeletePermission || isPermissionEmpty) {
-        actions.push("Delete");
-      }
+      const actions = ["Detail", "Edit", "Delete"];
       actions.push({
         IconName: "send-check",
         Title: "Ajukan",
@@ -198,33 +260,15 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
       return ["Detail", "Unduh Berkas"];
     }
     
-    // Hardcode check untuk Wadir dengan status "belum disetujui wadir 1"
+    // Check untuk Wadir dengan status "belum disetujui wadir 1"
     if (isWadir1 && statusLower === "belum disetujui wadir 1") {
-      
-      const actions = ["Detail"];
-      
-      // Jika permission kosong atau tidak ada, tetap tampilkan untuk Wadir (fallback ke role-based)
-      const hasApprovePermission = hasPermission(userData, "drop_out.approve_reject");
-      const isPermissionEmpty = !userData?.permission || userData.permission.length === 0;
-      
-      if (hasApprovePermission || isPermissionEmpty) {
-        actions.push("Approve", "Reject");
-      }
-      return actions;
+      return ["Detail", "Approve", "Reject"];
     }
     
     const approvalCheck = checkApprovalStatus(statusLower);
     
     if (approvalCheck) {
-      const actions = ["Detail"];
-      
-      const hasApprovePermission = hasPermission(userData, "drop_out.approve_reject");
-      const isPermissionEmpty = !userData?.permission || userData.permission.length === 0;
-      
-      if (hasApprovePermission || isPermissionEmpty) {
-        actions.push("Approve", "Reject");
-      }
-      return actions;
+      return ["Detail", "Approve", "Reject"];
     }
     
     return ["Detail"];
@@ -289,9 +333,13 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
             pageSize: 9999
           };
 
+          // Untuk admin, tidak perlu filter berdasarkan username
           if (isMahasiswa) {
             pengajuanParams.mhsId = nim;
             riwayatParams.mhsId = nim;
+          } else if (!isAdmin) {
+            // Non-admin (selain mahasiswa) tetap menggunakan username filter
+            riwayatParams.username = username;
           }
 
           const [pengajuanResponse, riwayatResponse] = await Promise.all([
@@ -329,8 +377,10 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
           const status = (item.status || "").trim();
           const statusLower = status.toLowerCase();
           const itemId = item.id || item.droId;
+          const namaMahasiswa = cleanMahasiswaName(item.namaMahasiswa || "-");
           
           let actions = ["Detail"];
+          let cetakSKAction = null;
           
           if (statusLower === "draft") {
             actions = [
@@ -344,15 +394,21 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
               }
             ];
           } else if (statusLower.includes("menunggu upload sk")) {
+            // Untuk Menunggu Upload SK: Detail dan Upload icon
             actions = [
-              "Detail", 
+              "Detail",
               {
-                IconName: "printer",
-                Title: "Cetak SK",
-                Function: () => globalThis.open(`${API_LINK}DropOut/template-sk`, '_blank')
-              },
-              "Unggah Berkas"
+                IconName: "cloud-upload",
+                Title: "Unggah Berkas",
+                Function: () => handleUploadSK(itemId)
+              }
             ];
+            // Cetak SK sebagai action object untuk kolom terpisah
+            cetakSKAction = {
+              IconName: "printer",
+              Title: "Cetak SK",
+              Function: () => handleCetakSK(itemId)
+            };
           } else if (statusLower.includes("belum disetujui") || statusLower.includes("menunggu")) {
             actions = ["Detail"];
           }
@@ -362,12 +418,14 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
             id: itemId || "",
             "No. Pengajuan DO": item.droId || "-",
             "Tanggal Pengajuan": item.tanggalPengajuan || "-",
+            "Dibuat Oleh": item.createdBy || item.dibuatOleh || "-",
+            "Nama Mahasiswa": namaMahasiswa,
+            Prodi: item.prodi || "-",
             "No. SK DO": item.noSkDo || "-",
             Status: status || "Draft",
-            "Cetak SK": statusLower.includes("menunggu upload sk"),
-            createdBy: item.createdBy || item.dibuatOleh || "",
+            "Cetak SK": cetakSKAction ? [cetakSKAction] : [],
             Aksi: actions,
-            Alignment: ["center", "center", "center", "center", "center", "center", "center"]
+            Alignment: ["center", "center", "center", "left", "left", "left", "center", "center", "center", "center"]
           };
         };
 
@@ -395,9 +453,8 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
         const draftData = [];
         const riwayatData = [];
         const currentUsername = (ssoData?.username || userData?.username || "").toLowerCase().trim();
-        const isUserAdminRole = isAdmin;
 
-        if (isUserAdminRole) {
+        if (isAdmin) {
           processDataForAdmin(pengajuanList, riwayatList, currentUsername, draftData, riwayatData, mapItemAdminPengajuan, mapItemAdminRiwayat);
         } else if (isProdi) {
           processDataForProdi(pengajuanList, riwayatList, currentUsername, draftData, riwayatData, mapItemDefault);
@@ -410,7 +467,7 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
         }
 
         // Sort untuk Admin
-        if (isUserAdminRole) {
+        if (isAdmin) {
           draftData.sort((a, b) => {
             const statusA = (a.Status || "").toUpperCase();
             const statusB = (b.Status || "").toUpperCase();
@@ -432,26 +489,43 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
         setLoading(false);
       }
     },
-    [sortBy, userData, ssoData, canCreate, canApprove]
+    [sortBy, userData, ssoData, canCreate, canApprove, isAdmin, isWadir1]
   );
 
   // Helper functions untuk process data by role
   const processDataForAdmin = (pengajuanList, riwayatList, currentUsername, draftData, riwayatData, mapPengajuan, mapRiwayat) => {
+    // Admin melihat:
+    // 1. Semua pengajuan yang dibuat oleh admin sendiri (createdBy = currentUsername)
+    // 2. Semua pengajuan dengan status "Menunggu Upload SK" (dari siapa saja)
     pengajuanList.forEach((item) => {
       const status = (item.status || "").toLowerCase().trim();
-      const itemCreatedBy = (item.createdBy || item.dibuatOleh || "").toLowerCase().trim();
+      // Coba berbagai kemungkinan field name untuk createdBy
+      const createdBy = (
+        item.createdBy || 
+        item.dibuatOleh || 
+        item.created_by || 
+        item.dibuat_oleh ||
+        item.CreatedBy ||
+        item.DibuatOleh ||
+        ""
+      ).toLowerCase().trim();
       
+      // Skip jika sudah selesai (ada di riwayat)
       if (status === "disetujui" || status.includes("ditolak")) return;
       
-      const shouldShow = status.includes("menunggu upload sk") || itemCreatedBy === currentUsername;
-      if (shouldShow) {
+      // Tampilkan jika:
+      // 1. Status = "Menunggu Upload SK" (dari siapa saja)
+      // 2. ATAU dibuat oleh admin sendiri (semua status lainnya)
+      if (status === "menunggu upload sk" || createdBy === currentUsername) {
         draftData.push(mapPengajuan(item, draftData.length));
       }
     });
     
+    // Riwayat: tampilkan semua yang sudah disetujui atau ditolak
     riwayatList.forEach((item) => {
       const status = (item.status || "").toLowerCase().trim();
-      if (status === "disetujui") {
+      
+      if (status === "disetujui" || status.includes("ditolak")) {
         riwayatData.push(mapRiwayat(item, riwayatData.length));
       }
     });
@@ -529,7 +603,7 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
 
   const processDataForWadir = (pengajuanList, riwayatList, draftData, riwayatData, mapItem, mapItemRiwayat) => {
     
-    // Data pengajuan - hanya yang Belum Disetujui Wadir 1
+    // Data pengajuan - hanya yang Belum Disetujui Wadir 1 (dari siapa saja)
     pengajuanList.forEach((item) => {
       const status = (item.status || "").toLowerCase().trim();
       if (status === "belum disetujui wadir 1") {
@@ -538,13 +612,10 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
       }
     });
     
-    // Data riwayat - hanya yang Disetujui atau Ditolak
+    // Data riwayat - SEMUA data (tampilkan semua riwayat)
     riwayatList.forEach((item) => {
-      const status = (item.status || "").toLowerCase().trim();
-      if (status === "disetujui" || status.includes("ditolak")) {
-        const mapped = mapItemRiwayat(item, 0);
-        riwayatData.push({ ...mapped, No: riwayatData.length + 1 });
-      }
+      const mapped = mapItemRiwayat(item, 0);
+      riwayatData.push({ ...mapped, No: riwayatData.length + 1 });
     });
     
   };
@@ -844,8 +915,6 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     // Buka URL template SK di tab baru
     window.open(`${API_LINK}DropOut/template-sk`, '_blank');
   };
-
-  // Helper functions untuk Excel styling
   const createHeaderStyle = () => ({
     font: { bold: true, color: { rgb: "FFFFFF" } },
     fill: { fgColor: { rgb: "4472C4" } },
@@ -982,7 +1051,6 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
   useEffect(() => {
     setIsClient(true);
     
-    
     if (!ssoData) {
       Toast.error("Sesi anda habis. Silakan login kembali.");
       router.push("/auth/login");
@@ -997,6 +1065,13 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     
     loadData(1, sortBy, "");
   }, []);
+
+  // Re-load data when isAdmin changes
+  useEffect(() => {
+    if (isClient && isAdmin !== undefined) {
+      loadData(1, sortBy, "");
+    }
+  }, [isAdmin]);
 
   /* ================= FILTER UI ================= */
 
@@ -1056,6 +1131,17 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
         { label: "Drop Out" }
       ]}
     >
+      {/* Check view permission */}
+      {!hasViewPermission && userData?.permission && userData.permission.length > 0 && (
+        <div className="alert alert-warning" role="alert">
+          <i className="bi bi-exclamation-triangle me-2"></i>
+          Anda tidak memiliki akses untuk melihat halaman ini. Silakan hubungi administrator untuk mendapatkan permission <strong>drop_out.view</strong>.
+        </div>
+      )}
+
+      {/* Show content only if has view permission or permission is empty (fallback to role) */}
+      {(hasViewPermission || !userData?.permission || userData.permission.length === 0) && (
+        <>
       {/* Tabel untuk Mahasiswa - Hanya menampilkan Daftar Pengajuan */}
       {isMahasiswa && (
         <div className="mb-4">
@@ -1092,8 +1178,91 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
         </div>
       )}
 
-      {/* Tabel Draft Pengajuan - Hanya untuk user_prodi/NDA_PRODI/ADMIN */}
-      {canSeeDraft && !isMahasiswa && (
+      {/* Tabel untuk Admin - Menampilkan Daftar Pengajuan dan Riwayat */}
+      {isAdmin && !isMahasiswa && (
+        <>
+          <div className="mb-4">
+            {/* Tombol Tambah untuk Admin - tampilkan jika punya create atau approve_reject */}
+            {(hasCreatePermission || hasApproveRejectPermission) && (
+              <div className="mb-3">
+                <button 
+                  className="btn btn-primary px-4"
+                  onClick={() => router.push("/pages/administrasi-akademik/drop-out/add")}
+                >
+                  <i className="bi bi-plus-lg me-1"></i>Tambah
+                </button>
+              </div>
+            )}
+            
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="mb-0">Daftar Pengajuan</h5>
+            </div>
+            
+            <Table
+              data={dataDraft.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
+              onDetail={handleDetail}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onApprove={handleApprove}
+              onReject={handleReject}
+              onAjukan={handleAjukan}
+              onUnggahBerkas={handleUploadSK}
+              onUnduhBerkas={handleUnduhBerkas}
+            />
+            
+            {dataDraft.length > pageSize && (
+              <Paging
+                pageSize={pageSize}
+                pageCurrent={currentPage}
+                totalData={dataDraft.length}
+                navigation={(p) => setCurrentPage(p)}
+              />
+            )}
+          </div>
+
+          <div className="mb-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="mb-0">Riwayat Pengajuan</h5>
+            </div>
+            
+            <Formsearch
+              onSearch={handleSearch}
+              onFilter={handleFilterApply}
+              onRefresh={handleRefresh}
+              onExport={canExport ? handleExportExcel : undefined}
+              showAddButton={false}
+              showRefreshButton={true}
+              showExportButton={canExport}
+              searchPlaceholder="Cari No. Pengajuan / Nama Mahasiswa"
+              filterContent={filterContent}
+            />
+            
+            <Table
+              data={filteredDataRiwayat.slice((currentPageRiwayat - 1) * pageSize, currentPageRiwayat * pageSize)}
+              onDetail={handleDetail}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onApprove={handleApprove}
+              onReject={handleReject}
+              onAjukan={handleAjukan}
+              onUnggahBerkas={handleUploadSK}
+              onUnduhBerkas={handleUnduhBerkas}
+            />
+            
+            {filteredDataRiwayat.length > pageSize && (
+              <Paging
+                pageSize={pageSize}
+                pageCurrent={currentPageRiwayat}
+                totalData={filteredDataRiwayat.length}
+                navigation={(p) => setCurrentPageRiwayat(p)}
+              />
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Tabel Draft Pengajuan - Untuk Prodi dan role lain (bukan Admin, bukan Mahasiswa) */}
+      {canSeeDraft && !isMahasiswa && !isAdmin && (
         <div className="mb-4">
           <div className="mb-3">
             <button 
@@ -1118,7 +1287,6 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
             onAjukan={handleAjukan}
             onUnggahBerkas={handleUploadSK}
             onUnduhBerkas={handleUnduhBerkas}
-            onCetakSK={handleCetakSK}
           />
           
           {dataDraft.length > pageSize && (
@@ -1136,7 +1304,7 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
       {isWadir1 && (
         <div className="mb-4">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h5 className="mb-0">Daftar Pengajuan</h5>
+            <h5 className="mb-0">Daftar Pengajuan (Belum Disetujui Wadir 1)</h5>
           </div>
           
           <Table
@@ -1158,8 +1326,8 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
       )}
 
 
-      {/* Tabel Riwayat Pengajuan - Untuk non-mahasiswa */}
-      {!isMahasiswa && (
+      {/* Tabel Riwayat Pengajuan - Untuk Prodi dan role lain (bukan Admin, bukan Mahasiswa, bukan Wadir) */}
+      {canSeeDraft && !isMahasiswa && !isAdmin && !isWadir1 && (
         <div className="mb-4">
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h5 className="mb-0">Riwayat Pengajuan</h5>
@@ -1169,10 +1337,10 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
             onSearch={handleSearch}
             onFilter={handleFilterApply}
             onRefresh={handleRefresh}
-            onExport={handleExportExcel}
+            onExport={canExport ? handleExportExcel : undefined}
             showAddButton={false}
             showRefreshButton={true}
-            showExportButton={true}
+            showExportButton={canExport}
             searchPlaceholder="Cari No. Pengajuan / Nama Mahasiswa"
             filterContent={filterContent}
           />
@@ -1187,7 +1355,6 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
             onAjukan={handleAjukan}
             onUnggahBerkas={handleUploadSK}
             onUnduhBerkas={handleUnduhBerkas}
-            onCetakSK={handleCetakSK}
           />
           
           {filteredDataRiwayat.length > pageSize && (
@@ -1204,82 +1371,158 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
       {/* Modal Upload SK */}
       {showUploadModal && (
         <>
-          <button
-            type="button"
-            className="position-fixed top-0 start-0 w-100 h-100 border-0 p-0"
-            style={{ backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 1050 }}
+          <div
+            className="position-fixed top-0 start-0 w-100 h-100"
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
             onClick={handleCloseUploadModal}
-            aria-label="Close modal"
           />
-          <dialog 
-            open
-            className="position-fixed top-50 start-50 translate-middle border-0 bg-transparent"
-            style={{ zIndex: 1051 }}
+          <div 
+            className="position-fixed top-50 start-50 translate-middle"
+            style={{ zIndex: 1051, width: '90%', maxWidth: '650px' }}
           >
-            <div 
-              className="bg-white rounded-3 shadow-lg p-4"
-              style={{ width: '100%', maxWidth: '500px' }}
-            >
-            {/* Header */}
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h5 className="mb-0 fw-bold">Unggah Berkas SK DO</h5>
-              <button 
-                type="button" 
-                className="btn-close"
-                onClick={handleCloseUploadModal}
-                aria-label="Close"
-              ></button>
-            </div>
+            <div className="bg-white rounded-4 shadow-lg overflow-hidden">
+              {/* Header */}
+              <div className="bg-primary text-white p-4 d-flex justify-content-between align-items-center">
+                <div className="d-flex align-items-center gap-3">
+                  <div className="bg-white bg-opacity-25 rounded-circle p-2">
+                    <i className="bi bi-cloud-upload fs-4"></i>
+                  </div>
+                  <div>
+                    <h5 className="mb-0 fw-bold">Unggah Berkas SK Drop Out</h5>
+                    <small className="opacity-75">Lengkapi dokumen yang diperlukan</small>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  className="btn-close btn-close-white"
+                  onClick={handleCloseUploadModal}
+                  aria-label="Close"
+                ></button>
+              </div>
 
-            {/* Body */}
-            <div className="mb-3">
-              <label htmlFor="fileSK" className="form-label">
-                <strong>File SK Drop Out</strong> <span className="text-danger">*</span>
-              </label>
-              <input
-                id="fileSK"
-                type="file"
-                className="form-control"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => setFileSK(e.target.files[0])}
-              />
-              <small className="text-muted">Format: PDF, JPG, PNG. Maks: 5MB</small>
-            </div>
+              {/* Body */}
+              <div className="p-4">
+                {/* File SK Drop Out */}
+                <div className="mb-4">
+                  <label htmlFor="fileSK" className="form-label fw-semibold d-flex align-items-center gap-2 mb-3">
+                    <i className="bi bi-file-earmark-pdf text-danger"></i>
+                    Berkas SK Drop Out
+                    <span className="text-danger">*</span>
+                  </label>
+                  <div className="position-relative">
+                    <input
+                      id="fileSK"
+                      type="file"
+                      className="form-control form-control-lg"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => setFileSK(e.target.files[0])}
+                      style={{ 
+                        paddingLeft: '3rem',
+                        border: '2px dashed #dee2e6',
+                        backgroundColor: '#f8f9fa'
+                      }}
+                    />
+                    <i 
+                      className="bi bi-paperclip position-absolute text-muted" 
+                      style={{ left: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '1.25rem' }}
+                    ></i>
+                  </div>
+                  {fileSK && (
+                    <div className="alert alert-success mt-2 py-2 px-3 d-flex align-items-center gap-2">
+                      <i className="bi bi-check-circle-fill"></i>
+                      <small className="mb-0">{fileSK.name}</small>
+                    </div>
+                  )}
+                  <div className="d-flex align-items-center gap-2 mt-2">
+                    <i className="bi bi-info-circle text-primary"></i>
+                    <small className="text-muted">Format: PDF, JPG, PNG • Maksimal: 5MB</small>
+                  </div>
+                </div>
 
-            <div className="mb-4">
-              <label htmlFor="fileSuratKeterangan" className="form-label">
-                <strong>File Surat Keterangan Pernah Berkuliah</strong> <span className="text-danger">*</span>
-              </label>
-              <input
-                id="fileSuratKeterangan"
-                type="file"
-                className="form-control"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => setFileSuratKeterangan(e.target.files[0])}
-              />
-              <small className="text-muted">Format: PDF, JPG, PNG. Maks: 5MB</small>
-            </div>
+                {/* File Surat Keterangan */}
+                <div className="mb-4">
+                  <label htmlFor="fileSuratKeterangan" className="form-label fw-semibold d-flex align-items-center gap-2 mb-3">
+                    <i className="bi bi-file-earmark-text text-info"></i>
+                    Berkas Surat Keterangan Pernah Berkuliah
+                    <span className="text-danger">*</span>
+                  </label>
+                  <div className="position-relative">
+                    <input
+                      id="fileSuratKeterangan"
+                      type="file"
+                      className="form-control form-control-lg"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => setFileSuratKeterangan(e.target.files[0])}
+                      style={{ 
+                        paddingLeft: '3rem',
+                        border: '2px dashed #dee2e6',
+                        backgroundColor: '#f8f9fa'
+                      }}
+                    />
+                    <i 
+                      className="bi bi-paperclip position-absolute text-muted" 
+                      style={{ left: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '1.25rem' }}
+                    ></i>
+                  </div>
+                  {fileSuratKeterangan && (
+                    <div className="alert alert-success mt-2 py-2 px-3 d-flex align-items-center gap-2">
+                      <i className="bi bi-check-circle-fill"></i>
+                      <small className="mb-0">{fileSuratKeterangan.name}</small>
+                    </div>
+                  )}
+                  <div className="d-flex align-items-center gap-2 mt-2">
+                    <i className="bi bi-info-circle text-primary"></i>
+                    <small className="text-muted">Format: PDF, JPG, PNG • Maksimal: 5MB</small>
+                  </div>
+                </div>
 
-            {/* Footer */}
-            <div className="d-flex justify-content-end gap-2">
-              <button 
-                type="button" 
-                className="btn btn-secondary px-4"
-                onClick={handleCloseUploadModal}
-              >
-                Batal
-              </button>
-              <button 
-                type="button" 
-                className="btn btn-primary px-4"
-                onClick={handleSubmitUpload}
-                disabled={uploading}
-              >
-                {uploading ? "Mengunggah..." : "Unggah"}
-              </button>
+                {/* Info Box */}
+                <div className="alert alert-light border-start border-4 border-primary py-3 px-4">
+                  <div className="d-flex gap-3">
+                    <i className="bi bi-exclamation-circle text-primary fs-5"></i>
+                    <div>
+                      <strong className="d-block mb-1">Perhatian:</strong>
+                      <small className="text-muted">
+                        Pastikan semua berkas yang diunggah sudah benar dan sesuai. 
+                        Berkas yang sudah diunggah tidak dapat diubah kembali.
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="bg-light p-4 d-flex justify-content-end gap-3">
+                <button 
+                  type="button" 
+                  className="btn btn-light border px-4 py-2"
+                  onClick={handleCloseUploadModal}
+                  disabled={uploading}
+                >
+                  <i className="bi bi-x-lg me-2"></i>
+                  Batal
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-primary px-4 py-2 shadow-sm"
+                  onClick={handleSubmitUpload}
+                  disabled={uploading || !fileSK || !fileSuratKeterangan}
+                >
+                  {uploading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Mengunggah...
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-cloud-upload me-2"></i>
+                      Unggah Berkas
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </dialog>
         </>
       )}
 
@@ -1340,6 +1583,8 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </MainContent>
   );

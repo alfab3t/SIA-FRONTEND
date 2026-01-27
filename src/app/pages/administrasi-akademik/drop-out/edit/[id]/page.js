@@ -210,8 +210,6 @@ export default function Page_Edit_DropOut() {
         "GET"
       );
 
-      console.log("Detail response:", response);
-
       if (response) {
         // Store original data
         editDataRef.current = response;
@@ -278,9 +276,6 @@ export default function Page_Edit_DropOut() {
           Value: item.Value ?? item.value ?? item.pro_id ?? item.id ?? "",
           Text: item.Text ?? item.text ?? item.pro_nama ?? item.nama ?? item.name ?? ""
         }));
-
-        console.log("Prodi list:", normalized);
-        console.log("Edit data prodi:", editDataRef.current?.prodi);
         
         setProdiList(normalized);
         
@@ -293,8 +288,6 @@ export default function Page_Edit_DropOut() {
             p.Text.includes(prodiName) ||
             prodiName.includes(p.Text)
           );
-          
-          console.log("Matched prodi:", matchedProdi);
           
           if (matchedProdi) {
             setSelectedProdi(matchedProdi.Value);
@@ -342,9 +335,6 @@ export default function Page_Edit_DropOut() {
           Value: x.Value ?? x.value ?? x.kon_id ?? x.id ?? "",
           Text: x.Text ?? x.text ?? x.kon_nama ?? x.nama ?? x.name ?? ""
         }));
-
-        console.log("Konsentrasi list:", normalized);
-        console.log("Edit data konsentrasi:", editDataRef.current?.konsentrasi);
         
         setKonsentrasiList(normalized);
         
@@ -356,8 +346,6 @@ export default function Page_Edit_DropOut() {
             k.Text.includes(konsName) ||
             konsName.includes(k.Text)
           );
-          
-          console.log("Matched konsentrasi:", matchedKons);
           
           if (matchedKons) {
             setSelectedKonsentrasi(matchedKons.Value);
@@ -415,9 +403,6 @@ export default function Page_Edit_DropOut() {
             Text: text
           };
         });
-
-        console.log("Mahasiswa list:", normalized);
-        console.log("Edit data mhsId:", editDataRef.current?.mhsId);
         
         setMahasiswaList(normalized);
         
@@ -536,9 +521,6 @@ export default function Page_Edit_DropOut() {
       mengingat: formData.mengingat
     };
 
-    console.log("Edit payload:", payload);
-    console.log("Edit ID:", id);
-
     try {
       // Get JWT token from cookie
       const jwtToken = document.cookie
@@ -554,8 +536,6 @@ export default function Page_Edit_DropOut() {
         },
         body: JSON.stringify(payload)
       });
-
-      console.log("Response status:", res.status);
       
       // Cek apakah response adalah JSON
       const contentType = res.headers.get("content-type");

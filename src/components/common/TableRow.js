@@ -230,7 +230,7 @@ export default function TableRow({
           }
         } else if (col === "Status") {
           cell = <Badge status={row[col]} />;
-        } else if (col === "Aksi") {
+        } else if (col === "Aksi" || col === "Cetak SK") {
           cell = renderAction(row[col], row.id, row.Status);
         } else if (typeof row[col] === "string") {
           cell = (

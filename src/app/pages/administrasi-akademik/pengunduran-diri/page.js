@@ -1,4 +1,42 @@
 "use client";
+
+/**
+ * ============================================================================
+ * HALAMAN PENGUNDURAN DIRI - ADMINISTRASI AKADEMIK
+ * ============================================================================
+ * 
+ * KONFIGURASI ROLE SISTEM:
+ * Anda bisa mengganti roleId sesuai kebutuhan di bagian ROLE_CONFIG di bawah
+ * 
+ * ┌─────────────┬──────────┬────────────────────────────────────────────────┐
+ * │ ROLE        │ ROLE ID  │ HAK AKSES                                      │
+ * ├─────────────┼──────────┼────────────────────────────────────────────────┤
+ * │ MAHASISWA   │ ROL23    │ - Buat pengajuan sendiri                       │
+ * │             │          │ - Lihat data sendiri + yang diajukan Prodi     │
+ * ├─────────────┼──────────┼────────────────────────────────────────────────┤
+ * │ PRODI       │ ROL71    │ - Buat pengajuan untuk mahasiswa               │
+ * │             │          │ - Lihat pengajuan yang dibuat sendiri          │
+ * │             │          │ - Approve/Reject "Belum Disetujui Prodi"       │
+ * │             │          │   (prodi sama dengan mahasiswa & user prodi)   │
+ * ├─────────────┼──────────┼────────────────────────────────────────────────┤
+ * │ WADIR 1     │ ROL999   │ - Lihat pengajuan "Belum Disetujui Wadir 1"   │
+ * │             │          │   (dari siapa saja)                            │
+ * │             │          │ - Approve/Reject untuk ubah status             │
+ * │             │          │ - Lihat SEMUA riwayat                          │
+ * ├─────────────┼──────────┼────────────────────────────────────────────────┤
+ * │ ADMIN       │ ROL21    │ - Upload SK untuk "Menunggu Upload SK"         │
+ * │             │ ROL74    │ - Cetak SK                                     │
+ * │             │          │ - HANYA lihat status "Menunggu Upload SK"      │
+ * │             │          │ - TIDAK BISA tambah data                       │
+ * ├─────────────┼──────────┼────────────────────────────────────────────────┤
+ * │ FINANCE     │ ROL01    │ - Lihat riwayat saja (yang sudah disetujui)    │
+ * │             │          │ - Download berkas                              │
+ * └─────────────┴──────────┴────────────────────────────────────────────────┘
+ * 
+ * CARA MENGGANTI ROLE ID:
+ * Edit bagian ROLE_CONFIG di bawah, ubah nilai roleId sesuai kebutuhan
+ */
+
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Paging from "@/components/common/Paging";
 import Table from "@/components/common/Table";
@@ -13,6 +51,19 @@ import { getSSOData, getUserData } from "@/context/user";
 import SweetAlert from "@/components/common/SweetAlert";
 import * as XLSX from "xlsx";
 import { hasPermission } from "@/lib/permission-utils";
+
+// ============================================================================
+// KONFIGURASI ROLE - EDIT DI SINI UNTUK MENGGANTI ROLE ID
+// ============================================================================
+const ROLE_CONFIG = {
+  MAHASISWA: "ROL23",
+  PRODI: "ROL71",
+  WADIR1: "ROL999",
+  ADMIN: "ROL21",
+  ADMIN_ALT: "ROL74",  // Role admin alternatif
+  FINANCE: "ROL01"
+};
+
 export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
   const router = useRouter();
   const ssoData = useMemo(() => getSSOData(), []);
@@ -24,6 +75,13 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectId, setRejectId] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
+  
+  // Modal Upload SK
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadId, setUploadId] = useState(null);
+  const [fileSK, setFileSK] = useState(null);
+  const [fileSuratKeterangan, setFileSuratKeterangan] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const sortRef = useRef();
   const statusRef = useRef();
   const dataFilterSort = [
@@ -56,21 +114,68 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState(dataFilterSort[0].Value);
   const [sortStatus, setSortStatus] = useState("");
+  
+  // ============================================================================
+  // DETEKSI ROLE USER - Menggunakan ROLE_CONFIG di atas
+  // ============================================================================
   const roleId = userData?.roleId || "";
-  const isMahasiswa = roleId === "ROL23";
-  const isProdi = roleId === "ROL71";
-  const isWadir1 = roleId === "ROL999";
-  const isFinance = roleId === "ROL01";
-  const isAdmin = roleId === "ROL21";
-  const isUserAdmin = isAdmin; // Alias untuk konsistensi dengan kode lama
+  const isMahasiswa = roleId === ROLE_CONFIG.MAHASISWA;
+  const isProdi = roleId === ROLE_CONFIG.PRODI;
+  const isWadir1 = roleId === ROLE_CONFIG.WADIR1;
+  const isFinance = roleId === ROLE_CONFIG.FINANCE;
+  const isAdmin = roleId === ROLE_CONFIG.ADMIN || roleId === ROLE_CONFIG.ADMIN_ALT;
+
+  // ============================================================================
+  // HAK AKSES BERDASARKAN ROLE
+  // ============================================================================
+  
+  // Permission checks untuk fitur-fitur
+  const hasViewPermission = useMemo(() => {
+    return hasPermission(userData, "pengunduran_diri.view");
+  }, [userData]);
+
+  const hasCreatePermission = useMemo(() => {
+    return hasPermission(userData, "pengunduran_diri.create");
+  }, [userData]);
+
+  const hasEditPermission = useMemo(() => {
+    return hasPermission(userData, "pengunduran_diri.edit");
+  }, [userData]);
+
+  const hasDeletePermission = useMemo(() => {
+    return hasPermission(userData, "pengunduran_diri.delete");
+  }, [userData]);
+
+  const hasApproveRejectPermission = useMemo(() => {
+    return hasPermission(userData, "pengunduran_diri.approve_reject");
+  }, [userData]);
+
+  const hasExportPermission = useMemo(() => {
+    return hasPermission(userData, "pengunduran_diri.export");
+  }, [userData]);
+
+  // Hak akses berdasarkan ROLE (untuk tampilan berbeda per user)
+  // Permission digunakan sebagai validasi tambahan
   const canCreate = useMemo(() => {
-    if (!isClient || !roleId) return false;
-    return isMahasiswa || isProdi || isAdmin;
-  }, [isClient, roleId, isMahasiswa, isProdi, isAdmin]);
+    if (!isClient) return false;
+    // Mahasiswa dan Prodi bisa tambah (berdasarkan ROLE)
+    // Permission sebagai validasi tambahan
+    return (isMahasiswa || isProdi) && (hasCreatePermission || !userData?.permission || userData.permission.length === 0);
+  }, [isClient, isMahasiswa, isProdi, hasCreatePermission, userData]);
+
   const canSeeDraft = useMemo(() => {
-    if (!isClient || !roleId) return false;
-    return isProdi;
-  }, [isClient, roleId, isProdi]);
+    if (!isClient) return false;
+    // Prodi dan Admin bisa lihat draft (berdasarkan ROLE)
+    return isProdi || isAdmin;
+  }, [isClient, isProdi, isAdmin]);
+
+  const canExport = useMemo(() => {
+    if (!isClient) return false;
+    // Admin dan Prodi bisa export (berdasarkan ROLE)
+    // Permission sebagai validasi tambahan
+    return (isAdmin || isProdi) && (hasExportPermission || !userData?.permission || userData.permission.length === 0);
+  }, [isClient, isAdmin, isProdi, hasExportPermission, userData]);
+
   const [checkingTanggungan, setCheckingTanggungan] = useState(true); // Default true saat loading
   const [bebasTanggungan, setBebasTanggungan] = useState(true);
   const checkBebasTanggunganMahasiswa = useCallback(async () => {
@@ -160,15 +265,34 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
     }
   };
   const fetchDataForAdmin = async (username, keyword, sort) => {
-    const [pengajuanResponse, riwayatResponse] = await Promise.all([
-      fetchData(API_LINK + "PengunduranDiri", { p1: username, status: "Menunggu Upload SK", userId: username }, "GET").catch(err => {
-        console.error("Error fetching Menunggu Upload SK:", err);
+    // Fetch semua status untuk pengajuan (kecuali yang sudah selesai)
+    const statusesToFetch = ["Draft", "Belum Disetujui Prodi", "Belum Disetujui Wadir 1", "Menunggu Upload SK"];
+    
+    const pengajuanPromises = statusesToFetch.map(status =>
+      fetchData(API_LINK + "PengunduranDiri", { 
+        status: status,
+        konsentrasi: "" // Admin melihat semua prodi
+      }, "GET").catch(err => {
+        console.error(`Error fetching ${status}:`, err);
         return [];
-      }),
-      fetchData(API_LINK + "PengunduranDiri/riwayat", { status: "Disetujui", keyword: keyword || "", orderBy: sort || "", konsentrasi: "" }, "GET").catch(() => [])
+      })
+    );
+    
+    const [pengajuanResponses, riwayatResponse] = await Promise.all([
+      Promise.all(pengajuanPromises),
+      fetchData(API_LINK + "PengunduranDiri/riwayat", { 
+        status: "Disetujui", 
+        keyword: keyword || "", 
+        orderBy: sort || "", 
+        konsentrasi: "" // Admin melihat semua prodi
+      }, "GET").catch(() => [])
     ]);
+    
+    // Gabungkan semua pengajuan dari berbagai status
+    const allData = pengajuanResponses.flat();
+    
     return {
-      allData: extractArrayFromResponse(pengajuanResponse),
+      allData: extractArrayFromResponse(allData.length > 0 ? allData : []),
       riwayatDataFromApi: extractArrayFromResponse(riwayatResponse)
     };
   };
@@ -236,8 +360,8 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
       return pdId.includes(lowerKeyword) || nama.includes(lowerKeyword);
     });
   };
-  const filterDataByRole = (data, isUserAdmin, isMahasiswa, isProdi) => {
-    if (isUserAdmin) return data;
+  const filterDataByRole = (data, isAdmin, isMahasiswa, isProdi) => {
+    if (isAdmin) return data;
     if (!isMahasiswa && !isProdi) {
       return data.filter(item => {
         const status = (item.status || "").toLowerCase();
@@ -266,7 +390,7 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
         let allData = [];
         let riwayatDataFromApi = [];
         
-        if (isUserAdmin) {
+        if (isAdmin) {
           const result = await fetchDataForAdmin(username, keyword, sort);
           allData = result.allData;
           riwayatDataFromApi = result.riwayatDataFromApi;
@@ -274,12 +398,10 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
           // Untuk Wadir, fetch pengajuan dan riwayat secara terpisah
           const [pengajuanResponse, riwayatResponse] = await Promise.all([
             fetchData(API_LINK + "PengunduranDiri", { 
-              p1: username, 
-              status: "Belum Disetujui Wadir 1", 
-              userId: username 
+              status: "Belum Disetujui Wadir 1",
+              konsentrasi: ""
             }, "GET").catch(() => []),
             fetchData(API_LINK + "PengunduranDiri/riwayat", {
-              status: "Belum Disetujui Wadir 1",
               keyword: keyword || "",
               orderBy: sort || "",
               konsentrasi: ""
@@ -291,53 +413,26 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
         } else {
           allData = await fetchDataForNonAdmin(nim, username, isMahasiswa, isProdi, userData);
         }
-        allData = filterDataByRole(allData, isUserAdmin, isMahasiswa, isProdi);
+        allData = filterDataByRole(allData, isAdmin, isMahasiswa, isProdi);
         allData = filterDataByKeyword(allData, keyword);
         const getActionsForItem = (itemStatusLower, itemId) => {
           if (itemStatusLower === "disetujui") {
             return ["Detail", "Unduh Berkas"];
           }
-          if (itemStatusLower === "menunggu upload sk" && isUserAdmin) {
+          if (itemStatusLower === "menunggu upload sk" && isAdmin) {
             return ["Detail", "Cetak SK", "Unggah Berkas"];
           }
           if (itemStatusLower === "belum disetujui prodi" && isProdi) {
-            const actions = ["Detail"];
-            
-            const hasApprovePermission = hasPermission(userData, "pengunduran_diri.approve_reject");
-            const isPermissionEmpty = !userData?.permission || userData.permission.length === 0;
-            
-            if (hasApprovePermission || isPermissionEmpty) {
-              actions.push("Approve", "Reject");
-            }
-            return actions;
+            return ["Detail", "Approve", "Reject"];
           }
           if (itemStatusLower === "belum disetujui wadir 1" && isWadir1) {
-            const actions = ["Detail"];
-            
-            const hasApprovePermission = hasPermission(userData, "pengunduran_diri.approve_reject");
-            const isPermissionEmpty = !userData?.permission || userData.permission.length === 0;
-            
-            if (hasApprovePermission || isPermissionEmpty) {
-              actions.push("Approve", "Reject");
-            }
-            return actions;
+            return ["Detail", "Approve", "Reject"];
           }
           if (itemStatusLower === "belum disetujui wadir 1") {
             return ["Detail"];
           }
-          if (itemStatusLower === "draft" && (isMahasiswa || isProdi || isUserAdmin)) {
-            const actions = ["Detail"];
-            
-            const hasEditPermission = hasPermission(userData, "pengunduran_diri.edit");
-            const hasDeletePermission = hasPermission(userData, "pengunduran_diri.delete");
-            const isPermissionEmpty = !userData?.permission || userData.permission.length === 0;
-            
-            if (hasEditPermission || isPermissionEmpty) {
-              actions.push("Edit");
-            }
-            if (hasDeletePermission || isPermissionEmpty) {
-              actions.push("Delete");
-            }
+          if (itemStatusLower === "draft" && (isMahasiswa || isProdi || isAdmin)) {
+            const actions = ["Detail", "Edit", "Delete"];
             actions.push({
               IconName: "send-check",
               Title: "Ajukan",
@@ -404,15 +499,29 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
         const mapItemAdminPengajuan = (item, index) => {
           const itemStatus = (item.status || item.Status || "").trim();
           const itemStatusLower = itemStatus.toLowerCase().trim();
-          let actions = [
-            "Detail", 
-            {
+          const itemId = item.pdiId || item.idAlternative || item.id;
+          
+          let actions = ["Detail"];
+          let cetakSKAction = null;
+          
+          // Untuk Menunggu Upload SK: Detail dan Upload icon
+          if (itemStatusLower === "menunggu upload sk") {
+            actions = [
+              "Detail",
+              {
+                IconName: "cloud-upload",
+                Title: "Unggah Berkas",
+                Function: () => handleUploadSK(itemId)
+              }
+            ];
+            // Cetak SK sebagai action object untuk kolom terpisah
+            cetakSKAction = {
               IconName: "printer",
               Title: "Cetak SK",
               Function: () => globalThis.open(`${API_LINK}PengunduranDiri/template-sk`, '_blank')
-            },
-            "Unggah Berkas"
-          ];
+            };
+          }
+          
           const pdId = item.pdiId || item.idAlternative || item.id || "-";
           const tanggal = item.tanggal || item.tanggalPengajuan || "-";
           const noSK = item.suratNo || item.noSK || "-";
@@ -423,6 +532,7 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
           const isWadirApproved = 
             itemStatusLower === "menunggu upload sk" || 
             itemStatusLower === "disetujui";
+          
           return {
             No: index + 1,
             id: pdId,
@@ -432,7 +542,7 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
             "Disetujui Prodi": isProdiApproved ? "✓" : "✗",
             "Disetujui Wadir 1": isWadirApproved ? "✓" : "✗",
             "Status": itemStatus || "Draft",
-            "Cetak SK": true,
+            "Cetak SK": cetakSKAction ? [cetakSKAction] : [],
             "Aksi": actions,
             Alignment: ["center", "center", "center", "center", "center", "center", "center", "center", "center"]
           };
@@ -463,7 +573,7 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
         const separateDataByRole = (allData, riwayatDataFromApi, username, nim) => {
           const currentUsername = (username || "").toLowerCase().trim();
           const currentNim = (nim || "").toLowerCase().trim();
-          if (isUserAdmin) {
+          if (isAdmin) {
             return separateDataForAdmin(allData, riwayatDataFromApi, currentUsername);
           }
           if (isMahasiswa) {
@@ -478,17 +588,23 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
           return separateDataForOthers(allData);
         };
         const separateDataForAdmin = (allData, riwayatDataFromApi, currentUsername) => {
+          // Admin melihat:
+          // Hanya pengajuan dengan status "Menunggu Upload SK" (dari siapa saja, tanpa filter createdBy)
           const draftData = allData
             .filter(item => {
               const status = (item.status || "").toLowerCase().trim();
-              const itemCreatedBy = (item.createdBy || "").toLowerCase().trim();
-              if (status === "menunggu upload sk") return true;
-              const isMyData = itemCreatedBy === currentUsername;
-              const isValidStatus = ["draft", "belum disetujui prodi", "belum disetujui wadir 1"].includes(status);
-              return isMyData && isValidStatus;
+              
+              // Exclude status yang sudah selesai (ada di riwayat)
+              if (status === "disetujui" || status.includes("ditolak")) return false;
+              
+              // Tampilkan hanya jika status = "Menunggu Upload SK"
+              return status === "menunggu upload sk";
             })
             .map((item, idx) => mapItemAdminPengajuan(item, idx));
+          
+          // Riwayat: tampilkan semua data dari riwayatDataFromApi (sudah di-filter di API dengan status "Disetujui")
           const riwayatData = riwayatDataFromApi.map((item, idx) => mapItemAdminRiwayat(item, idx));
+          
           return { draftData, riwayatData };
         };
         const separateDataForMahasiswa = (allData, currentNim) => {
@@ -513,9 +629,14 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
               const status = (item.status || "").toLowerCase().trim();
               const itemCreatedBy = (item.createdBy || "").toLowerCase().trim();
               
+              // Untuk status "Belum Disetujui Prodi":
+              // Tampilkan jika prodi mahasiswa sama dengan prodi user yang login
+              // (filter ini seharusnya sudah dilakukan di backend berdasarkan displayName/prodi)
               if (status === "belum disetujui prodi") {
-                return true;
+                return true; // Backend sudah filter berdasarkan prodi
               }
+              
+              // Untuk status lain, tampilkan jika dibuat oleh prodi sendiri
               const isMyData = itemCreatedBy === currentUsername;
               const validStatuses = ["draft", "belum disetujui wadir 1", "menunggu upload sk"];
               return isMyData && validStatuses.includes(status);
@@ -534,16 +655,16 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
         };
         const separateDataForWadir = (allData, riwayatDataFromApi) => {
           
-          // Data pengajuan (Belum Disetujui Wadir 1) - gunakan mapItem
-          const draftData = allData.map((item, idx) => mapItem(item, idx));
-          
-          // Data riwayat - filter hanya yang Disetujui atau Ditolak (exclude Menunggu Upload SK)
-          const riwayatData = riwayatDataFromApi
+          // Data pengajuan - hanya yang Belum Disetujui Wadir 1 (dari siapa saja)
+          const draftData = allData
             .filter(item => {
               const status = (item.status || item.Status || "").toLowerCase();
-              return status === "disetujui" || status.includes("ditolak");
+              return status === "belum disetujui wadir 1";
             })
-            .map((item, idx) => mapItemAdminRiwayat(item, idx));
+            .map((item, idx) => mapItem(item, idx));
+          
+          // Data riwayat - SEMUA data (tampilkan semua riwayat)
+          const riwayatData = riwayatDataFromApi.map((item, idx) => mapItemAdminRiwayat(item, idx));
           
           
           return { draftData, riwayatData };
@@ -577,7 +698,7 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
         setLoading(false);
       }
     },
-    [sortBy, isUserAdmin, isMahasiswa, isProdi, isWadir1, isFinance]
+    [sortBy, isAdmin, isMahasiswa, isProdi, isWadir1, isFinance]
   );
   const handleSearch = (q) => {
     setSearch(q);
@@ -780,8 +901,65 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
     }
   };
   const handleUploadSK = (id) => {
-    const encodedId = encodeURIComponent(id);
-    router.push(`/pages/administrasi-akademik/pengunduran-diri/upload-sk/${encodedId}`);
+    setUploadId(id);
+    setFileSK(null);
+    setFileSuratKeterangan(null);
+    setShowUploadModal(true);
+  };
+
+  const handleCloseUploadModal = () => {
+    setShowUploadModal(false);
+    setUploadId(null);
+    setFileSK(null);
+    setFileSuratKeterangan(null);
+  };
+
+  const handleSubmitUpload = async () => {
+    if (!fileSK) {
+      Toast.error("Berkas SK Pengunduran Diri wajib diunggah");
+      return;
+    }
+    if (!fileSuratKeterangan) {
+      Toast.error("Berkas Surat Keterangan Pernah Berkuliah wajib diunggah");
+      return;
+    }
+
+    try {
+      setUploading(true);
+
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append("PdiId", uploadId);
+      formData.append("SkFile", fileSK);
+      formData.append("SkpbFile", fileSuratKeterangan);
+
+      const jwtToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('jwtToken='))
+        ?.split('=')[1];
+
+      const res = await fetch(`${API_LINK}PengunduranDiri/upload-sk-file`, {
+        method: "POST",
+        headers: {
+          ...(jwtToken && { Authorization: `Bearer ${jwtToken}` })
+        },
+        body: formData
+      });
+
+      if (res.ok) {
+        Toast.success("Berkas berhasil diupload");
+        handleCloseUploadModal();
+        loadData();
+      } else {
+        const errorText = await res.text();
+        Toast.error("Gagal mengupload berkas: " + errorText);
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      Toast.error("Terjadi kesalahan: " + err.message);
+    } finally {
+      setUploading(false);
+    }
   };
   const handleUnduhBerkas = async (id) => {
     try {
@@ -899,16 +1077,14 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
   useEffect(() => {
     setIsClient(true);
     
-    
     if (!ssoData) {
       Toast.error("Sesi anda habis. Silakan login kembali.");
       router.push("/auth/login");
       return;
     }
-    Promise.all([
-      loadData(1, sortBy, ""),
-      checkBebasTanggunganMahasiswa()
-    ]);
+    
+    loadData(1, sortBy, "");
+    checkBebasTanggunganMahasiswa();
   }, []);
   const filteredDataRiwayat = useMemo(() => {
     if (!search || search.trim() === "") {
@@ -962,10 +1138,7 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
       );
     }
     
-    const hasCreatePermission = hasPermission(userData, "pengunduran_diri.create");
-    const isPermissionEmpty = !userData?.permission || userData.permission.length === 0;
-    
-    if (canCreate && (hasCreatePermission || isPermissionEmpty)) {
+    if (canCreate) {
       return (
         <button 
           className="btn btn-primary px-4"
@@ -988,59 +1161,61 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
         { label: "Pengunduran Diri" }
       ]}
     >
-      {}
-      {isUserAdmin && (
-        <div className="mb-4">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <h5 className="mb-0">Daftar Pengajuan Menunggu Upload SK</h5>
-          </div>
-          <Table
-            data={dataDraft.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
-            onDetail={handleDetail}
-            onUnggahBerkas={handleUploadSK}
-            onCetakSK={handleCetakSK}
-          />
-          {dataDraft.length > pageSize && (
-            <Paging
-              pageSize={pageSize}
-              pageCurrent={currentPage}
-              totalData={dataDraft.length}
-              navigation={(p) => setCurrentPage(p)}
+      {/* Section untuk Admin */}
+      {isAdmin && (
+        <>
+          <div className="mb-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="mb-0">Daftar Pengajuan</h5>
+            </div>
+            <Table
+              data={dataDraft.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
+              onDetail={handleDetail}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onUnggahBerkas={handleUploadSK}
+              onCetakSK={handleCetakSK}
             />
-          )}
-        </div>
-      )}
-      {}
-      {isUserAdmin && (
-        <div className="mb-4">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <h5 className="mb-0">Daftar Riwayat Pengajuan</h5>
+            {dataDraft.length > pageSize && (
+              <Paging
+                pageSize={pageSize}
+                pageCurrent={currentPage}
+                totalData={dataDraft.length}
+                navigation={(p) => setCurrentPage(p)}
+              />
+            )}
           </div>
-          <Formsearch
-            onSearch={handleSearch}
-            onFilter={handleFilterApply}
-            onRefresh={handleRefresh}
-            onExport={handleExportExcel}
-            showAddButton={false}
-            showRefreshButton={true}
-            showExportButton={true}
-            searchPlaceholder="Cari No. Pengajuan / Nama Mahasiswa"
-            filterContent={filterContent}
-          />
-          <Table
-            data={filteredDataRiwayat.slice((currentPageRiwayat - 1) * pageSize, currentPageRiwayat * pageSize)}
-            onDetail={handleDetail}
-            onUnduhBerkas={handleUnduhBerkas}
-          />
-          {filteredDataRiwayat.length > pageSize && (
-            <Paging
-              pageSize={pageSize}
-              pageCurrent={currentPageRiwayat}
-              totalData={filteredDataRiwayat.length}
-              navigation={(p) => setCurrentPageRiwayat(p)}
+          
+          <div className="mb-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="mb-0">Daftar Riwayat Pengajuan</h5>
+            </div>
+            <Formsearch
+              onSearch={handleSearch}
+              onFilter={handleFilterApply}
+              onRefresh={handleRefresh}
+              onExport={hasExportPermission || !userData?.permission || userData.permission.length === 0 ? handleExportExcel : undefined}
+              showAddButton={false}
+              showRefreshButton={true}
+              showExportButton={hasExportPermission || !userData?.permission || userData.permission.length === 0}
+              searchPlaceholder="Cari No. Pengajuan / Nama Mahasiswa"
+              filterContent={filterContent}
             />
-          )}
-        </div>
+            <Table
+              data={filteredDataRiwayat.slice((currentPageRiwayat - 1) * pageSize, currentPageRiwayat * pageSize)}
+              onDetail={handleDetail}
+              onUnduhBerkas={handleUnduhBerkas}
+            />
+            {filteredDataRiwayat.length > pageSize && (
+              <Paging
+                pageSize={pageSize}
+                pageCurrent={currentPageRiwayat}
+                totalData={filteredDataRiwayat.length}
+                navigation={(p) => setCurrentPageRiwayat(p)}
+              />
+            )}
+          </div>
+        </>
       )}
       {}
       {isMahasiswa && (
@@ -1079,7 +1254,7 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
         </div>
       )}
       {}
-      {canSeeDraft && !isMahasiswa && !isUserAdmin && (
+      {canSeeDraft && !isMahasiswa && !isAdmin && (
         <div className="mb-4">
           {}
           {canCreate && (
@@ -1118,7 +1293,7 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
         </div>
       )}
       {}
-      {canSeeDraft && !isMahasiswa && !isUserAdmin && (
+      {canSeeDraft && !isMahasiswa && !isAdmin && (
         <div className="mb-4">
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h5 className="mb-0">Daftar Riwayat Pengajuan Pengunduran Diri</h5>
@@ -1127,10 +1302,10 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
             onSearch={handleSearch}
             onFilter={handleFilterApply}
             onRefresh={handleRefresh}
-            onExport={handleExportExcel}
+            onExport={hasExportPermission || !userData?.permission || userData.permission.length === 0 ? handleExportExcel : undefined}
             showAddButton={false}
             showRefreshButton={true}
-            showExportButton={true}
+            showExportButton={hasExportPermission || !userData?.permission || userData.permission.length === 0}
             searchPlaceholder="Cari No. Pengajuan / Nama Mahasiswa"
             filterContent={filterContent}
           />
@@ -1240,7 +1415,7 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
       )}
       {}
       {/* Untuk role lain (selain Mahasiswa, Prodi, Admin, Finance, Wadir) */}
-      {!isMahasiswa && !canSeeDraft && !isUserAdmin && !isFinance && !isWadir1 && (
+      {!isMahasiswa && !canSeeDraft && !isAdmin && !isFinance && !isWadir1 && (
         <>
           <div className="mb-4">
             <div className="d-flex justify-content-between align-items-center mb-3">
@@ -1303,7 +1478,166 @@ export default function Page_Administrasi_Pengajuan_Pengunduran_Diri() {
           </div>
         </>
       )}
-      {}
+
+      {/* Modal Upload SK */}
+      {showUploadModal && (
+        <>
+          <div
+            className="position-fixed top-0 start-0 w-100 h-100"
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+            onClick={handleCloseUploadModal}
+          />
+          <div 
+            className="position-fixed top-50 start-50 translate-middle"
+            style={{ zIndex: 1051, width: '90%', maxWidth: '650px' }}
+          >
+            <div className="bg-white rounded-4 shadow-lg overflow-hidden">
+              {/* Header */}
+              <div className="bg-primary text-white p-4 d-flex justify-content-between align-items-center">
+                <div className="d-flex align-items-center gap-3">
+                  <div className="bg-white bg-opacity-25 rounded-circle p-2">
+                    <i className="bi bi-cloud-upload fs-4"></i>
+                  </div>
+                  <div>
+                    <h5 className="mb-0 fw-bold">Unggah Berkas SK Pengunduran Diri</h5>
+                    <small className="opacity-75">Lengkapi dokumen yang diperlukan</small>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  className="btn-close btn-close-white"
+                  onClick={handleCloseUploadModal}
+                  aria-label="Close"
+                ></button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4">
+                {/* File SK Pengunduran Diri */}
+                <div className="mb-4">
+                  <label htmlFor="fileSK" className="form-label fw-semibold d-flex align-items-center gap-2 mb-3">
+                    <i className="bi bi-file-earmark-pdf text-danger"></i>
+                    Berkas SK Pengunduran Diri
+                    <span className="text-danger">*</span>
+                  </label>
+                  <div className="position-relative">
+                    <input
+                      id="fileSK"
+                      type="file"
+                      className="form-control form-control-lg"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => setFileSK(e.target.files[0])}
+                      style={{ 
+                        paddingLeft: '3rem',
+                        border: '2px dashed #dee2e6',
+                        backgroundColor: '#f8f9fa'
+                      }}
+                    />
+                    <i 
+                      className="bi bi-paperclip position-absolute text-muted" 
+                      style={{ left: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '1.25rem' }}
+                    ></i>
+                  </div>
+                  {fileSK && (
+                    <div className="alert alert-success mt-2 py-2 px-3 d-flex align-items-center gap-2">
+                      <i className="bi bi-check-circle-fill"></i>
+                      <small className="mb-0">{fileSK.name}</small>
+                    </div>
+                  )}
+                  <div className="d-flex align-items-center gap-2 mt-2">
+                    <i className="bi bi-info-circle text-primary"></i>
+                    <small className="text-muted">Format: PDF, JPG, PNG • Maksimal: 5MB</small>
+                  </div>
+                </div>
+
+                {/* File Surat Keterangan */}
+                <div className="mb-4">
+                  <label htmlFor="fileSuratKeterangan" className="form-label fw-semibold d-flex align-items-center gap-2 mb-3">
+                    <i className="bi bi-file-earmark-text text-info"></i>
+                    Berkas Surat Keterangan Pernah Berkuliah
+                    <span className="text-danger">*</span>
+                  </label>
+                  <div className="position-relative">
+                    <input
+                      id="fileSuratKeterangan"
+                      type="file"
+                      className="form-control form-control-lg"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => setFileSuratKeterangan(e.target.files[0])}
+                      style={{ 
+                        paddingLeft: '3rem',
+                        border: '2px dashed #dee2e6',
+                        backgroundColor: '#f8f9fa'
+                      }}
+                    />
+                    <i 
+                      className="bi bi-paperclip position-absolute text-muted" 
+                      style={{ left: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '1.25rem' }}
+                    ></i>
+                  </div>
+                  {fileSuratKeterangan && (
+                    <div className="alert alert-success mt-2 py-2 px-3 d-flex align-items-center gap-2">
+                      <i className="bi bi-check-circle-fill"></i>
+                      <small className="mb-0">{fileSuratKeterangan.name}</small>
+                    </div>
+                  )}
+                  <div className="d-flex align-items-center gap-2 mt-2">
+                    <i className="bi bi-info-circle text-primary"></i>
+                    <small className="text-muted">Format: PDF, JPG, PNG • Maksimal: 5MB</small>
+                  </div>
+                </div>
+
+                {/* Info Box */}
+                <div className="alert alert-light border-start border-4 border-primary py-3 px-4">
+                  <div className="d-flex gap-3">
+                    <i className="bi bi-exclamation-circle text-primary fs-5"></i>
+                    <div>
+                      <strong className="d-block mb-1">Perhatian:</strong>
+                      <small className="text-muted">
+                        Pastikan semua berkas yang diunggah sudah benar dan sesuai. 
+                        Berkas yang sudah diunggah tidak dapat diubah kembali.
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="bg-light p-4 d-flex justify-content-end gap-3">
+                <button 
+                  type="button" 
+                  className="btn btn-light border px-4 py-2"
+                  onClick={handleCloseUploadModal}
+                  disabled={uploading}
+                >
+                  <i className="bi bi-x-lg me-2"></i>
+                  Batal
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-primary px-4 py-2 shadow-sm"
+                  onClick={handleSubmitUpload}
+                  disabled={uploading || !fileSK || !fileSuratKeterangan}
+                >
+                  {uploading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Mengunggah...
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-cloud-upload me-2"></i>
+                      Unggah Berkas
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Modal Reject */}
       {showRejectModal && (
         <div 
           className="modal fade show d-block" 

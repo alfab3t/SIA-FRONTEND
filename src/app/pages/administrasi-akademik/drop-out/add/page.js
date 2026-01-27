@@ -190,26 +190,7 @@ export default function Page_Add_DropOut() {
     mengingat: "Contoh: Buku Pedoman Mahasiswa tahun 2014 Pasal 61 ayat 3 point b mengenai pencabutan hak mengikuti perkuliahan (DO)."
   };
 
-  // Debug logging
-  useEffect(() => {
-    console.log("ProdiList updated:", prodiList);
-  }, [prodiList]);
 
-  useEffect(() => {
-    console.log("KonsentrasiList updated:", konsentrasiList);
-  }, [konsentrasiList]);
-
-  useEffect(() => {
-    console.log("MahasiswaList updated:", mahasiswaList);
-  }, [mahasiswaList]);
-
-  useEffect(() => {
-    console.log("Selected states - Prodi:", selectedProdi, "Konsentrasi:", selectedKonsentrasi, "Mahasiswa:", selectedMhs);
-  }, [selectedProdi, selectedKonsentrasi, selectedMhs]);
-
-  useEffect(() => {
-    console.log("Angkatan mahasiswa updated:", angkatanMahasiswa);
-  }, [angkatanMahasiswa]);
 
   /* ========================================================
      LOAD PROGRAM STUDI (NORMALIZED)
@@ -218,26 +199,27 @@ export default function Page_Add_DropOut() {
     const loadProdi = async () => {
       setIsLoading(true);
       try {
-        console.log("API_LINK:", API_LINK);
-        
         // Get JWT token
         const jwtToken = document.cookie
           .split('; ')
           .find(row => row.startsWith('jwtToken='))
           ?.split('=')[1];
         
-        // Cek role user menggunakan roleId
+        // Cek apakah user adalah Prodi berdasarkan roleId
         const roleId = userData?.roleId || "";
-        const isAdmin = roleId === "ROL21";
+        const isProdiByRole = roleId === "ROL71";
         
-        // User Admin menggunakan endpoint /prodi/list untuk mendapatkan semua prodi
-        // User Prodi menggunakan endpoint /prodi untuk mendapatkan prodi sesuai user yang login
-        const endpoint = isAdmin 
-          ? `${API_LINK}DropOut/prodi/list`
-          : `${API_LINK}DropOut/prodi`;
+        // Cek apakah user punya prodiId
+        const hasProdiId = !!(userData?.prodiId || userData?.kodeProdi);
         
-        console.log("Loading prodi from:", endpoint);
-        console.log("User roleId:", roleId, "Is Admin:", isAdmin);
+        // User dianggap Prodi jika roleId = ROL71 ATAU punya prodiId
+        const isProdi = isProdiByRole || hasProdiId;
+        
+        // User Admin: gunakan endpoint /prodi/list untuk mendapatkan semua prodi
+        // User Prodi: gunakan endpoint /prodi untuk mendapatkan prodi sesuai user yang login
+        const endpoint = isProdi 
+          ? `${API_LINK}DropOut/prodi`
+          : `${API_LINK}DropOut/prodi/list`;
         
         const res = await fetch(endpoint, {
           method: 'GET',
@@ -247,9 +229,6 @@ export default function Page_Add_DropOut() {
           },
         });
         
-        console.log("Response status:", res.status);
-        console.log("Response ok:", res.ok);
-        
         if (!res.ok) {
           const errorText = await res.text();
           console.error("Error response body:", errorText);
@@ -257,7 +236,6 @@ export default function Page_Add_DropOut() {
         }
         
         const raw = await res.json();
-        console.log("Raw prodi data:", raw);
 
         // Handle different response formats
         let dataArray = [];
@@ -274,7 +252,6 @@ export default function Page_Add_DropOut() {
           Text: item.Text ?? item.text ?? item.pro_nama ?? item.nama ?? item.name ?? ""
         }));
 
-        console.log("Normalized prodi data:", normalized);
         setProdiList(normalized || []);
         
         if (normalized.length === 0) {
@@ -307,15 +284,16 @@ export default function Page_Add_DropOut() {
   useEffect(() => {
     if (!userData || prodiList.length === 0) return;
 
-    // Role-based access menggunakan roleId
+    // Cek apakah user adalah Prodi berdasarkan roleId
     const roleId = userData?.roleId || "";
-    const isProdi = roleId === "ROL71";
-    const isAdmin = roleId === "ROL21";
+    const isProdiByRole = roleId === "ROL71";
+    const hasProdiId = !!(userData?.prodiId || userData?.kodeProdi);
+    const isProdi = isProdiByRole || hasProdiId;
     
-    // Untuk user Prodi, auto-set prodi dari list yang dikembalikan API (karena API /prodi hanya return prodi user tersebut)
-    if (isProdi && !isAdmin && prodiList.length > 0 && !selectedProdi) {
+    // Untuk user Prodi, auto-set prodi dari list yang dikembalikan API
+    if (isProdi && prodiList.length > 0 && !selectedProdi) {
       const firstProdi = prodiList[0].Value;
-      console.log("Auto-setting prodi for Prodi user:", firstProdi);
+      
       setSelectedProdi(firstProdi);
       loadKonsentrasi(firstProdi);
     }
@@ -326,8 +304,6 @@ export default function Page_Add_DropOut() {
   ======================================================== */
   const loadKonsentrasi = async (prodiId) => {
     try {
-      console.log("Loading konsentrasi for prodi:", prodiId);
-      
       // Get JWT token from cookie
       const jwtToken = document.cookie
         .split('; ')
@@ -337,7 +313,6 @@ export default function Page_Add_DropOut() {
       // Menggunakan parameter yang benar sesuai Swagger: prodiId
       const endpoint = `${API_LINK}DropOut/konsentrasi?prodiId=${prodiId}`;
       
-      console.log("Fetching konsentrasi from:", endpoint);
       const res = await fetch(endpoint, {
         method: 'GET',
         headers: {
@@ -351,7 +326,6 @@ export default function Page_Add_DropOut() {
       }
       
       const data = await res.json();
-      console.log("Raw konsentrasi data:", data);
 
       // Handle different response formats
       let dataArray = [];
@@ -368,7 +342,6 @@ export default function Page_Add_DropOut() {
         Text: x.Text ?? x.text ?? x.kon_nama ?? x.nama ?? x.name ?? ""
       }));
 
-      console.log("Normalized konsentrasi data:", normalized);
       setKonsentrasiList(normalized);
       
       if (normalized.length === 0) {
@@ -392,8 +365,6 @@ export default function Page_Add_DropOut() {
   ======================================================== */
   const loadMahasiswaByKonsentrasi = async (konsId) => {
     try {
-      console.log("Loading mahasiswa for konsentrasi:", konsId);
-      
       // Get JWT token from cookie
       const jwtToken = document.cookie
         .split('; ')
@@ -401,7 +372,6 @@ export default function Page_Add_DropOut() {
         ?.split('=')[1];
       
       const endpoint = `${API_LINK}DropOut/mahasiswa-by-konsentrasi?konsentrasiId=${konsId}`;
-      console.log("Mahasiswa endpoint:", endpoint);
       
       const res = await fetch(endpoint, {
         method: 'GET',
@@ -411,9 +381,6 @@ export default function Page_Add_DropOut() {
         },
       });
       
-      console.log("Mahasiswa response status:", res.status);
-      console.log("Mahasiswa response ok:", res.ok);
-      
       if (!res.ok) {
         const errorText = await res.text();
         console.error("Mahasiswa error response:", errorText);
@@ -421,8 +388,6 @@ export default function Page_Add_DropOut() {
       }
       
       const data = await res.json();
-      console.log("Raw mahasiswa data length:", data.length);
-      console.log("Raw mahasiswa data sample:", data.slice(0, 3));
 
       // Handle different response formats
       let dataArray = [];
@@ -452,8 +417,6 @@ export default function Page_Add_DropOut() {
         };
       });
 
-      console.log("Normalized mahasiswa data length:", normalized.length);
-      console.log("Normalized mahasiswa sample:", normalized.slice(0, 3));
       setMahasiswaList(normalized);
 
       if (normalized.length === 0) {
@@ -473,8 +436,6 @@ export default function Page_Add_DropOut() {
   ======================================================== */
   const loadAngkatanByMahasiswa = async (mhsId) => {
     try {
-      console.log("Loading angkatan for mahasiswa:", mhsId);
-      
       // Get JWT token from cookie
       const jwtToken = document.cookie
         .split('; ')
@@ -482,7 +443,6 @@ export default function Page_Add_DropOut() {
         ?.split('=')[1];
       
       const endpoint = `${API_LINK}DropOut/angkatan-by-mahasiswa?mhsId=${mhsId}`;
-      console.log("Angkatan endpoint:", endpoint);
       
       const res = await fetch(endpoint, {
         method: 'GET',
@@ -492,9 +452,6 @@ export default function Page_Add_DropOut() {
         },
       });
       
-      console.log("Angkatan response status:", res.status);
-      console.log("Angkatan response ok:", res.ok);
-      
       if (!res.ok) {
         const errorText = await res.text();
         console.error("Angkatan error response:", errorText);
@@ -502,7 +459,6 @@ export default function Page_Add_DropOut() {
       }
       
       const data = await res.json();
-      console.log("Raw angkatan data:", data);
 
       // Handle different response formats
       let angkatan = "";
@@ -516,7 +472,6 @@ export default function Page_Add_DropOut() {
         angkatan = data.result;
       }
 
-      console.log("Angkatan mahasiswa:", angkatan);
       setAngkatanMahasiswa(angkatan);
 
       if (angkatan) {
@@ -534,8 +489,6 @@ export default function Page_Add_DropOut() {
   ======================================================== */
   const checkBebasTanggungan = async (mhsId) => {
     try {
-      console.log("Checking bebas tanggungan for mahasiswa:", mhsId);
-      
       // Get JWT token from cookie
       const jwtToken = document.cookie
         .split('; ')
@@ -543,7 +496,6 @@ export default function Page_Add_DropOut() {
         ?.split('=')[1];
       
       const endpoint = `${API_LINK}DropOut/mahasiswa/${encodeURIComponent(mhsId)}/bebas-tanggungan`;
-      console.log("Bebas tanggungan endpoint:", endpoint);
       
       const res = await fetch(endpoint, {
         method: 'GET',
@@ -553,8 +505,6 @@ export default function Page_Add_DropOut() {
         },
       });
       
-      console.log("Bebas tanggungan response status:", res.status);
-      
       if (!res.ok) {
         const errorText = await res.text();
         console.error("Bebas tanggungan error response:", errorText);
@@ -562,7 +512,6 @@ export default function Page_Add_DropOut() {
       }
       
       const data = await res.json();
-      console.log("Raw bebas tanggungan data:", data);
 
       // Handle response format: { isBebasTanggungan: false, message: "..." }
       let isBebas = false;
@@ -577,7 +526,6 @@ export default function Page_Add_DropOut() {
         isBebas = data;
       }
 
-      console.log("Bebas tanggungan:", isBebas);
       return { isBebas, message };
     } catch (err) {
       console.error("Error checking bebas tanggungan:", err);
@@ -599,30 +547,22 @@ export default function Page_Add_DropOut() {
   };
 
   const handleSelectKonsentrasi = (val) => {
-    console.log("User selected konsentrasi:", val);
     setSelectedKonsentrasi(val);
     setSelectedMhs("");
     setAngkatanMahasiswa(""); // Reset angkatan
     setMahasiswaList([]);
     
     if (val) {
-      console.log("Loading mahasiswa for konsentrasi ID:", val);
       loadMahasiswaByKonsentrasi(val);
-    } else {
-      console.log("No konsentrasi selected, clearing mahasiswa list");
     }
   };
 
   const handleSelectMhs = (val) => {
-    console.log("User selected mahasiswa:", val);
     setSelectedMhs(val);
     setAngkatanMahasiswa(""); // Reset angkatan
     
     if (val) {
-      console.log("Loading angkatan for mahasiswa ID:", val);
       loadAngkatanByMahasiswa(val);
-    } else {
-      console.log("No mahasiswa selected, clearing angkatan");
     }
   };
 
@@ -684,18 +624,12 @@ export default function Page_Add_DropOut() {
       createdBy: userData?.username || ""
     };
 
-    console.log("📤 Submit payload:", payload);
-    console.log("📤 userData:", userData);
-
     try {
       // Get JWT token from cookie
       const jwtToken = document.cookie
         .split('; ')
         .find(row => row.startsWith('jwtToken='))
         ?.split('=')[1];
-      
-      console.log("🔑 JWT Token exists:", !!jwtToken);
-      console.log("🔑 JWT Token (first 50 chars):", jwtToken?.substring(0, 50));
       
       const res = await fetch(`${API_LINK}DropOut/create-pengajuan`, {
         method: "POST",
@@ -742,13 +676,13 @@ export default function Page_Add_DropOut() {
               arrData={isLoading ? [] : prodiList}
               value={selectedProdi}
               onChange={(e) => handleSelectProdi(e.target.value)}
-              isDisabled={isLoading || (prodiList.length === 1)}
+              isDisabled={isLoading || !!(userData?.prodiId || userData?.kodeProdi)}
               isRequired={true}
             />
             {isLoading && (
               <div className="text-muted small">Memuat data program studi...</div>
             )}
-            {!isLoading && prodiList.length === 1 && (
+            {!isLoading && (userData?.prodiId || userData?.kodeProdi) && (
               <div className="text-muted small">Prodi sudah dipilih otomatis</div>
             )}
           </div>

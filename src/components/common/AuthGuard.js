@@ -17,14 +17,7 @@ export default function AuthGuard({ children }) {
       try {
         const authStatus = checkAuthStatus();
         
-        if (process.env.NODE_ENV === 'development') {
-          console.log("AuthGuard - Auth Status:", authStatus);
-        }
-        
         if (!authStatus.isAuthenticated) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log("AuthGuard - Not authenticated:", authStatus.reason);
-          }
           clearAuthCookies();
           router.push("/auth/login");
           return;
@@ -32,11 +25,6 @@ export default function AuthGuard({ children }) {
 
         // For now, skip permission checking to allow access
         // This is a temporary fix while we debug the permission system
-        if (process.env.NODE_ENV === 'development') {
-          console.log("AuthGuard - Authentication successful, allowing access");
-          console.log("AuthGuard - User permissions:", authStatus.permissions);
-        }
-
         setIsAuthenticated(true);
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {

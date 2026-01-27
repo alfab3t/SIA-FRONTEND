@@ -53,12 +53,6 @@ export default function Sidebar({
       const sso = getSSOData();
       const user = getUserData();
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log("🔍 Loading user data, attempt:", retryCount + 1);
-        console.log("🔍 ssoData:", sso);
-        console.log("🔍 userData:", user);
-      }
-      
       if (sso && user) {
         setSsoData(sso);
         setUserData(user);
@@ -69,17 +63,11 @@ export default function Sidebar({
       // Jika data belum ada dan masih bisa retry
       if (retryCount < maxRetries) {
         retryCount++;
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`🔄 Data belum tersedia, retry ${retryCount}/${maxRetries} dalam 500ms...`);
-        }
         setTimeout(loadUserData, 500);
         return false;
       }
       
       // Setelah max retries, set initialized dan biarkan useEffect berikutnya handle redirect
-      if (process.env.NODE_ENV === 'development') {
-        console.log("❌ Max retries reached, data masih tidak tersedia");
-      }
       setSsoData(sso);
       setUserData(user);
       setIsInitialized(true);
@@ -99,27 +87,12 @@ export default function Sidebar({
   useEffect(() => {
     // Tunggu sampai initialized
     if (!isInitialized) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log("⏳ Waiting for initialization...");
-      }
       return;
     }
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log("🔍 Debug Sidebar - ssoData:", ssoData);
-      console.log("🔍 Debug Sidebar - userData:", userData);
-    }
-    
     if (!ssoData || !userData) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log("❌ Data tidak tersedia - ssoData:", !!ssoData, "userData:", !!userData);
-      }
-      
       // Jika ssoData ada tapi userData tidak ada, redirect ke SSO (bukan login)
       if (ssoData && !userData) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log("🔄 SSO data exists but user data missing, redirecting to SSO");
-        }
         Toast.warn("Silakan pilih role Anda kembali.");
         router.push("/auth/sso");
         return;
