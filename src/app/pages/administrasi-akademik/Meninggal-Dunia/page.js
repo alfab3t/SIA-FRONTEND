@@ -799,14 +799,14 @@ export default function Page_MeninggalDunia() {
         setLoadingPengajuan(true);
 
         try {
-            const approvedBy = userData?.nama || userData?.username || userData?.userid || "";
+            const username = userData?.nama || userData?.username || userData?.userid || "";
             
             let role = "";
-            if (isProdi) role = "prodi";
-            else if (isWadir1) role = "wadir1";
-            else if (isFinance) role = "finance";
+            if (isProdi) role = "ROL71";
+            else if (isWadir1) role = "ROL999";
+            else if (isFinance) role = "ROL01";
 
-            const payload = { approvedBy, role };
+            const payload = { username, role };
             const encodedItemId = encodeURIComponent(itemId);
             const url = `${API_LINK}MeninggalDunia/approve/${encodedItemId}`;
 
