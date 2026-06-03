@@ -2,7 +2,7 @@ import { Barlow } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./globals.css";
-import BootstrapClient from "./bootsrap-client";
+import BootstrapClient from "./bootstrap-client";
 import "./custom.scss";
 import PropTypes from "prop-types";
 

@@ -54,13 +54,18 @@ const DropDown = (
         {placeholder}
         {arrData &&
           arrData.length > 0 &&
-          arrData.map((data) => {
+          arrData.map((data, index) => {
             return (
-              <option key={data.Value} value={data.Value}>
+              <option key={data.Value || index} value={data.Value}>
                 {data.Text}
               </option>
             );
           })}
+        {(!arrData || arrData.length === 0) && (
+          <option value="" disabled>
+            -- Data tidak tersedia --
+          </option>
+        )}
       </select>
       {errorMessage ? (
         <span className="fw-normal text-danger"> {errorMessage}</span>

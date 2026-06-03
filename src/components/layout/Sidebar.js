@@ -39,9 +39,44 @@ export default function Sidebar({
   const [searchTerm, setSearchTerm] = useState("");
   const [openMenu, setOpenMenu] = useState(null);
   const [dynamicMenu, setDynamicMenu] = useState([]);
+  const [isInitialized, setIsInitialized] = useState(false);
   const pathname = usePathname();
-  const ssoData = useMemo(() => getSSOData(), []);
-  const userData = useMemo(() => getUserData(), []);
+  const [ssoData, setSsoData] = useState(null);
+  const [userData, setUserData] = useState(null);
+
+  // Update data dengan retry mechanism
+  useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    const loadUserData = () => {
+      const sso = getSSOData();
+      const user = getUserData();
+      
+      if (sso && user) {
+        setSsoData(sso);
+        setUserData(user);
+        setIsInitialized(true);
+        return true;
+      }
+      
+      // Jika data belum ada dan masih bisa retry
+      if (retryCount < maxRetries) {
+        retryCount++;
+        setTimeout(loadUserData, 500);
+        return false;
+      }
+      
+      // Setelah max retries, set initialized dan biarkan useEffect berikutnya handle redirect
+      setSsoData(sso);
+      setUserData(user);
+      setIsInitialized(true);
+      return false;
+    };
+    
+    loadUserData();
+  }, []);
+  
   const width = collapsed ? 63 : 215;
 
   const processedMenus = useMemo(
@@ -50,7 +85,20 @@ export default function Sidebar({
   );
 
   useEffect(() => {
+    // Tunggu sampai initialized
+    if (!isInitialized) {
+      return;
+    }
+    
     if (!ssoData || !userData) {
+      // Jika ssoData ada tapi userData tidak ada, redirect ke SSO (bukan login)
+      if (ssoData && !userData) {
+        Toast.error("Silakan pilih role Anda kembali.");
+        router.push("/auth/sso");
+        return;
+      }
+      
+      // Jika keduanya tidak ada, baru redirect ke login
       Toast.error("Sesi tidak valid, silakan login kembali.");
       Cookies.remove("ssoData");
       Cookies.remove("userData");
@@ -79,7 +127,7 @@ export default function Sidebar({
         if (data.listMenu && data.listMenu.length > 0) {
           setDynamicMenu(data.listMenu);
         } else {
-          Toast.warn("Menu tidak ditemukan atau kosong.");
+          Toast.error("Menu tidak ditemukan atau kosong.");
           setDynamicMenu([]);
         }
       } catch (error) {
@@ -88,7 +136,7 @@ export default function Sidebar({
     };
 
     fetchMenu();
-  }, [ssoData, userData, router]);
+  }, [ssoData, userData, router, isInitialized]);
 
   useEffect(() => {
     const activeParent = processedMenus.find((item) =>

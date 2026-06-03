@@ -17,7 +17,6 @@ const Toast = {
         ...defaultOptions.style,
       },
     }),
-
   error: (message, position = "top-right") =>
     toast.error(message, {
       ...defaultOptions,

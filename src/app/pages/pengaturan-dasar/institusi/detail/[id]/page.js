@@ -174,7 +174,7 @@ export default function DetailInstitusiPage() {
                   type="button"
                 />
                 {isClient &&
-                  userData?.permission?.includes("institusi.edit") && (
+                  permission?.includes("institusi.edit") && (
                     <Button
                       classType="primary"
                       iconName="pencil"

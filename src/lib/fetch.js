@@ -30,14 +30,12 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response) {
       const { status } = error.response;
-
       if (status === 403 || status === 401) {
         if (globalThis.window !== undefined) {
           globalThis.location.href = UNAUTHORIZED_PAGE;
         }
       }
     }
-
     return Promise.reject(error);
   }
 );
@@ -47,6 +45,7 @@ const fetchData = async (url, param = {}, method = "POST") => {
 
   try {
     let response;
+
     switch (normalizedMethod) {
       case "GET":
         response = await apiClient.get(url, { params: param });
@@ -63,6 +62,7 @@ const fetchData = async (url, param = {}, method = "POST") => {
       default:
         throw new Error(`Metode tidak didukung: ${method}`);
     }
+
     return response.data;
   } catch (err) {
     if (err.response) {
