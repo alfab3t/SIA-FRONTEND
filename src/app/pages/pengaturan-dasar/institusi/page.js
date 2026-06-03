@@ -76,7 +76,7 @@ export default function MasterInstitusiPage() {
           Status: item.status,
           Aksi: [
             "Detail",
-            ...(isClient && userData?.permission?.includes("institusi.edit")
+            ...(isClient && permission?.includes("institusi.edit")
               ? ["Edit", "Toggle"]
               : []),
           ],
@@ -237,7 +237,7 @@ export default function MasterInstitusiPage() {
           onAdd={handleAdd}
           onFilter={handleFilterApply}
           showAddButton={
-            isClient && userData?.permission?.includes("institusi.create")
+            isClient && permission?.includes("institusi.create")
           }
           showExportButton={false}
           searchPlaceholder="Cari data institusi"

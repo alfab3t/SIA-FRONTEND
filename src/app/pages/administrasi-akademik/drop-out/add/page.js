@@ -1,9 +1,7 @@
 "use client";
-
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import PropTypes from "prop-types";
-
 const Editor = dynamic(() => import("@/components/common/Editor"), {
   ssr: false,
   loading: () => (
@@ -14,15 +12,13 @@ import MainContent from "@/components/layout/MainContent";
 import Card from "@/components/common/Card";
 import Button from "@/components/common/Button";
 import DropDown from "@/components/common/Dropdown";
-
 import Toast from "@/components/common/Toast";
 import SweetAlert from "@/components/common/SweetAlert";
+import Loading from "@/components/common/Loading";
 import { API_LINK } from "@/lib/constant";
 import { getUserData } from "@/context/user";
 import { useRouter } from "next/navigation";
 import { encryptIdUrl } from "@/lib/encryptor";
-
-// SearchableDropdown Component (inline)
 function SearchableDropdown({
   label,
   forInput,
@@ -36,19 +32,16 @@ function SearchableDropdown({
   const [searchTerm, setSearchTerm] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
-
   const filteredData = useMemo(() => {
     if (!searchTerm) return arrData;
     return arrData.filter((item) =>
       item.Text.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [arrData, searchTerm]);
-
   const selectedText = useMemo(() => {
     const selected = arrData.find((item) => item.Value === value);
     return selected ? selected.Text : placeholder;
   }, [arrData, value, placeholder]);
-
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -58,13 +51,11 @@ function SearchableDropdown({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
   const handleSelect = (selectedValue) => {
     onChange({ target: { value: selectedValue } });
     setIsOpen(false);
     setSearchTerm("");
   };
-
   return (
     <div className="mb-3" ref={dropdownRef}>
       <label htmlFor={forInput} className="form-label fw-bold">
@@ -142,7 +133,6 @@ function SearchableDropdown({
     </div>
   );
 }
-
 SearchableDropdown.propTypes = {
   label: PropTypes.string.isRequired,
   forInput: PropTypes.string.isRequired,
@@ -158,86 +148,79 @@ SearchableDropdown.propTypes = {
   isRequired: PropTypes.bool,
   placeholder: PropTypes.string,
 };
-
-
-
-
 export default function Page_Add_DropOut() {
   const router = useRouter();
   const userData = useMemo(() => getUserData(), []);
-
   const [prodiList, setProdiList] = useState([]);
   const [konsentrasiList, setKonsentrasiList] = useState([]);
   const [mahasiswaList, setMahasiswaList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-
   const [selectedProdi, setSelectedProdi] = useState("");
   const [selectedKonsentrasi, setSelectedKonsentrasi] = useState("");
   const [selectedMhs, setSelectedMhs] = useState("");
   const [angkatanMahasiswa, setAngkatanMahasiswa] = useState("");
-
-
-  // Form data untuk editor dengan placeholder - menggunakan state agar reactive
   const [formData, setFormData] = useState({
     menimbang: "",
     mengingat: "",
   });
   const [errors, setErrors] = useState({});
-  
-  // Placeholder text yang akan hilang saat user mengetik
+  const [existingSubmissions, setExistingSubmissions] = useState([]);
   const placeholderText = {
     menimbang: "Contoh: Bahwa mahasiswa yang bersangkutan tidak mengikuti perkuliahan tanpa pemberitahuan selama 2 (dua) minggu berturut-turut.",
     mengingat: "Contoh: Buku Pedoman Mahasiswa tahun 2014 Pasal 61 ayat 3 point b mengenai pencabutan hak mengikuti perkuliahan (DO)."
   };
-
-
-
-  /* ========================================================
-     LOAD PROGRAM STUDI (NORMALIZED)
-  ======================================================== */
   useEffect(() => {
     const loadProdi = async () => {
       setIsLoading(true);
       try {
-        // Get JWT token
         const jwtToken = document.cookie
           .split('; ')
           .find(row => row.startsWith('jwtToken='))
           ?.split('=')[1];
-        
-        // Cek apakah user adalah Prodi berdasarkan roleId
         const roleId = userData?.roleId || "";
         const isProdiByRole = roleId === "ROL71";
-        
-        // Cek apakah user punya prodiId
         const hasProdiId = !!(userData?.prodiId || userData?.kodeProdi);
-        
-        // User dianggap Prodi jika roleId = ROL71 ATAU punya prodiId
         const isProdi = isProdiByRole || hasProdiId;
-        
-        // User Admin: gunakan endpoint /prodi/list untuk mendapatkan semua prodi
-        // User Prodi: gunakan endpoint /prodi untuk mendapatkan prodi sesuai user yang login
         const endpoint = isProdi 
           ? `${API_LINK}DropOut/prodi`
           : `${API_LINK}DropOut/prodi/list`;
         
-        const res = await fetch(endpoint, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
-          },
-        });
+        // Fetch prodi dan semua pengajuan aktif (bukan Ditolak dan Disetujui)
+        const [prodiRes, draftRes, belumWadirRes, belumDirekturRes] = await Promise.all([
+          fetch(endpoint, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
+            },
+          }),
+          fetch(`${API_LINK}DropOut?status=Draft`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
+            },
+          }).catch(() => ({ ok: false })),
+          fetch(`${API_LINK}DropOut?status=Belum Disetujui Wadir 1`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
+            },
+          }).catch(() => ({ ok: false })),
+          fetch(`${API_LINK}DropOut?status=Belum Disetujui Direktur`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
+            },
+          }).catch(() => ({ ok: false }))
+        ]);
         
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("Error response body:", errorText);
-          throw new Error(`HTTP error! status: ${res.status}`);
+        if (!prodiRes.ok) {
+          throw new Error(`HTTP error! status: ${prodiRes.status}`);
         }
-        
-        const raw = await res.json();
-
-        // Handle different response formats
+        const raw = await prodiRes.json();
         let dataArray = [];
         if (Array.isArray(raw)) {
           dataArray = raw;
@@ -246,73 +229,69 @@ export default function Page_Add_DropOut() {
         } else if (raw.result && Array.isArray(raw.result)) {
           dataArray = raw.result;
         }
-
         const normalized = dataArray.map((item) => ({
           Value: item.Value ?? item.value ?? item.pro_id ?? item.id ?? "",
           Text: item.Text ?? item.text ?? item.pro_nama ?? item.nama ?? item.name ?? ""
         }));
-
         setProdiList(normalized || []);
+        
+        // Gabungkan semua pengajuan aktif
+        const extractSubmissions = async (response) => {
+          if (!response.ok) return [];
+          try {
+            const data = await response.json();
+            return Array.isArray(data) ? data : [];
+          } catch {
+            return [];
+          }
+        };
+        
+        const [draftData, belumWadirData, belumDirekturData] = await Promise.all([
+          extractSubmissions(draftRes),
+          extractSubmissions(belumWadirRes),
+          extractSubmissions(belumDirekturRes)
+        ]);
+        
+        const allActiveSubmissions = [...draftData, ...belumWadirData, ...belumDirekturData];
+        setExistingSubmissions(allActiveSubmissions);
         
         if (normalized.length === 0) {
           Toast.info("Tidak ada data program studi yang tersedia");
-        } else {
-          Toast.success(`Berhasil memuat ${normalized.length} program studi`);
         }
       } catch (err) {
-        console.error("Error loading prodi:", err);
-        Toast.error("Gagal memuat program studi: " + err.message);
+        Toast.error("Gagal memuat program studi. Silakan coba lagi.");
         setProdiList([]);
       } finally {
         setIsLoading(false);
       }
     };
-
     if (API_LINK) {
       loadProdi();
     } else {
-      console.error("API_LINK is not defined");
       Toast.error("Konfigurasi API tidak ditemukan");
       setProdiList([]);
       setIsLoading(false);
     }
   }, [userData]);
-
-  /* ========================================================
-     ROLE PRODI → AUTO SET
-  ======================================================== */
   useEffect(() => {
     if (!userData || prodiList.length === 0) return;
-
-    // Cek apakah user adalah Prodi berdasarkan roleId
     const roleId = userData?.roleId || "";
     const isProdiByRole = roleId === "ROL71";
     const hasProdiId = !!(userData?.prodiId || userData?.kodeProdi);
     const isProdi = isProdiByRole || hasProdiId;
-    
-    // Untuk user Prodi, auto-set prodi dari list yang dikembalikan API
     if (isProdi && prodiList.length > 0 && !selectedProdi) {
       const firstProdi = prodiList[0].Value;
-      
       setSelectedProdi(firstProdi);
       loadKonsentrasi(firstProdi);
     }
   }, [userData, prodiList, selectedProdi]);
-
-  /* ========================================================
-     LOAD KONSENTRASI (NORMALIZED)
-  ======================================================== */
   const loadKonsentrasi = async (prodiId) => {
     try {
-      // Get JWT token from cookie
       const jwtToken = document.cookie
         .split('; ')
         .find(row => row.startsWith('jwtToken='))
         ?.split('=')[1];
-      
-      // Menggunakan parameter yang benar sesuai Swagger: prodiId
       const endpoint = `${API_LINK}DropOut/konsentrasi?prodiId=${prodiId}`;
-      
       const res = await fetch(endpoint, {
         method: 'GET',
         headers: {
@@ -320,14 +299,10 @@ export default function Page_Add_DropOut() {
           ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
         },
       });
-      
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
-      
       const data = await res.json();
-
-      // Handle different response formats
       let dataArray = [];
       if (Array.isArray(data)) {
         dataArray = data;
@@ -336,43 +311,30 @@ export default function Page_Add_DropOut() {
       } else if (data.result && Array.isArray(data.result)) {
         dataArray = data.result;
       }
-
       const normalized = dataArray.map((x) => ({
         Value: x.Value ?? x.value ?? x.kon_id ?? x.id ?? "",
         Text: x.Text ?? x.text ?? x.kon_nama ?? x.nama ?? x.name ?? ""
       }));
-
       setKonsentrasiList(normalized);
-      
       if (normalized.length === 0) {
         Toast.info("Tidak ada konsentrasi untuk program studi ini");
       }
-      
     } catch (err) {
-      console.error("Error loading konsentrasi:", err);
       setKonsentrasiList([]);
-      
       if (err.message.includes("400")) {
         Toast.error("Data konsentrasi belum tersedia untuk prodi ini");
       } else {
-        Toast.error("Gagal memuat konsentrasi: " + err.message);
+        Toast.error("Gagal memuat konsentrasi. Silakan coba lagi.");
       }
     }
   };
-
-  /* ========================================================
-     LOAD MAHASISWA BY KONSENTRASI (NORMALIZED)
-  ======================================================== */
   const loadMahasiswaByKonsentrasi = async (konsId) => {
     try {
-      // Get JWT token from cookie
       const jwtToken = document.cookie
         .split('; ')
         .find(row => row.startsWith('jwtToken='))
         ?.split('=')[1];
-      
       const endpoint = `${API_LINK}DropOut/mahasiswa-by-konsentrasi?konsentrasiId=${konsId}`;
-      
       const res = await fetch(endpoint, {
         method: 'GET',
         headers: {
@@ -380,16 +342,11 @@ export default function Page_Add_DropOut() {
           ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
         },
       });
-      
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("Mahasiswa error response:", errorText);
         throw new Error(`HTTP error! status: ${res.status} - ${errorText}`);
       }
-      
       const data = await res.json();
-
-      // Handle different response formats
       let dataArray = [];
       if (Array.isArray(data)) {
         dataArray = data;
@@ -398,52 +355,38 @@ export default function Page_Add_DropOut() {
       } else if (data.result && Array.isArray(data.result)) {
         dataArray = data.result;
       }
-
       const normalized = dataArray.map((x) => {
-        let text = x.Text ?? x.text ?? x.mhs_nama ?? x.nama ?? x.name ?? "";
-        // Hapus NIM di depan nama jika ada (format: "NIM - NAMA" atau "NIM-NAMA")
-        if (text.includes(" - ")) {
-          text = text.split(" - ").slice(1).join(" - ").trim();
-        } else if (text.includes("-")) {
-          const parts = text.split("-");
-          // Cek apakah bagian pertama adalah angka (NIM)
-          if (parts[0] && /^\d+$/.test(parts[0].trim())) {
-            text = parts.slice(1).join("-").trim();
-          }
+        let originalText = x.Text ?? x.text ?? x.mhs_nama ?? x.nama ?? x.name ?? "";
+        const nim = x.Value ?? x.value ?? x.mhs_id ?? x.id ?? "";
+        
+        // Cek apakah text sudah mengandung NIM di awal
+        let displayText = originalText;
+        if (originalText && !originalText.startsWith(nim)) {
+          // Jika belum ada NIM, tambahkan
+          displayText = `${nim} - ${originalText}`;
         }
+        
         return {
-          Value: x.Value ?? x.value ?? x.mhs_id ?? x.id ?? "",
-          Text: text
+          Value: nim,
+          Text: displayText
         };
       });
-
       setMahasiswaList(normalized);
-
       if (normalized.length === 0) {
         Toast.info("Tidak ada mahasiswa aktif pada konsentrasi ini.");
-      } else {
-        Toast.success(`Berhasil memuat ${normalized.length} mahasiswa`);
       }
     } catch (err) {
-      console.error("Error loading mahasiswa:", err);
       setMahasiswaList([]);
-      Toast.error("Gagal memuat daftar mahasiswa: " + err.message);
+      Toast.error("Gagal memuat daftar mahasiswa. Silakan coba lagi.");
     }
   };
-
-  /* ========================================================
-     LOAD ANGKATAN BY MAHASISWA
-  ======================================================== */
   const loadAngkatanByMahasiswa = async (mhsId) => {
     try {
-      // Get JWT token from cookie
       const jwtToken = document.cookie
         .split('; ')
         .find(row => row.startsWith('jwtToken='))
         ?.split('=')[1];
-      
       const endpoint = `${API_LINK}DropOut/angkatan-by-mahasiswa?mhsId=${mhsId}`;
-      
       const res = await fetch(endpoint, {
         method: 'GET',
         headers: {
@@ -451,16 +394,10 @@ export default function Page_Add_DropOut() {
           ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
         },
       });
-      
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Angkatan error response:", errorText);
-        throw new Error(`HTTP error! status: ${res.status} - ${errorText}`);
+        throw new Error(`HTTP error! status: ${res.status}`);
       }
-      
       const data = await res.json();
-
-      // Handle different response formats
       let angkatan = "";
       if (typeof data === 'string') {
         angkatan = data;
@@ -471,32 +408,22 @@ export default function Page_Add_DropOut() {
       } else if (data.result) {
         angkatan = data.result;
       }
-
       setAngkatanMahasiswa(angkatan);
-
       if (angkatan) {
         Toast.success(`Angkatan mahasiswa: ${angkatan}`);
       }
     } catch (err) {
-      console.error("Error loading angkatan:", err);
       setAngkatanMahasiswa("");
-      Toast.error("Gagal memuat angkatan mahasiswa: " + err.message);
+      Toast.error("Gagal memuat angkatan mahasiswa. Silakan coba lagi.");
     }
   };
-
-  /* ========================================================
-     CEK BEBAS TANGGUNGAN MAHASISWA (dipanggil saat submit)
-  ======================================================== */
   const checkBebasTanggungan = async (mhsId) => {
     try {
-      // Get JWT token from cookie
       const jwtToken = document.cookie
         .split('; ')
         .find(row => row.startsWith('jwtToken='))
         ?.split('=')[1];
-      
       const endpoint = `${API_LINK}DropOut/mahasiswa/${encodeURIComponent(mhsId)}/bebas-tanggungan`;
-      
       const res = await fetch(endpoint, {
         method: 'GET',
         headers: {
@@ -504,19 +431,12 @@ export default function Page_Add_DropOut() {
           ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
         },
       });
-      
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Bebas tanggungan error response:", errorText);
         return { isBebas: false, message: "Gagal memeriksa status tanggungan" };
       }
-      
       const data = await res.json();
-
-      // Handle response format: { isBebasTanggungan: false, message: "..." }
       let isBebas = false;
       let message = "Mahasiswa ini memiliki tanggungan yang belum diselesaikan.";
-      
       if (data && typeof data === 'object') {
         isBebas = data.isBebasTanggungan === true;
         if (data.message) {
@@ -525,48 +445,41 @@ export default function Page_Add_DropOut() {
       } else if (typeof data === 'boolean') {
         isBebas = data;
       }
-
       return { isBebas, message };
     } catch (err) {
-      console.error("Error checking bebas tanggungan:", err);
+      console.error("Error checking tanggungan status:", err);
       return { isBebas: false, message: "Gagal memeriksa status tanggungan" };
     }
   };
-
-  /* ========================================================
-     HANDLE SELECT
-  ======================================================== */
   const handleSelectProdi = (val) => {
     setSelectedProdi(val);
     setSelectedKonsentrasi("");
     setSelectedMhs("");
-    setAngkatanMahasiswa(""); // Reset angkatan
+    setAngkatanMahasiswa(""); 
     setKonsentrasiList([]);
     setMahasiswaList([]);
+    setErrors(prev => ({ ...prev, prodi: null }));
     loadKonsentrasi(val);
   };
-
   const handleSelectKonsentrasi = (val) => {
     setSelectedKonsentrasi(val);
     setSelectedMhs("");
-    setAngkatanMahasiswa(""); // Reset angkatan
+    setAngkatanMahasiswa(""); 
     setMahasiswaList([]);
-    
+    setErrors(prev => ({ ...prev, konsentrasi: null }));
     if (val) {
       loadMahasiswaByKonsentrasi(val);
     }
   };
-
   const handleSelectMhs = (val) => {
     setSelectedMhs(val);
-    setAngkatanMahasiswa(""); // Reset angkatan
-    
+    setAngkatanMahasiswa(""); 
+    setErrors(prev => ({ ...prev, mahasiswa: null }));
     if (val) {
       loadAngkatanByMahasiswa(val);
     }
   };
-
-  const handleEditorChange = useCallback((e) => {
+  const handleEditorChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -575,38 +488,45 @@ export default function Page_Add_DropOut() {
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: null }));
     }
-  }, [errors]);
-
-
-
-  /* ========================================================
-     SUBMIT → CREATE DRAFT
-  ======================================================== */
+  };
   const handleSubmit = async () => {
-    // Validasi form
     const newErrors = {};
-    
     if (!selectedProdi) newErrors.prodi = "Program studi wajib dipilih";
     if (!selectedKonsentrasi) newErrors.konsentrasi = "Konsentrasi wajib dipilih";
     if (!selectedMhs) newErrors.mahasiswa = "Mahasiswa wajib dipilih";
-    if (!formData.menimbang.trim()) newErrors.menimbang = "Bagian Menimbang wajib diisi";
-    if (!formData.mengingat.trim()) newErrors.mengingat = "Bagian Mengingat wajib diisi";
-
+    if (!formData.menimbang?.trim() || formData.menimbang === '<p><br></p>') {
+      newErrors.menimbang = "Bagian Menimbang wajib diisi";
+    }
+    if (!formData.mengingat?.trim() || formData.mengingat === '<p><br></p>') {
+      newErrors.mengingat = "Bagian Mengingat wajib diisi";
+    }
     setErrors(newErrors);
-
     if (Object.keys(newErrors).length > 0) {
       Toast.error("Mohon lengkapi semua field yang wajib diisi.");
       return;
     }
 
-    // Cek bebas tanggungan saat submit
-    const result = await checkBebasTanggungan(selectedMhs);
+    // Validasi apakah mahasiswa sudah memiliki pengajuan aktif (bukan Ditolak)
+    const existingSubmission = existingSubmissions.find(sub => {
+      const subMhsId = sub.mhsId || sub.nim || sub.id;
+      const subStatus = (sub.status || sub.dro_status || "").toLowerCase();
+      return subMhsId === selectedMhs && !subStatus.includes("ditolak");
+    });
     
-    if (!result.isBebas) {
-      Toast.error("Tidak dapat mengajukan Drop Out. " + result.message);
+    if (existingSubmission) {
+      const statusPengajuan = existingSubmission.status || existingSubmission.dro_status || "aktif";
+      Toast.error(
+        `Mahasiswa ini sudah memiliki pengajuan dengan status "${statusPengajuan}". ` +
+        `Pengajuan baru hanya dapat dibuat jika status pengajuan sebelumnya "Ditolak".`
+      );
       return;
     }
 
+    const result = await checkBebasTanggungan(selectedMhs);
+    if (!result.isBebas) {
+      Toast.error("Tidak dapat mengajukan Drop Out. Mahasiswa masih memiliki tanggungan.");
+      return;
+    }
     const confirm = await SweetAlert({
       title: "Simpan Draft",
       text: "Apakah Anda yakin ingin menyimpan pengajuan sebagai draft?",
@@ -614,18 +534,17 @@ export default function Page_Add_DropOut() {
       confirmText: "Ya, Simpan!",
       confirmButtonColor: "#1e88e5",
     });
-
     if (!confirm) return;
-
     const payload = {
       mhsId: selectedMhs,
-      lampiran: formData.menimbang,
-      lampiranSuratPengajuan: formData.mengingat,
+      menimbang: formData.menimbang || "",
+      mengingat: formData.mengingat || "",
+      lampiran: "",
+      lampiranSuratPengajuan: "",
       createdBy: userData?.username || ""
     };
-
+    
     try {
-      // Get JWT token from cookie
       const jwtToken = document.cookie
         .split('; ')
         .find(row => row.startsWith('jwtToken='))
@@ -634,28 +553,44 @@ export default function Page_Add_DropOut() {
       const res = await fetch(`${API_LINK}DropOut/create-pengajuan`, {
         method: "POST",
         headers: { 
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
         },
         body: JSON.stringify(payload)
       });
-
-      const data = await res.json();
-
+      
+      const responseText = await res.text();
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("Error parsing response:", parseError);
+        data = { error: true, message: responseText };
+      }
+      
       if (!res.ok) {
-        Toast.error(data?.message || "Gagal membuat pengajuan Drop Out");
+        Toast.error(data?.message || `Gagal membuat pengajuan Drop Out (${res.status})`);
         return;
       }
-
+      
       Toast.success("Pengajuan Drop Out berhasil dibuat sebagai draft");
-      // Redirect ke halaman list
+      
+      // Redirect ke halaman utama
       router.push(`/pages/administrasi-akademik/drop-out`);
+      
+      // Tunggu sebentar untuk memastikan redirect selesai, lalu reload
+      setTimeout(() => {
+        if (globalThis.location.pathname === "/pages/administrasi-akademik/drop-out") {
+          globalThis.location.reload();
+        }
+      }, 500);
+      
     } catch (err) {
-      console.error("Submit error:", err);
+      console.error("Error creating drop out submission:", err);
       Toast.error("Terjadi kesalahan server");
     }
   };
-
   return (
     <MainContent
       layout="Admin"
@@ -666,8 +601,11 @@ export default function Page_Add_DropOut() {
         { label: "Drop Out" }
       ]}
     >
+      {/* Loading overlay saat fetch data */}
+      <Loading loading={isLoading} message="Memuat data..." />
+      
       <Card title="Tambah Pengajuan Drop Out">
-        {/* Row 1: Dropdown Selection */}
+        {}
         <div className="row g-3 mb-4">
           <div className="col-md-4">
             <DropDown
@@ -679,6 +617,12 @@ export default function Page_Add_DropOut() {
               isDisabled={isLoading || !!(userData?.prodiId || userData?.kodeProdi)}
               isRequired={true}
             />
+            {errors.prodi && (
+              <div className="text-danger small mt-1">
+                <i className="bi bi-exclamation-circle me-1" />
+                {errors.prodi}
+              </div>
+            )}
             {isLoading && (
               <div className="text-muted small">Memuat data program studi...</div>
             )}
@@ -686,7 +630,6 @@ export default function Page_Add_DropOut() {
               <div className="text-muted small">Prodi sudah dipilih otomatis</div>
             )}
           </div>
-
           <div className="col-md-4">
             <DropDown
               label="Konsentrasi"
@@ -697,8 +640,13 @@ export default function Page_Add_DropOut() {
               isDisabled={!selectedProdi}
               isRequired={true}
             />
+            {errors.konsentrasi && (
+              <div className="text-danger small mt-1">
+                <i className="bi bi-exclamation-circle me-1" />
+                {errors.konsentrasi}
+              </div>
+            )}
           </div>
-
           <div className="col-md-4">
             <SearchableDropdown
               label="Mahasiswa"
@@ -710,13 +658,18 @@ export default function Page_Add_DropOut() {
               isRequired={true}
               placeholder="-- Pilih Mahasiswa --"
             />
+            {errors.mahasiswa && (
+              <div className="text-danger small mt-1">
+                <i className="bi bi-exclamation-circle me-1" />
+                {errors.mahasiswa}
+              </div>
+            )}
             {selectedKonsentrasi && mahasiswaList.length === 0 && (
               <div className="text-muted small">Memuat data mahasiswa...</div>
             )}
           </div>
         </div>
-
-        {/* Angkatan Section */}
+        {}
         <div className="mb-4">
           <div className="row align-items-center">
             <div className="col-md-6">
@@ -740,7 +693,7 @@ export default function Page_Add_DropOut() {
                 <button
                   type="button"
                   className="btn btn-outline-primary btn-sm d-flex align-items-center"
-                  onClick={() => router.push(`/pages/persiapan-perkuliahan/mahasiswa/detail/${encryptIdUrl(selectedMhs)}`)}
+                  onClick={() => window.open(`/pages/persiapan-perkuliahan/mahasiswa/detail/${encryptIdUrl(selectedMhs)}`, '_blank')}
                 >
                   <i className="bi bi-eye me-2" /> Lihat Profil Mahasiswa
                 </button>
@@ -752,8 +705,7 @@ export default function Page_Add_DropOut() {
             </div>
           </div>
         </div>
-
-        {/* Editor Section dengan Placeholder */}
+        {}
         <div className="row g-3">
           <div className="col-md-6">
             <Editor
@@ -764,9 +716,9 @@ export default function Page_Add_DropOut() {
               error={errors.menimbang}
               isRequired={true}
               placeholder={placeholderText.menimbang}
+              editorKey="menimbang-editor"
             />
           </div>
-
           <div className="col-md-6">
             <Editor
               label="Mengingat"
@@ -776,11 +728,11 @@ export default function Page_Add_DropOut() {
               error={errors.mengingat}
               isRequired={true}
               placeholder={placeholderText.mengingat}
+              editorKey="mengingat-editor"
             />
           </div>
         </div>
-
-        {/* Action Buttons */}
+        {}
         <div className="mt-4 d-flex justify-content-end gap-2">
           <Button
             classType="secondary"
@@ -798,4 +750,3 @@ export default function Page_Add_DropOut() {
     </MainContent>
   );
 }
-

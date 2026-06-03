@@ -5,12 +5,13 @@ import { useRouter, useParams } from "next/navigation";
 import MainContent from "@/components/layout/MainContent";
 import Card from "@/components/common/Card";
 import Button from "@/components/common/Button";
+import Badge from "@/components/common/Badge";
 import Toast from "@/components/common/Toast";
 import SweetAlert from "@/components/common/SweetAlert";
 import { API_LINK } from "@/lib/constant";
 import { getSSOData } from "@/context/user";
 import fetchData from "@/lib/fetch";
-import { encryptIdUrl } from "@/lib/encryptor";
+import { encryptIdUrl, decryptIdUrl } from "@/lib/encryptor";
 
 export default function DetailPengunduranDiri() {
   const router = useRouter();
@@ -20,6 +21,19 @@ export default function DetailPengunduranDiri() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  
+  const getStatusBadge = (status) => {
+    return (
+      <Badge status={status || "Draft"} customMap={{ 
+        "Revisi": "bg-danger-subtle text-danger",
+        "Draft": "bg-secondary-subtle text-secondary",
+        "Menunggu Upload SK": "bg-warning-subtle text-warning",
+        "Belum Disetujui Wadir 1": "bg-warning-subtle text-warning",
+        "Belum Disetujui Prodi": "bg-warning-subtle text-warning",
+        "Belum Disetujui Direktur": "bg-warning-subtle text-warning"
+      }} />
+    );
+  };
 
   useEffect(() => {
     if (!ssoData) {
@@ -35,24 +49,44 @@ export default function DetailPengunduranDiri() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const id = decodeURIComponent(params.id);
+      const encryptedId = decodeURIComponent(params.id);
+      const id = decryptIdUrl(encryptedId);
       
-      // Gunakan endpoint GET /api/PengunduranDiri/detail?id={id}
+      if (!id) {
+        Toast.error("ID tidak valid");
+        router.push("/pages/administrasi-akademik/pengunduran-diri");
+        return;
+      }
+      
+      // Gunakan endpoint GET /api/PengunduranDiri/detail dengan query params
       const response = await fetchData(
-        API_LINK + `PengunduranDiri/detail?id=${encodeURIComponent(id)}`,
-        {},
+        API_LINK + `PengunduranDiri/detail`,
+        { id: id },
         "GET"
       );
 
-      if (response && !response.error) {
-        setData(response);
+      // Handle different response structures
+      let actualData = response;
+      if (response && typeof response === 'object') {
+        // Check if response has data property
+        if (response.data) {
+          actualData = response.data;
+        } else if (response.result) {
+          actualData = response.result;
+        } else if (Array.isArray(response) && response.length > 0) {
+          actualData = response[0];
+        }
+      }
+
+      if (actualData && !actualData.error) {
+        setData(actualData);
       } else {
-        Toast.error(response?.message || "Gagal memuat data");
-        router.push("/pages/administrasi-akademik/Page_Administrasi_Pengajuan_Pengunduran_Diri");
+        Toast.error(actualData?.message || "Gagal memuat data");
+        router.push("/pages/administrasi-akademik/pengunduran-diri");
       }
     } catch (err) {
       Toast.error("Gagal memuat data: " + err.message);
-      router.push("/pages/administrasi-akademik/Page_Administrasi_Pengajuan_Pengunduran_Diri");
+      router.push("/pages/administrasi-akademik/pengunduran-diri");
     } finally {
       setLoading(false);
     }
@@ -77,13 +111,22 @@ export default function DetailPengunduranDiri() {
         "PUT"
       );
 
-      if (response && !response.error) {
+      // Cek berbagai kemungkinan response sukses
+      const isSuccess = response && !response.error && 
+                       (response.success === true || 
+                        response.status === "success" || 
+                        response.message?.toLowerCase().includes("berhasil") ||
+                        response.message?.toLowerCase().includes("success") ||
+                        !response.message); // Jika tidak ada message, anggap sukses
+
+      if (isSuccess) {
         Toast.success("Pengajuan berhasil disetujui");
-        router.push("/pages/administrasi-akademik/Page_Administrasi_Pengajuan_Pengunduran_Diri");
+        router.push("/pages/administrasi-akademik/pengunduran-diri");
       } else {
         Toast.error(response?.message || "Gagal menyetujui pengajuan");
       }
     } catch (err) {
+      console.error("Error approving:", err);
       Toast.error("Gagal menyetujui pengajuan: " + err.message);
     } finally {
       setProcessing(false);
@@ -135,8 +178,43 @@ export default function DetailPengunduranDiri() {
     }
     
     if (fileName) {
-      // Download file dari endpoint /api/PengunduranDiri/file/{filename}
-      window.open(`${API_LINK}PengunduranDiri/file/${encodeURIComponent(fileName)}`, '_blank');
+      // Get JWT token
+      const jwtToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('jwtToken='))
+        ?.split('=')[1];
+      
+      // Download file dengan token
+      const downloadUrl = `${API_LINK}PengunduranDiri/file/${encodeURIComponent(fileName)}`;
+      
+      // Buat fetch request dengan token
+      fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Download failed');
+        }
+        return response.blob();
+      })
+      .then(blob => {
+        // Buat URL untuk blob dan trigger download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      })
+      .catch(error => {
+        console.error('Download error:', error);
+        Toast.error("Gagal mengunduh file");
+      });
     } else {
       Toast.error("File tidak tersedia");
     }
@@ -145,7 +223,8 @@ export default function DetailPengunduranDiri() {
   const handleLihatProfil = () => {
     const mhsId = data?.mhsId || data?.nim;
     if (mhsId) {
-      router.push(`/pages/persiapan-perkuliahan/mahasiswa/detail/${encryptIdUrl(mhsId)}`);
+      const url = `/pages/persiapan-perkuliahan/mahasiswa/detail/${encryptIdUrl(mhsId)}`;
+      window.open(url, '_blank');
     }
   };
 
@@ -231,16 +310,29 @@ export default function DetailPengunduranDiri() {
         {/* Row 3: Status, Persetujuan Prodi oleh, Persetujuan Wakil Direktur 1 oleh */}
         <div className="row mb-4">
           <div className="col-md-4">
-            <div className="form-label fw-bold text-muted small">Status</div>
-            <div className="fs-6">{data?.status || "-"}</div>
+            <div className="mb-3">
+              <div className="fw-bold mb-1">Status</div>
+              <div><Badge status={data?.status || "Draft"} customMap={{ 
+                "Revisi": "bg-danger-subtle text-danger",
+                "Draft": "bg-secondary-subtle text-secondary",
+                "Menunggu Upload SK": "bg-warning-subtle text-warning",
+                "Belum Disetujui Wadir 1": "bg-warning-subtle text-warning",
+                "Belum Disetujui Prodi": "bg-warning-subtle text-warning",
+                "Belum Disetujui Direktur": "bg-warning-subtle text-warning"
+              }} /></div>
+            </div>
           </div>
           <div className="col-md-4">
-            <div className="form-label fw-bold text-muted small">Persetujuan Prodi oleh</div>
-            <div className="fs-6">{data?.approvalProdiBy || "-"}</div>
+            <div className="mb-3">
+              <div className="fw-bold mb-1">Persetujuan Prodi oleh</div>
+              <div>{data?.approvalProdiBy || "-"}</div>
+            </div>
           </div>
           <div className="col-md-4">
-            <div className="form-label fw-bold text-muted small">Persetujuan Wakil Direktur 1 oleh</div>
-            <div className="fs-6">{data?.approvalDir1By || "-"}</div>
+            <div className="mb-3">
+              <div className="fw-bold mb-1">Persetujuan Wakil Direktur 1 oleh</div>
+              <div>{data?.approvalDir1By || "-"}</div>
+            </div>
           </div>
         </div>
 
@@ -261,7 +353,7 @@ export default function DetailPengunduranDiri() {
       {/* Action Buttons */}
       <div className="mt-3 d-flex gap-2">
         <Button
-          classType="warning"
+          classType="secondary"
           label="Kembali"
           onClick={() => router.back()}
         />

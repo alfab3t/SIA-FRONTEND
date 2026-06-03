@@ -4,9 +4,11 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import MainContent from "@/components/layout/MainContent";
 import Toast from "@/components/common/Toast";
+import Badge from "@/components/common/Badge";
 import fetchData from "@/lib/fetch";
 import { API_LINK } from "@/lib/constant";
 import { getSSOData } from "@/context/user";
+import { decryptIdUrl } from "@/lib/encryptor";
 
 export default function DetailDropOut() {
   const router = useRouter();
@@ -29,8 +31,16 @@ export default function DetailDropOut() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const id = decodeURIComponent(params.id);
+      const encryptedId = params.id;
+      const id = decryptIdUrl(encryptedId);
       
+      if (!id) {
+        Toast.error("ID tidak valid");
+        router.push("/pages/administrasi-akademik/drop-out");
+        return;
+      }
+      
+      // Gunakan endpoint GET /api/DropOut/detail dengan query params (sama seperti backend)
       const response = await fetchData(
         API_LINK + `DropOut/detail`,
         { id: id },
@@ -50,7 +60,12 @@ export default function DetailDropOut() {
         }
       }
       
-      setData(actualData);
+      if (actualData && !actualData.error) {
+        setData(actualData);
+      } else {
+        Toast.error(actualData?.message || "Gagal memuat data");
+        router.push("/pages/administrasi-akademik/drop-out");
+      }
     } catch (err) {
       console.error("Load data error:", err);
       Toast.error("Gagal memuat detail: " + err.message);
@@ -63,12 +78,16 @@ export default function DetailDropOut() {
   const handleBack = () => {
     router.push("/pages/administrasi-akademik/drop-out");
   };
-
-  const getStatusBadgeClass = (status) => {
-    if (status === "Draft") return "bg-secondary";
-    if (status === "Disetujui") return "bg-success";
-    if (status === "Ditolak") return "bg-danger";
-    return "bg-warning";
+  
+  const handleLihatProfil = () => {
+    const mhsId = data?.mhsId || data?.nim;
+    if (mhsId) {
+      const { encryptIdUrl } = require("@/lib/encryptor");
+      const url = `/pages/persiapan-perkuliahan/mahasiswa/detail/${encryptIdUrl(mhsId)}`;
+      window.open(url, '_blank');
+    } else {
+      Toast.error("Data mahasiswa tidak ditemukan");
+    }
   };
 
   if (loading) return null;
@@ -116,9 +135,14 @@ export default function DetailDropOut() {
                 <div className="col-md-4">
                   <div className="mb-3">
                     <div className="fw-bold mb-1">Status</div>
-                    <span className={`badge ${getStatusBadgeClass(data.status || data.dro_status)}`}>
-                      {data.status || data.dro_status || "-"}
-                    </span>
+                    <div><Badge status={data.status || data.dro_status || "Draft"} customMap={{ 
+                      "Revisi": "bg-danger-subtle text-danger",
+                      "Draft": "bg-secondary-subtle text-secondary",
+                      "Menunggu Upload SK": "bg-warning-subtle text-warning",
+                      "Belum Disetujui Wadir 1": "bg-warning-subtle text-warning",
+                      "Belum Disetujui Prodi": "bg-warning-subtle text-warning",
+                      "Belum Disetujui Direktur": "bg-warning-subtle text-warning"
+                    }} /></div>
                   </div>
                 </div>
                 <div className="col-md-4">
@@ -155,8 +179,8 @@ export default function DetailDropOut() {
                 </div>
               )}
 
-              {/* Rejection Reason (if exists) */}
-              {data.alasanTolak && (
+              {/* Rejection Reason (only show if status is "Revisi") */}
+              {data.alasanTolak && (data.status || "").toLowerCase() === "revisi" && (
                 <div className="row mb-4">
                   <div className="col-md-12">
                     <div className="alert alert-danger mb-0">
@@ -172,9 +196,7 @@ export default function DetailDropOut() {
                   <button 
                     type="button"
                     className="btn btn-link text-primary text-decoration-none p-0"
-                    onClick={() => {
-                      // Navigate to mahasiswa profile if needed
-                    }}
+                    onClick={handleLihatProfil}
                   >
                     <i className="bi bi-person-circle me-1"></i> Lihat Profil Mahasiswa
                   </button>

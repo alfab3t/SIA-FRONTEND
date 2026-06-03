@@ -93,7 +93,7 @@ export default function Sidebar({
     if (!ssoData || !userData) {
       // Jika ssoData ada tapi userData tidak ada, redirect ke SSO (bukan login)
       if (ssoData && !userData) {
-        Toast.warn("Silakan pilih role Anda kembali.");
+        Toast.error("Silakan pilih role Anda kembali.");
         router.push("/auth/sso");
         return;
       }
@@ -127,7 +127,7 @@ export default function Sidebar({
         if (data.listMenu && data.listMenu.length > 0) {
           setDynamicMenu(data.listMenu);
         } else {
-          Toast.warn("Menu tidak ditemukan atau kosong.");
+          Toast.error("Menu tidak ditemukan atau kosong.");
           setDynamicMenu([]);
         }
       } catch (error) {

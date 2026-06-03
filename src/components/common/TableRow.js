@@ -57,6 +57,7 @@ export default function TableRow({
             }
             return null;
           }
+
           case "Detail":
             return (
               <Icon
@@ -78,6 +79,7 @@ export default function TableRow({
                 onClick={() => onCancel(id)}
               />
             );
+
           case "Edit":
             return (
               <Icon
@@ -165,15 +167,12 @@ export default function TableRow({
           default: {
             try {
               if (typeof action === "object") {
-                const colorClass = action.Color 
-                  ? `text-${action.Color}` 
-                  : "text-primary";
                 return (
                   <Icon
                     key={row.id + "Custom" + action.IconName}
                     name={action.IconName}
                     type="Bold"
-                    cssClass={`btn px-1 py-0 ${colorClass}`}
+                    cssClass="btn px-1 py-0 text-primary"
                     title={action.Title}
                     onClick={action.Function}
                   />
@@ -208,7 +207,9 @@ export default function TableRow({
 
   return (
     <tr
-      className={`align-middle ${isSelected ? "table-active" : ""} ${customRowClass}`}
+      className={`align-middle ${
+        isSelected ? "table-active" : ""
+      } ${customRowClass}`}
     >
       {columns.map((col, index) => {
         let cell;
@@ -230,7 +231,7 @@ export default function TableRow({
           }
         } else if (col === "Status") {
           cell = <Badge status={row[col]} />;
-        } else if (col === "Aksi" || col === "Cetak SK") {
+        } else if (col === "Aksi") {
           cell = renderAction(row[col], row.id, row.Status);
         } else if (typeof row[col] === "string") {
           cell = (

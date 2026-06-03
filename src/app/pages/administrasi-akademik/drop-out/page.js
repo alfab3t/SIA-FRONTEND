@@ -1,42 +1,5 @@
 "use client";
 
-/**
- * ============================================================================
- * HALAMAN DROP OUT - ADMINISTRASI AKADEMIK
- * ============================================================================
- * 
- * KONFIGURASI ROLE SISTEM:
- * Anda bisa mengganti roleId sesuai kebutuhan di bagian ROLE_CONFIG di bawah
- * 
- * ┌─────────────┬──────────┬────────────────────────────────────────────────┐
- * │ ROLE        │ ROLE ID  │ HAK AKSES                                      │
- * ├─────────────┼──────────┼────────────────────────────────────────────────┤
- * │ MAHASISWA   │ ROL23    │ - Lihat data sendiri yang diajukan Prodi/Admin│
- * │             │          │ - TIDAK BISA tambah/edit data                  │
- * ├─────────────┼──────────┼────────────────────────────────────────────────┤
- * │ PRODI       │ ROL71    │ - Buat pengajuan untuk mahasiswa               │
- * │             │          │ - Lihat pengajuan yang dibuat sendiri          │
- * │             │          │ - Edit/hapus draft sendiri                     │
- * ├─────────────┼──────────┼────────────────────────────────────────────────┤
- * │ WADIR 1     │ ROL999   │ - Lihat pengajuan "Belum Disetujui Wadir 1"   │
- * │             │          │   (dari siapa saja)                            │
- * │             │          │ - Approve/Reject untuk ubah status             │
- * │             │          │ - Lihat SEMUA riwayat                          │
- * ├─────────────┼──────────┼────────────────────────────────────────────────┤
- * │ ADMIN       │ ROL21    │ - Buat pengajuan untuk mahasiswa               │
- * │             │ ROL74    │ - Lihat pengajuan yang dibuat sendiri          │
- * │             │          │ - Upload SK untuk "Menunggu Upload SK"         │
- * │             │          │ - Cetak SK                                     │
- * │             │          │ - Export data                                  │
- * ├─────────────┼──────────┼────────────────────────────────────────────────┤
- * │ FINANCE     │ ROL01    │ - Lihat riwayat saja (yang sudah disetujui)    │
- * │             │          │ - Download berkas                              │
- * └─────────────┴──────────┴────────────────────────────────────────────────┘
- * 
- * CARA MENGGANTI ROLE ID:
- * Edit bagian ROLE_CONFIG di bawah, ubah nilai roleId sesuai kebutuhan
- */
-
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Paging from "@/components/common/Paging";
 import Table from "@/components/common/Table";
@@ -44,25 +7,27 @@ import Toast from "@/components/common/Toast";
 import DropDown from "@/components/common/Dropdown";
 import MainContent from "@/components/layout/MainContent";
 import Formsearch from "@/components/common/Formsearch";
+import Loading from "@/components/common/Loading";
+import Badge from "@/components/common/Badge";
+import Icon from "@/components/common/Icon";
 import { useRouter } from "next/navigation";
 import fetchData from "@/lib/fetch";
 import { API_LINK } from "@/lib/constant";
 import { getSSOData, getUserData } from "@/context/user";
 import SweetAlert from "@/components/common/SweetAlert";
 import * as XLSX from "xlsx";
-import { hasPermission } from "@/lib/permission-utils";
+import { encryptIdUrl } from "@/lib/encryptor";
 
-// ============================================================================
-// KONFIGURASI ROLE - EDIT DI SINI UNTUK MENGGANTI ROLE ID
-// ============================================================================
-const ROLE_CONFIG = {
-  MAHASISWA: "ROL23",
-  PRODI: "ROL71",
-  WADIR1: "ROL999",
-  ADMIN: "ROL21",
-  ADMIN_ALT: "ROL74",  // Role admin alternatif
-  DIREKTUR: "ROL02",
-  FINANCE: "ROL01"
+// Helper function untuk check permission (inline, tidak dari external file)
+const hasPermission = (userData, permissionName) => {
+  if (!userData || !userData.permission) return false;
+  
+  // Permission adalah array of strings, bukan array of objects
+  if (Array.isArray(userData.permission)) {
+    return userData.permission.includes(permissionName);
+  }
+  
+  return false;
 };
 
 export default function Page_Administrasi_Pengajuan_Drop_Out() {
@@ -72,15 +37,16 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
 
   const [dataDraft, setDataDraft] = useState([]);
   const [dataRiwayat, setDataRiwayat] = useState([]);
+  const [totalRiwayat, setTotalRiwayat] = useState(0);
+  const [totalDraft, setTotalDraft] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
+
   
-  // Modal Reject
+  // Modal states
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectId, setRejectId] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
-  
-  // Modal Upload SK
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadId, setUploadId] = useState(null);
   const [fileSK, setFileSK] = useState(null);
@@ -89,10 +55,12 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
 
   const sortRef = useRef();
   const statusRef = useRef();
+  const prodiRef = useRef();
 
-  /* ================= FILTER ================= */
-
+  // Filter options
   const dataFilterSort = [
+    { Value: "a.dro_modif_date desc", Text: "Tanggal Modifikasi [↓]" },
+    { Value: "a.dro_modif_date asc", Text: "Tanggal Modifikasi [↑]" },
     { Value: "a.dro_created_date desc", Text: "Tanggal Pengajuan [↓]" },
     { Value: "a.dro_created_date asc", Text: "Tanggal Pengajuan [↑]" },
     { Value: "a.dro_id asc", Text: "No Pengajuan DO [↑]" },
@@ -108,44 +76,58 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     { Value: "Ditolak", Text: "Ditolak" }
   ];
 
+  const [prodiList, setProdiList] = useState([]);
+  const [userProdiRestriction, setUserProdiRestriction] = useState(null); // null = no restriction, string = restricted to specific prodi
   const [currentPage, setCurrentPage] = useState(1);
   const [currentPageRiwayat, setCurrentPageRiwayat] = useState(1);
-  const [pageSize, setPageSize] = useState(10); // Default 10 rows per table
-  
-  const pageSizeOptions = [
-    { Value: 10, Text: "10 per halaman" },
-    { Value: 25, Text: "25 per halaman" },
-    { Value: 50, Text: "50 per halaman" },
-    { Value: 100, Text: "100 per halaman" },
-    { Value: 999999, Text: "Tampilkan Semua" }
-  ];
+  const pageSize = 10; // Ubah dari useState ke const karena tidak pernah diubah
   
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState(dataFilterSort[0].Value);
   const [sortStatus, setSortStatus] = useState("");
+  const [filterProdi, setFilterProdi] = useState("");
 
   // ============================================================================
-  // DETEKSI ROLE USER - Menggunakan ROLE_CONFIG di atas
+  // PERMISSION CHECKS - Menggunakan permission dari backend
   // ============================================================================
-  const roleId = userData?.roleId || "";
-  const isMahasiswa = roleId === ROLE_CONFIG.MAHASISWA;
-  const isProdi = roleId === ROLE_CONFIG.PRODI;
-  const isWadir1 = roleId === ROLE_CONFIG.WADIR1;
-  const isFinance = roleId === ROLE_CONFIG.FINANCE;
-  const isAdmin = roleId === ROLE_CONFIG.ADMIN || roleId === ROLE_CONFIG.ADMIN_ALT;
-  const isDirektur = roleId === ROLE_CONFIG.DIREKTUR;
-
-  // ============================================================================
-  // HAK AKSES BERDASARKAN ROLE
-  // ============================================================================
-  
-  // Permission checks untuk fitur-fitur
   const hasViewPermission = useMemo(() => {
-    return hasPermission(userData, "drop_out.view");
+    console.log("=== DEBUG VIEW PERMISSION ===");
+    console.log("userData:", userData);
+    console.log("userData.permission:", userData?.permission);
+    
+    // Jika tidak ada permission array, berikan akses default
+    if (!userData?.permission || !Array.isArray(userData.permission)) {
+      console.log("No permission array found, granting default access");
+      return true;
+    }
+    
+    const result = hasPermission(userData, "drop_out.view");
+    console.log("hasViewPermission result:", result);
+    console.log("=== END DEBUG ===");
+    return result;
   }, [userData]);
 
   const hasCreatePermission = useMemo(() => {
-    return hasPermission(userData, "drop_out.create");
+    console.log("=== DEBUG CREATE PERMISSION ===");
+    console.log("userData:", userData);
+    console.log("userData.permission:", userData?.permission);
+    console.log("Checking permission: drop_out.create");
+    
+    // Jika tidak ada permission array, fallback ke role-based (untuk backward compatibility)
+    if (!userData?.permission?.length) {
+      console.log("No permissions found, using fallback logic");
+      // Fallback: admin dan staff bisa create
+      const isAdmin = userData?.roleId === "1" || userData?.role === "admin";
+      const isStaff = userData?.roleId === "2" || userData?.role === "staff";
+      const fallbackResult = isAdmin || isStaff;
+      console.log("Fallback result:", fallbackResult);
+      return fallbackResult;
+    }
+    
+    const result = hasPermission(userData, "drop_out.create");
+    console.log("hasCreatePermission result:", result);
+    console.log("=== END DEBUG ===");
+    return result;
   }, [userData]);
 
   const hasEditPermission = useMemo(() => {
@@ -161,39 +143,73 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
   }, [userData]);
 
   const hasExportPermission = useMemo(() => {
-    return hasPermission(userData, "drop_out.export");
+    const result = hasPermission(userData, "drop_out.export");
+    console.log("=== DEBUG EXPORT PERMISSION ===");
+    console.log("Checking permission: drop_out.export");
+    console.log("hasExportPermission result:", result);
+    console.log("=== END DEBUG ===");
+    return result;
   }, [userData]);
 
-  // Hak akses berdasarkan ROLE (untuk tampilan berbeda per user)
-  // Permission digunakan sebagai validasi tambahan
-  const canCreate = useMemo(() => {
-    if (!isClient) return false;
-    // Hanya Prodi dan Admin yang bisa tambah (berdasarkan ROLE)
-    // Permission sebagai validasi tambahan
-    return (isProdi || isAdmin) && (hasCreatePermission || !userData?.permission || userData.permission.length === 0);
-  }, [isClient, isProdi, isAdmin, hasCreatePermission, userData]);
+  const hasUploadSKPermission = useMemo(() => {
+    // Backend menggunakan permission "drop_out.import" untuk upload SK
+    const result = hasPermission(userData, "drop_out.import");
+    console.log("=== DEBUG UPLOAD SK PERMISSION ===");
+    console.log("userData:", userData);
+    console.log("Checking permission: drop_out.import");
+    console.log("hasUploadSKPermission result:", result);
+    
+    // Fallback: jika tidak ada permission array, berikan akses ke admin/staff
+    if (!userData?.permission?.length) {
+      const isAdmin = userData?.roleId === "1" || userData?.role === "admin";
+      const isStaff = userData?.roleId === "2" || userData?.role === "staff";
+      const fallbackResult = isAdmin || isStaff;
+      console.log("Using fallback permission:", fallbackResult);
+      console.log("=== END DEBUG ===");
+      return fallbackResult;
+    }
+    
+    console.log("=== END DEBUG ===");
+    return result;
+  }, [userData]);
 
-  const canApprove = useMemo(() => {
-    if (!isClient) return false;
-    // Wadir bisa approve (berdasarkan ROLE)
-    // Permission sebagai validasi tambahan
-    return isWadir1 && (hasApproveRejectPermission || !userData?.permission || userData.permission.length === 0);
-  }, [isClient, isWadir1, hasApproveRejectPermission, userData]);
+  const hasCetakSKPermission = useMemo(() => {
+    // Cetak SK dan Download Template SK menggunakan permission export (sama dengan hasExportPermission)
+    const result = hasPermission(userData, "drop_out.export");
+    console.log("=== DEBUG CETAK SK PERMISSION ===");
+    console.log("Checking permission: drop_out.export");
+    console.log("hasCetakSKPermission result:", result);
+    
+    // Fallback: jika tidak ada permission array, berikan akses ke admin/staff
+    if (!userData?.permission?.length) {
+      const isAdmin = userData?.roleId === "1" || userData?.role === "admin";
+      const isStaff = userData?.roleId === "2" || userData?.role === "staff";
+      const fallbackResult = isAdmin || isStaff;
+      console.log("Using fallback permission:", fallbackResult);
+      console.log("=== END DEBUG ===");
+      return fallbackResult;
+    }
+    
+    console.log("=== END DEBUG ===");
+    return result;
+  }, [userData]);
 
-  const canSeeDraft = useMemo(() => {
-    if (!isClient) return false;
-    // Prodi dan Admin bisa lihat draft (berdasarkan ROLE)
-    return isProdi || isAdmin;
-  }, [isClient, isProdi, isAdmin]);
+  // Helper function untuk format nomor pengajuan
+  const formatNoPengajuan = (noPengajuan, status) => {
+    // Jika status adalah Draft atau nomor pengajuan hanya angka, tampilkan "DRAFT"
+    const statusLower = (status || "").toLowerCase();
+    const noStr = String(noPengajuan || "");
+    
+    // Cek apakah nomor pengajuan hanya berisi angka (tanpa huruf/karakter khusus)
+    const isOnlyNumber = /^\d+$/.test(noStr);
+    
+    if (statusLower === "draft" || isOnlyNumber) {
+      return "DRAFT";
+    }
+    
+    return noPengajuan || "-";
+  };
 
-  const canExport = useMemo(() => {
-    if (!isClient) return false;
-    // Admin dan Prodi bisa export (berdasarkan ROLE)
-    // Permission sebagai validasi tambahan
-    return (isAdmin || isProdi) && (hasExportPermission || !userData?.permission || userData.permission.length === 0);
-  }, [isClient, isAdmin, isProdi, hasExportPermission, userData]);
-
-  // Helper functions untuk extract dan parse response
   const extractArrayFromResponse = (response) => {
     if (Array.isArray(response)) return response;
     
@@ -208,7 +224,6 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     return [];
   };
 
-  // Helper function untuk clean nama mahasiswa
   const cleanMahasiswaName = (namaMahasiswa) => {
     if (namaMahasiswa === "-") return namaMahasiswa;
     
@@ -226,56 +241,99 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     return namaMahasiswa;
   };
 
-  // Helper function untuk check approval status
-  const checkApprovalStatus = (statusLower) => {
-    if (!canApprove) return false;
-    
-    const isFinanceApproval = (statusLower.includes("belum disetujui finance") || statusLower.includes("menunggu persetujuan finance")) && isFinance;
-    const isWadirApproval = (statusLower.includes("belum disetujui wadir") || statusLower.includes("menunggu persetujuan wadir") || statusLower === "belum disetujui wadir 1") && isWadir1;
-    const isDirekturApproval = (statusLower.includes("belum disetujui direktur") || statusLower.includes("menunggu persetujuan direktur")) && isDirektur;
-    
-    return isFinanceApproval || isWadirApproval || isDirekturApproval;
-  };
-
-  // Helper function untuk determine actions
+  // Helper function untuk determine actions berdasarkan permission
   const getActionsForDropOut = (statusLower, itemId) => {
+    const normalizedStatus = statusLower.trim().toLowerCase();
+    const actions = ["Detail"]; // Detail selalu ada di posisi pertama
     
-    if (statusLower === "draft") {
-      if (isMahasiswa) return ["Detail"];
+    console.log("=== DEBUG GET ACTIONS ===");
+    console.log("Status:", statusLower);
+    console.log("Normalized Status:", normalizedStatus);
+    console.log("hasUploadSKPermission:", hasUploadSKPermission);
+    console.log("includes 'menunggu upload sk':", normalizedStatus.includes("menunggu upload sk"));
+    
+    // Upload SK untuk status Menunggu Upload SK - letakkan setelah Detail
+    if (normalizedStatus.includes("menunggu upload sk") && hasUploadSKPermission) {
+      console.log("Adding 'Upload' action");
+      actions.push("Upload"); // Gunakan "Upload" bukan "Unggah Berkas" agar sesuai dengan TableRow.js
+    }
+    
+    // Edit, Delete, dan Ajukan untuk status Draft/Revisi
+    if (normalizedStatus === "draft" || normalizedStatus === "revisi") {
+      // Urutan: Detail → Edit → Delete → Ajukan (Sent di paling kanan)
+      if (hasEditPermission) {
+        actions.push("Edit");
+      }
+      if (hasDeletePermission) {
+        actions.push("Delete");
+      }
+      // Ajukan (Sent) - untuk submit draft - di paling kanan
+      actions.push("Sent");
       
-      const actions = ["Detail", "Edit", "Delete"];
-      actions.push({
-        IconName: "send-check",
-        Title: "Ajukan",
-        Function: () => handleAjukan(itemId)
-      });
+      console.log("Final actions for Draft/Revisi:", actions);
+      console.log("=== END DEBUG ===");
       return actions;
     }
     
-    if (isMahasiswa) {
-      return statusLower === "disetujui" ? ["Detail", "Unduh Berkas"] : ["Detail"];
+    // Approve/Reject untuk status yang membutuhkan persetujuan
+    if (hasApproveRejectPermission) {
+      const needsApproval = [
+        "belum disetujui wadir 1",
+        "belum disetujui direktur",
+        "menunggu persetujuan wadir",
+        "menunggu persetujuan direktur",
+        "menunggu wadir 1",
+        "menunggu direktur"
+      ].some(status => normalizedStatus.includes(status));
+      
+      if (needsApproval) {
+        actions.push("Approve", "Reject");
+      }
     }
     
-    if (statusLower === "disetujui") {
-      return ["Detail", "Unduh Berkas"];
-    }
-    
-    // Check untuk Wadir dengan status "belum disetujui wadir 1"
-    if (isWadir1 && statusLower === "belum disetujui wadir 1") {
-      return ["Detail", "Approve", "Reject"];
-    }
-    
-    const approvalCheck = checkApprovalStatus(statusLower);
-    
-    if (approvalCheck) {
-      return ["Detail", "Approve", "Reject"];
-    }
-    
-    return ["Detail"];
+    console.log("Final actions:", actions);
+    console.log("=== END DEBUG ===");
+    return actions;
   };
 
+  const getCetakSKAction = (statusLower, itemId) => {
+    // Cetak SK (Download Template SK) hanya untuk user dengan permission export
+    console.log("=== DEBUG GET CETAK SK ACTION ===");
+    console.log("statusLower:", statusLower);
+    console.log("hasExportPermission:", hasExportPermission);
+    
+    if (!hasExportPermission) {
+      console.log("No export permission - returning null");
+      console.log("=== END DEBUG ===");
+      return null;
+    }
+    
+    const normalizedStatus = statusLower.trim().toLowerCase();
+    console.log("normalizedStatus:", normalizedStatus);
+    console.log("includes 'menunggu upload sk':", normalizedStatus.includes("menunggu upload sk"));
+    
+    if (normalizedStatus.includes("menunggu upload sk")) {
+      console.log("Returning Cetak SK icon");
+      console.log("=== END DEBUG ===");
+      // Return Icon component langsung, bukan object
+      return (
+        <Icon
+          name="printer"
+          type="Bold"
+          cssClass="btn px-1 py-0 text-primary"
+          title="Cetak SK"
+          onClick={() => handleDownloadTemplate(itemId)}
+        />
+      );
+    }
+    console.log("Status not 'menunggu upload sk' - returning null");
+    console.log("=== END DEBUG ===");
+    return null;
+  };
+
+  // Fungsi untuk load data dengan permission-based logic
   const loadData = useCallback(
-    async (page = 1, sort = sortBy, keyword = "") => {
+    async (page = 1, sort = sortBy, keyword = "", forceProdiFilter = null) => {
       try {
         setLoading(true);
 
@@ -288,367 +346,307 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
           return;
         }
 
-        let pengajuanList = [];
-        let riwayatList = [];
+        // Gunakan parameter forceProdiFilter jika ada, atau fallback ke state
+        const prodiFilter = forceProdiFilter || filterProdi || "";
+        const finalProdiFilter = userProdiRestriction && !prodiFilter ? userProdiRestriction : prodiFilter;
 
-        // Untuk Wadir, fetch pengajuan dan riwayat secara terpisah dengan parameter khusus
-        if (isWadir1) {
-          const [pengajuanResponse, riwayatResponse] = await Promise.all([
-            fetchData(API_LINK + "DropOut", { 
-              keyword: keyword || "",
-              sortBy: sort || "a.dro_created_date desc",
-              status: "Belum Disetujui Wadir 1"
-            }, "GET").catch(() => []),
-            fetchData(API_LINK + "DropOut/riwayat", {
-              username: username,
-              keyword: keyword || "",
-              sortBy: sort || "a.dro_created_date desc",
-              konsentrasi: "",
-              roleId: userData?.roleId || "",
-              displayName: userData?.displayName || userData?.fullName || "",
-              page: 1,
-              pageSize: 9999
-            }, "GET").catch(() => [])
-          ]);
-          
-          pengajuanList = extractArrayFromResponse(pengajuanResponse);
-          riwayatList = extractArrayFromResponse(riwayatResponse);
-          
+        const pengajuanParams = {
+          page: page,
+          pageSize: pageSize,
+          keyword: keyword || "",
+          sortBy: sort || "a.dro_modif_date desc",
+          konsentrasi: finalProdiFilter,
+          status: sortStatus || ""
+        };
+
+        // Filter berdasarkan user (tidak berdasarkan role lagi)
+        if (nim) {
+          pengajuanParams.mhsId = nim;
         } else {
-          // Fetch data pengajuan dan riwayat secara PARALLEL untuk role lain
-          let pengajuanParams = {
-            keyword: keyword || "",
-            sortBy: sort || "a.dro_created_date desc",
-            konsentrasi: ""
-          };
-
-          let riwayatParams = {
-            username: username,
-            keyword: keyword || "",
-            sortBy: sort || "a.dro_created_date desc",
-            konsentrasi: "",
-            roleId: userData?.roleId || "",
-            displayName: userData?.displayName || userData?.fullName || "",
-            page: 1,
-            pageSize: 9999
-          };
-
-          // Untuk admin, tidak perlu filter berdasarkan username
-          if (isMahasiswa) {
-            pengajuanParams.mhsId = nim;
-            riwayatParams.mhsId = nim;
-          } else if (!isAdmin) {
-            // Non-admin (selain mahasiswa) tetap menggunakan username filter
-            riwayatParams.username = username;
-          }
-
-          const [pengajuanResponse, riwayatResponse] = await Promise.all([
-            fetchData(API_LINK + "DropOut", pengajuanParams, "GET").catch(() => []),
-            fetchData(API_LINK + "DropOut/riwayat", riwayatParams, "GET").catch(() => [])
-          ]);
-
-          pengajuanList = extractArrayFromResponse(pengajuanResponse);
-          riwayatList = extractArrayFromResponse(riwayatResponse);
+          pengajuanParams.username = username;
         }
-        // Mapping functions
+
+        // Fetch riwayat (data yang sudah selesai)
+        const riwayatBaseParams = {
+          username: username,
+          page: page,
+          pageSize: pageSize,
+          keyword: keyword || "",
+          konsentrasi: finalProdiFilter,
+          role: userData?.roleId || "",
+          displayName: userData?.displayName || userData?.fullName || "",
+          status: "Disetujui"
+        };
+
+        if (nim) {
+          riwayatBaseParams.mhsId = nim;
+        }
+
+        // Jalankan fetch pengajuan dan riwayat secara parallel untuk mempercepat loading
+        const [pengajuanResponse, riwayatResponse] = await Promise.all([
+          // Fetch pengajuan (data yang belum selesai)
+          fetchData(API_LINK + "DropOut", pengajuanParams, "GET").catch(() => ({ data: [], pagination: { totalRecords: 0 } })),
+          
+          // Fetch riwayat (data yang sudah selesai)
+          fetchData(API_LINK + "DropOut/riwayat", riwayatBaseParams, "GET").catch(() => ({ data: [], pagination: { totalRecords: 0 } }))
+        ]);
+
+        // Process pengajuan response
+        const pengajuanList = extractArrayFromResponse(pengajuanResponse);
+        const totalRecordsPengajuan = pengajuanResponse?.pagination?.totalRecords || 0;
+        setTotalDraft(totalRecordsPengajuan);
+
+        // Process riwayat response
+        const riwayatList = extractArrayFromResponse(riwayatResponse);
+        const totalRecords = riwayatResponse?.pagination?.totalRecords || 0;
+        setTotalRiwayat(totalRecords);
+
+        // Cek apakah ada data dengan status "Menunggu Upload SK"
+        const hasMenungguUploadSK = pengajuanList.some(item => {
+          const status = (item.status || "").toLowerCase();
+          return status.includes("menunggu upload sk");
+        });
+        
+        // Tentukan apakah kolom Cetak SK harus ditampilkan
+        const showCetakSKColumn = hasExportPermission && hasMenungguUploadSK;
+        
+        console.log("=== DEBUG CETAK SK COLUMN ===");
+        console.log("hasExportPermission:", hasExportPermission);
+        console.log("hasMenungguUploadSK:", hasMenungguUploadSK);
+        console.log("showCetakSKColumn:", showCetakSKColumn);
+        console.log("=== END DEBUG ===");
+
+        // Map pengajuan data
         const mapItemDefault = (item, index) => {
           const status = item.status || "";
           const statusLower = status.toLowerCase();
           const itemId = item.id || item.droId;
+          
           const actions = getActionsForDropOut(statusLower, itemId);
-          const namaMahasiswa = cleanMahasiswaName(item.namaMahasiswa || "-");
+          const namaMahasiswa = cleanMahasiswaName(item.mahasiswa || item.namaMahasiswa || "-");
+          const noPengajuan = formatNoPengajuan(item.id || item.droId, status);
+          const cetakSKAction = getCetakSKAction(statusLower, itemId);
 
-          return {
+          const result = {
             No: index + 1,
             id: itemId || "",
-            "No. Pengajuan DO": item.droId || "-",
-            "Tanggal Pengajuan": item.tanggalPengajuan || "-",
+            "No. Pengajuan DO": noPengajuan,
+            "Tanggal Pengajuan": item.createdDate || item.tanggalPengajuan || "-",
             "Dibuat Oleh": item.createdBy || item.dibuatOleh || "-",
             "Nama Mahasiswa": namaMahasiswa,
-            Prodi: item.prodi || "-",
-            "No. SK DO": item.noSkDo || "-",
-            Status: status || "Draft",
-            Aksi: actions,
+            Prodi: item.konsentrasi || item.prodi || "-",
+            "No. SK DO": item.suratNo || item.noSkDo || "-",
+            "Status Pengajuan": <Badge status={status || "Draft"} customMap={{ 
+              "Revisi": "bg-danger-subtle text-danger",
+              "Draft": "bg-secondary-subtle text-secondary",
+              "Menunggu Upload SK": "bg-warning-subtle text-warning",
+              "Belum Disetujui Wadir 1": "bg-warning-subtle text-warning",
+              "Belum Disetujui Prodi": "bg-warning-subtle text-warning",
+              "Belum Disetujui Direktur": "bg-warning-subtle text-warning"
+            }} />,
             Alignment: ["center", "center", "center", "left", "left", "left", "center", "center", "center"]
           };
-        };
 
-        const mapItemAdminPengajuan = (item, index) => {
-          const status = (item.status || "").trim();
-          const statusLower = status.toLowerCase();
-          const itemId = item.id || item.droId;
-          const namaMahasiswa = cleanMahasiswaName(item.namaMahasiswa || "-");
-          
-          let actions = ["Detail"];
-          let cetakSKAction = null;
-          
-          if (statusLower === "draft") {
-            actions = [
-              "Detail", 
-              "Edit", 
-              "Delete", 
-              {
-                IconName: "send-check",
-                Title: "Ajukan",
-                Function: () => handleAjukan(itemId)
-              }
-            ];
-          } else if (statusLower.includes("menunggu upload sk")) {
-            // Untuk Menunggu Upload SK: Detail dan Upload icon
-            actions = [
-              "Detail",
-              {
-                IconName: "cloud-upload",
-                Title: "Unggah Berkas",
-                Function: () => handleUploadSK(itemId)
-              }
-            ];
-            // Cetak SK sebagai action object untuk kolom terpisah
-            cetakSKAction = {
-              IconName: "printer",
-              Title: "Cetak SK",
-              Function: () => handleCetakSK(itemId)
-            };
-          } else if (statusLower.includes("belum disetujui") || statusLower.includes("menunggu")) {
-            actions = ["Detail"];
+          // Tambahkan kolom Cetak SK untuk SEMUA row jika showCetakSKColumn = true
+          if (showCetakSKColumn) {
+            // Jika row ini berstatus "Menunggu Upload SK", tampilkan icon
+            // Jika tidak, tampilkan "-"
+            result["Cetak SK"] = cetakSKAction || "-";
+            result.Alignment.push("center");
           }
 
+          // Tambahkan kolom Aksi di akhir
+          result.Aksi = actions;
+          result.Alignment.push("center");
+
+          return result;
+        };
+
+        // Map riwayat data
+        const mapItemRiwayat = (item, index) => {
+          const status = item.status || "";
+          const itemId = item.id || item.droId || "";
+          const actions = [
+            "Detail",
+            {
+              IconName: "download",
+              Title: "Download SK",
+              Function: () => handleDownloadSK(itemId)
+            }
+          ];
+          const namaMahasiswa = cleanMahasiswaName(item.mahasiswa || item.namaMahasiswa || "-");
+          const noPengajuan = formatNoPengajuan(item.id || item.droId, status);
+
           return {
             No: index + 1,
             id: itemId || "",
-            "No. Pengajuan DO": item.droId || "-",
-            "Tanggal Pengajuan": item.tanggalPengajuan || "-",
+            "No. Pengajuan DO": noPengajuan,
+            "Tanggal Pengajuan": item.createdDate || item.tanggalPengajuan || "-",
             "Dibuat Oleh": item.createdBy || item.dibuatOleh || "-",
             "Nama Mahasiswa": namaMahasiswa,
-            Prodi: item.prodi || "-",
-            "No. SK DO": item.noSkDo || "-",
-            Status: status || "Draft",
-            "Cetak SK": cetakSKAction ? [cetakSKAction] : [],
-            Aksi: actions,
-            Alignment: ["center", "center", "center", "left", "left", "left", "center", "center", "center", "center"]
-          };
-        };
-
-        const mapItemAdminRiwayat = (item, index) => {
-          const status = item.status || "";
-          const actions = ["Detail", "Unduh Berkas"];
-          const namaMahasiswa = cleanMahasiswaName(item.namaMahasiswa || "-");
-
-          return {
-            No: index + 1,
-            id: item.id || item.droId || "",
-            "No. Pengajuan DO": item.droId || "-",
-            "Tanggal Pengajuan": item.tanggalPengajuan || "-",
-            "Dibuat Oleh": item.createdBy || item.dibuatOleh || "-",
-            "Nama Mahasiswa": namaMahasiswa,
-            Prodi: item.prodi || "-",
-            "No. SK DO": item.noSkDo || "-",
-            Status: status || "Draft",
+            Prodi: item.konsentrasi || item.prodi || "-",
+            "No. SK DO": item.suratNo || item.noSkDo || "-",
+            "Status Pengajuan": <Badge status={status || "Disetujui"} customMap={{ 
+              "Revisi": "bg-danger-subtle text-danger",
+              "Draft": "bg-secondary-subtle text-secondary",
+              "Menunggu Upload SK": "bg-warning-subtle text-warning",
+              "Belum Disetujui Wadir 1": "bg-warning-subtle text-warning",
+              "Belum Disetujui Prodi": "bg-warning-subtle text-warning",
+              "Belum Disetujui Direktur": "bg-warning-subtle text-warning"
+            }} />,
             Aksi: actions,
             Alignment: ["center", "center", "center", "left", "left", "left", "center", "center", "center"]
           };
         };
 
-        // Process data based on role
-        const draftData = [];
-        const riwayatData = [];
-        const currentUsername = (ssoData?.username || userData?.username || "").toLowerCase().trim();
+        // Filter pengajuan: hanya yang belum selesai
+        const draftData = pengajuanList
+          .filter(item => {
+            const status = (item.status || "").toLowerCase();
+            return !["disetujui", "ditolak"].includes(status);
+          })
+          .map(mapItemDefault);
 
-        if (isAdmin) {
-          processDataForAdmin(pengajuanList, riwayatList, currentUsername, draftData, riwayatData, mapItemAdminPengajuan, mapItemAdminRiwayat);
-        } else if (isProdi) {
-          processDataForProdi(pengajuanList, riwayatList, currentUsername, draftData, riwayatData, mapItemDefault);
-        } else if (isMahasiswa) {
-          processDataForMahasiswa(pengajuanList, riwayatList, draftData, riwayatData, mapItemDefault);
-        } else if (isWadir1) {
-          processDataForWadir(pengajuanList, riwayatList, draftData, riwayatData, mapItemDefault, mapItemAdminRiwayat);
-        } else {
-          processDataForOthers(pengajuanList, riwayatList, draftData, riwayatData, mapItemDefault);
-        }
-
-        // Sort untuk Admin
-        if (isAdmin) {
-          draftData.sort((a, b) => {
-            const statusA = (a.Status || "").toUpperCase();
-            const statusB = (b.Status || "").toUpperCase();
-            if (statusA.includes("MENUNGGU UPLOAD SK") && !statusB.includes("MENUNGGU UPLOAD SK")) return -1;
-            if (!statusA.includes("MENUNGGU UPLOAD SK") && statusB.includes("MENUNGGU UPLOAD SK")) return 1;
-            return 0;
-          });
-          draftData.forEach((item, idx) => { item.No = idx + 1; });
-        }
+        const riwayatData = riwayatList.map(mapItemRiwayat);
 
         setDataDraft(draftData);
         setDataRiwayat(riwayatData);
         setCurrentPage(page);
       } catch (err) {
         console.error("Error loading data:", err);
+        Toast.error("Gagal memuat data. Silakan coba lagi.");
         setDataDraft([]);
         setDataRiwayat([]);
       } finally {
         setLoading(false);
       }
     },
-    [sortBy, userData, ssoData, canCreate, canApprove, isAdmin, isWadir1]
+    [sortBy, filterProdi, pageSize, search, sortStatus, userData, ssoData, hasCreatePermission, hasEditPermission, hasDeletePermission, hasApproveRejectPermission, hasUploadSKPermission, hasCetakSKPermission]
   );
 
-  // Helper functions untuk process data by role
-  const processDataForAdmin = (pengajuanList, riwayatList, currentUsername, draftData, riwayatData, mapPengajuan, mapRiwayat) => {
-    // Admin melihat:
-    // 1. Semua pengajuan yang dibuat oleh admin sendiri (createdBy = currentUsername)
-    // 2. Semua pengajuan dengan status "Menunggu Upload SK" (dari siapa saja)
-    pengajuanList.forEach((item) => {
-      const status = (item.status || "").toLowerCase().trim();
-      // Coba berbagai kemungkinan field name untuk createdBy
-      const createdBy = (
-        item.createdBy || 
-        item.dibuatOleh || 
-        item.created_by || 
-        item.dibuat_oleh ||
-        item.CreatedBy ||
-        item.DibuatOleh ||
-        ""
-      ).toLowerCase().trim();
-      
-      // Skip jika sudah selesai (ada di riwayat)
-      if (status === "disetujui" || status.includes("ditolak")) return;
-      
-      // Tampilkan jika:
-      // 1. Status = "Menunggu Upload SK" (dari siapa saja)
-      // 2. ATAU dibuat oleh admin sendiri (semua status lainnya)
-      if (status === "menunggu upload sk" || createdBy === currentUsername) {
-        draftData.push(mapPengajuan(item, draftData.length));
-      }
-    });
-    
-    // Riwayat: tampilkan semua yang sudah disetujui atau ditolak
-    riwayatList.forEach((item) => {
-      const status = (item.status || "").toLowerCase().trim();
-      
-      if (status === "disetujui" || status.includes("ditolak")) {
-        riwayatData.push(mapRiwayat(item, riwayatData.length));
-      }
-    });
-  };
-
-  const processDataForProdi = (pengajuanList, riwayatList, currentUsername, draftData, riwayatData, mapItem) => {
-    pengajuanList.forEach((item) => {
-      const status = (item.status || "").toLowerCase().trim();
-      const itemCreatedBy = (item.createdBy || item.dibuatOleh || "").toLowerCase().trim();
-      
-      if (status === "disetujui" || status.includes("ditolak")) return;
-      
-      if (itemCreatedBy === currentUsername) {
-        const mapped = mapItem(item, 0);
-        draftData.push({ ...mapped, No: draftData.length + 1 });
-      }
-    });
-    
-    riwayatList.forEach((item) => {
-      const status = (item.status || "").toLowerCase().trim();
-      if (status === "disetujui") {
-        const mapped = mapItem(item, 0);
-        riwayatData.push({ ...mapped, No: riwayatData.length + 1 });
-      }
-    });
-  };
-
-  const processDataForMahasiswa = (pengajuanList, riwayatList, draftData, riwayatData, mapItem) => {
-    const seenIds = new Set();
-    const allItems = [...pengajuanList, ...riwayatList];
-    
-    // Mahasiswa hanya melihat daftar pengajuan (semua status)
-    allItems.forEach((item) => {
-      const itemId = item.id || item.droId || item.dro_id || "";
-      
-      if (seenIds.has(itemId)) return;
-      
-      if (itemId) seenIds.add(itemId);
-      
-      const mapped = mapItem(item, 0);
-      draftData.push({ ...mapped, No: draftData.length + 1 });
-    });
-    
-    // Mahasiswa tidak melihat riwayat (riwayatData tetap kosong)
-  };
-
-  const processDataForOthers = (pengajuanList, riwayatList, draftData, riwayatData, mapItem) => {
-    const seenDraftIds = new Set();
-    const seenRiwayatIds = new Set();
-    
-    pengajuanList.forEach((item) => {
-      const status = (item.status || "").toLowerCase().trim();
-      const itemId = item.id || item.droId || item.dro_id || "";
-      
-      if (status === "disetujui" || status.includes("ditolak") || seenDraftIds.has(itemId)) return;
-      
-      if (itemId) seenDraftIds.add(itemId);
-      
-      const mapped = mapItem(item, 0);
-      draftData.push({ ...mapped, No: draftData.length + 1 });
-    });
-    
-    riwayatList.forEach((item) => {
-      const status = (item.status || "").toLowerCase().trim();
-      const itemId = item.id || item.droId || item.dro_id || "";
-      
-      if ((status === "disetujui" || status.includes("ditolak")) && !seenRiwayatIds.has(itemId)) {
-        if (itemId) seenRiwayatIds.add(itemId);
+  // Fungsi khusus untuk reload riwayat saja (untuk pagination)
+  const loadRiwayatOnly = useCallback(
+    async (page = 1, forceProdiFilter = null) => {
+      try {
+        const username = ssoData?.username || userData?.username || "";
+        const nim = userData?.nim || userData?.username || "";
         
-        const mapped = mapItem(item, 0);
-        riwayatData.push({ ...mapped, No: riwayatData.length + 1 });
+        if (!username) return;
+        
+        // Gunakan parameter forceProdiFilter jika ada, atau fallback ke state
+        const prodiFilter = forceProdiFilter || filterProdi || "";
+        const finalProdiFilter = userProdiRestriction && !prodiFilter ? userProdiRestriction : prodiFilter;
+        
+        const riwayatBaseParams = {
+          username: username,
+          page: page,
+          pageSize: pageSize,
+          keyword: search || "",
+          konsentrasi: finalProdiFilter,
+          role: userData?.roleId || "",
+          displayName: userData?.displayName || userData?.fullName || "",
+          status: "Disetujui"
+        };
+
+        if (nim) {
+          riwayatBaseParams.mhsId = nim;
+        }
+
+        const riwayatResponse = await fetchData(API_LINK + "DropOut/riwayat", riwayatBaseParams, "GET").catch(() => ({ data: [], pagination: { totalRecords: 0 } }));
+        const riwayatList = extractArrayFromResponse(riwayatResponse);
+        const totalRecords = riwayatResponse?.pagination?.totalRecords || 0;
+        setTotalRiwayat(totalRecords);
+
+        // Map riwayat data
+        const mapItemRiwayat = (item, index) => {
+          const status = item.status || "";
+          const itemId = item.id || item.droId || "";
+          const actions = [
+            "Detail",
+            {
+              IconName: "download",
+              Title: "Download SK",
+              Function: () => handleDownloadSK(itemId)
+            }
+          ];
+          const namaMahasiswa = cleanMahasiswaName(item.mahasiswa || item.namaMahasiswa || "-");
+          const noPengajuan = formatNoPengajuan(item.id || item.droId, status);
+
+          return {
+            No: index + 1,
+            id: itemId || "",
+            "No. Pengajuan DO": noPengajuan,
+            "Tanggal Pengajuan": item.createdDate || item.tanggalPengajuan || "-",
+            "Dibuat Oleh": item.createdBy || item.dibuatOleh || "-",
+            "Nama Mahasiswa": namaMahasiswa,
+            Prodi: item.konsentrasi || item.prodi || "-",
+            "No. SK DO": item.suratNo || item.noSkDo || "-",
+            "Status Pengajuan": <Badge status={status || "Disetujui"} customMap={{ 
+              "Revisi": "bg-danger-subtle text-danger",
+              "Draft": "bg-secondary-subtle text-secondary",
+              "Menunggu Upload SK": "bg-warning-subtle text-warning",
+              "Belum Disetujui Wadir 1": "bg-warning-subtle text-warning",
+              "Belum Disetujui Prodi": "bg-warning-subtle text-warning",
+              "Belum Disetujui Direktur": "bg-warning-subtle text-warning"
+            }} />,
+            Aksi: actions,
+            Alignment: ["center", "center", "center", "left", "left", "left", "center", "center", "center"]
+          };
+        };
+        
+        const riwayatData = riwayatList.map(mapItemRiwayat);
+        setDataRiwayat(riwayatData);
+        
+      } catch (err) {
+        console.error("Error loading riwayat:", err);
+      } finally {
+        setLoading(false);
       }
-    });
+    },
+    [ssoData, userData, pageSize, search, filterProdi]
+  );
+
+  const handleDetail = (id) => {
+    const encryptedId = encryptIdUrl(id);
+    router.push(`/pages/administrasi-akademik/drop-out/detail/${encryptedId}`);
   };
 
-  const processDataForWadir = (pengajuanList, riwayatList, draftData, riwayatData, mapItem, mapItemRiwayat) => {
-    
-    // Data pengajuan - hanya yang Belum Disetujui Wadir 1 (dari siapa saja)
-    pengajuanList.forEach((item) => {
-      const status = (item.status || "").toLowerCase().trim();
-      if (status === "belum disetujui wadir 1") {
-        const mapped = mapItem(item, 0);
-        draftData.push({ ...mapped, No: draftData.length + 1 });
-      }
-    });
-    
-    // Data riwayat - SEMUA data (tampilkan semua riwayat)
-    riwayatList.forEach((item) => {
-      const mapped = mapItemRiwayat(item, 0);
-      riwayatData.push({ ...mapped, No: riwayatData.length + 1 });
-    });
-    
+  const handleEdit = (id) => {
+    const encryptedId = encryptIdUrl(id);
+    router.push(`/pages/administrasi-akademik/drop-out/edit/${encryptedId}`);
+  };
+
+  const handleAddClick = () => {
+    // Redirect ke halaman add
+    // Validasi sudah dilakukan di showAddButton, jadi tombol hanya muncul jika memenuhi syarat
+    router.push("/pages/administrasi-akademik/drop-out/add");
   };
 
   /* ================= HANDLER ================= */
 
   const handleSearch = (q) => {
     setSearch(q);
-    // Search hanya di tabel riwayat, tidak reload semua data
-    if (!q || q.trim() === "") {
-      // Jika search kosong, reload semua data
-      loadData(1, sortBy, "");
-    }
-    // Filter akan diterapkan saat render tabel riwayat
+    setCurrentPage(1);
+    setCurrentPageRiwayat(1);
+    setLoading(true);
+    // Hanya reload Daftar Riwayat
+    loadRiwayatOnly(1);
   };
 
   const handleFilterApply = () => {
     const s = sortRef.current.value;
     const st = statusRef.current.value;
+    const pr = prodiRef.current?.value || "";
 
+    // Update state
     setSortBy(s);
     setSortStatus(st);
-    loadData(1, s, search);
-  };
-
-  const handleDetail = (id) => {
-    const encodedId = encodeURIComponent(id);
-    router.push(`/pages/administrasi-akademik/drop-out/detail/${encodedId}`);
-  };
-
-  const handleEdit = (id) => {
-    const encodedId = encodeURIComponent(id);
-    router.push(`/pages/administrasi-akademik/drop-out/edit/${encodedId}`);
+    setFilterProdi(pr);
+    setCurrentPageRiwayat(1);
+    setLoading(true);
+    
+    // Langsung reload dengan nilai baru (tidak menunggu state update)
+    loadRiwayatOnly(1);
   };
 
   const handleApprove = async (id) => {
@@ -665,30 +663,23 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     try {
       const username = userData?.username || ssoData?.username || "";
       
-      let endpoint = "";
-      let requestBody = {};
-      
-      if (isWadir1) {
-        // Endpoint khusus untuk Wadir
-        endpoint = `DropOut/wadir/approve?id=${encodeURIComponent(id)}`;
-        requestBody = { username: username };
-      } else {
-        // Endpoint umum untuk role lain
-        endpoint = `DropOut/approve/${id}`;
-      }
+      const requestBody = { username: username };
       
       const response = await fetchData(
-        API_LINK + endpoint,
+        API_LINK + `DropOut/wadir/approve?id=${encodeURIComponent(id)}`,
         requestBody,
         "PUT"
       );
 
-      if (response) {
+      if (response && !response.error) {
         Toast.success("Pengajuan berhasil disetujui");
-        loadData(); // Reload data
+        await loadData(1, sortBy, search); // Reload data
+      } else {
+        Toast.error(response?.message || "Gagal menyetujui pengajuan");
       }
     } catch (err) {
-      Toast.error("Gagal menyetujui pengajuan: " + err.message);
+      console.error("Error approving:", err);
+      Toast.error("Gagal menyetujui pengajuan. Silakan coba lagi.");
     }
   };
 
@@ -707,64 +698,29 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     try {
       const username = userData?.username || ssoData?.username || "";
       
-      let apiRole = "";
-      if (isProdi) {
-        apiRole = "Prodi";
-      } else if (isWadir1) {
-        apiRole = "Wadir1";
-      }
-
-      if (!apiRole) {
-        Toast.error("Role tidak terdeteksi. Anda tidak memiliki akses untuk menolak pengajuan ini.");
-        return;
-      }
-
-      if (!username) {
-        Toast.error("Username tidak ditemukan. Silakan login ulang.");
-        return;
-      }
-
       const requestBody = {
-        role: apiRole,
-        reason: rejectReason.trim()
+        reason: rejectReason.trim(),
+        username: username
       };
 
-      const jwtToken = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('jwtToken='))
-        ?.split('=')[1];
+      const response = await fetchData(
+        API_LINK + `DropOut/wadir/reject?id=${encodeURIComponent(rejectId)}`,
+        requestBody,
+        "PUT"
+      );
 
-      const res = await fetch(`${API_LINK}DropOut/reject?id=${encodeURIComponent(rejectId)}`, {
-        method: "PUT",
-        headers: {
-          'Content-Type': 'application/json',
-          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      const text = await res.text();
-      let result = null;
-      if (text) {
-        try { 
-          result = JSON.parse(text); 
-        } catch (e) {
-          console.error("Error parsing JSON response:", e);
-        }
-      }
-
-      if (res.ok) {
+      if (response && !response.error) {
         Toast.success("Pengajuan berhasil ditolak");
         setShowRejectModal(false);
         setRejectReason("");
         setRejectId(null);
-        loadData();
+        await loadData(1, sortBy, search);
       } else {
-        Toast.error(result?.message || "Gagal menolak pengajuan");
+        Toast.error(response?.message || "Gagal menolak pengajuan");
       }
     } catch (err) {
       console.error("Error rejecting pengajuan:", err);
-      Toast.error("Gagal menolak pengajuan: " + (err?.message || "Unknown error"));
+      Toast.error("Gagal menolak pengajuan. Silakan coba lagi.");
     }
   };
 
@@ -788,18 +744,39 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     try {
       const username = userData?.username || ssoData?.username || "";
       
-      const response = await fetchData(
-        API_LINK + `DropOut/draft/${id}/generate-id`,
-        { createdBy: username },
-        "PUT"
-      );
+      // Cek apakah ID sudah dalam format generated (mengandung "/")
+      const isGeneratedId = id.includes("/");
+      
+      let response;
+      
+      if (isGeneratedId) {
+        // Untuk ID yang sudah di-generate, kirim lewat query parameter
+        response = await fetchData(
+          API_LINK + `DropOut/draft/generate-id?id=${encodeURIComponent(id)}`,
+          { createdBy: username },
+          "PUT"
+        );
+      } else {
+        // Untuk draft baru (ID tanpa "/"), gunakan path parameter seperti biasa
+        response = await fetchData(
+          API_LINK + `DropOut/draft/${id}/generate-id`,
+          { createdBy: username },
+          "PUT"
+        );
+      }
 
-      if (response) {
-        Toast.success("Draft berhasil diajukan dengan ID: " + response.id);
-        loadData(); // Reload data
+      if (response?.error) {
+        Toast.error(response.message || "Gagal mengajukan. Silakan coba lagi.");
+      } else if (response) {
+        const newId = response.newId || response.id || "";
+        Toast.success("Pengajuan berhasil diajukan" + (newId && !isGeneratedId ? " dengan ID: " + newId : ""));
+        await loadData(1, sortBy, search);
+      } else {
+        Toast.error("Response dari server kosong. Silakan coba lagi.");
       }
     } catch (err) {
-      Toast.error("Gagal mengajukan draft: " + err.message);
+      console.error("Error submitting draft:", err);
+      Toast.error("Gagal mengajukan. Silakan coba lagi.");
     }
   };
 
@@ -824,10 +801,11 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
 
       if (response) {
         Toast.success("Draft pengajuan berhasil dihapus");
-        loadData(); // Reload data
+        await loadData(1, sortBy, search); // Reload data
       }
     } catch (err) {
-      Toast.error("Gagal menghapus draft: " + err.message);
+      console.error("Error deleting draft:", err);
+      Toast.error("Gagal menghapus draft. Silakan coba lagi.");
     }
   };
 
@@ -858,18 +836,31 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
     try {
       setUploading(true);
 
-      // Create FormData for multipart/form-data
+      console.log("=== DEBUG UPLOAD SK ===");
+      console.log("Upload ID:", uploadId);
+      console.log("SK File:", fileSK?.name);
+      console.log("Surat Keterangan File:", fileSuratKeterangan?.name);
+
+      // Step 1: Upload files dengan endpoint upload-sk-file
       const formData = new FormData();
       formData.append("DroId", uploadId);
       formData.append("SkFile", fileSK);
       formData.append("SkpbFile", fileSuratKeterangan);
+
+      // Debug: Log FormData contents
+      console.log("FormData contents:");
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}:`, value);
+      }
 
       const jwtToken = document.cookie
         .split('; ')
         .find(row => row.startsWith('jwtToken='))
         ?.split('=')[1];
 
-      const res = await fetch(`${API_LINK}DropOut/upload-sk-file`, {
+      console.log("Step 1: Uploading files to:", `${API_LINK}DropOut/upload-sk-file`);
+
+      const uploadRes = await fetch(`${API_LINK}DropOut/upload-sk-file`, {
         method: "POST",
         headers: {
           ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
@@ -877,44 +868,250 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
         body: formData,
       });
 
-      const text = await res.text();
-      let result = null;
-      if (text) {
-        try { 
-          result = JSON.parse(text); 
-        } catch (e) {
-          console.error("Error parsing JSON response:", e);
-        }
-      }
+      console.log("Upload response status:", uploadRes.status);
+      console.log("Upload response ok:", uploadRes.ok);
 
-      if (!res.ok) {
-        Toast.error(result?.message || result?.errorMessage || `Gagal mengupload berkas (${res.status})`);
+      if (!uploadRes.ok) {
+        const errorText = await uploadRes.text();
+        console.error("Upload failed:", errorText);
+        Toast.error("Gagal mengupload berkas. Silakan coba lagi.");
         return;
       }
 
-      Toast.success("SK berhasil diunggah");
-      handleCloseUploadModal();
-      loadData();
+      const uploadResponseText = await uploadRes.text();
+      console.log("Upload response text:", uploadResponseText);
+      
+      // Step 2: Update status dengan endpoint upload-sk
+      console.log("Step 2: Updating status to:", `${API_LINK}DropOut/upload-sk`);
+      
+      const updateResponse = await fetchData(
+        API_LINK + "DropOut/upload-sk",
+        {
+          droId: uploadId,
+          sk: fileSK.name, // Nama file SK
+          skpb: fileSuratKeterangan.name, // Nama file Surat Keterangan
+          modifiedBy: userData?.username || userData?.displayName || ""
+        },
+        "PUT"
+      );
+      
+      console.log("Update status response:", updateResponse);
+      
+      if (updateResponse && !updateResponse.error) {
+        Toast.success("Berkas SK berhasil diunggah dan status berhasil diupdate");
+        handleCloseUploadModal();
+        
+        console.log("Reloading data...");
+        await loadData(1, sortBy, search); // Reload data
+        console.log("Data reload completed");
+      } else {
+        Toast.error("File berhasil diupload tapi gagal update status. Silakan hubungi administrator.");
+      }
+
     } catch (err) {
-      Toast.error("Terjadi kesalahan: " + err.message);
+      console.error("Upload error:", err);
+      Toast.error("Terjadi kesalahan saat mengupload. Silakan coba lagi.");
     } finally {
       setUploading(false);
+      console.log("=== END DEBUG UPLOAD SK ===");
     }
   };
 
   const handleUnduhBerkas = async (id) => {
     try {
-      // Gunakan endpoint download-sk untuk download file SK
-      window.open(`${API_LINK}DropOut/download-sk/${encodeURIComponent(id)}`, '_blank');
+      // Ambil JWT token dari cookie
+      const jwtToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('jwtToken='))
+        ?.split('=')[1];
+      
+      // Fetch dengan authorization header
+      const response = await fetch(`${API_LINK}DropOut/download-sk/${encodeURIComponent(id)}`, {
+        method: 'GET',
+        headers: {
+          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      // Ambil blob dari response
+      const blob = await response.blob();
+      
+      // Ambil filename dari header Content-Disposition jika ada
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `SK_Drop_Out_${id}.pdf`;
+      
+      if (contentDisposition) {
+        const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+        const filenameMatch = filenameRegex.exec(contentDisposition);
+        if (filenameMatch?.[1]) {
+          filename = filenameMatch[1].replaceAll(/['"]/g, '');
+        }
+      }
+      
+      // Buat URL object dan trigger download
+      const blobUrl = globalThis.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      globalThis.URL.revokeObjectURL(blobUrl);
+      
+      Toast.success("Berkas SK berhasil diunduh");
     } catch (err) {
-      Toast.error("Gagal mengunduh berkas: " + err.message);
+      console.error("Download error:", err);
+      Toast.error("Gagal mengunduh berkas. Silakan coba lagi.");
     }
   };
 
   const handleCetakSK = (id) => {
-    // Buka URL template SK di tab baru
-    window.open(`${API_LINK}DropOut/template-sk`, '_blank');
+    globalThis.open(`${API_LINK}DropOut/${encodeURIComponent(id)}/generate-pdf-sk`, '_blank');
   };
+
+  const handleDownloadTemplate = async (dropOutId) => {
+    try {
+      // Ambil JWT token dari cookie
+      const jwtToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('jwtToken='))
+        ?.split('=')[1];
+
+      const response = await fetch(`${API_LINK}DropOut/DownloadTemplateSK/${encodeURIComponent(dropOutId)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` })
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Buka file dalam tab baru
+      const blob = await response.blob();
+      const url = globalThis.URL.createObjectURL(blob);
+      globalThis.open(url, '_blank');
+      
+      // Cleanup URL object setelah delay
+      setTimeout(() => {
+        globalThis.URL.revokeObjectURL(url);
+      }, 1000);
+
+    } catch (err) {
+      console.error("Download template error:", err);
+      Toast.error("Gagal mendownload template SK. Silakan coba lagi.");
+    }
+  };
+  
+  const createDownloadLink = (file, fileType) => {
+    const url = `${API_LINK.replace('/api/', '')}${file.url}`;
+    console.log(`Preparing ${fileType} download:`, url);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.download = file.filename || `${fileType}_Drop_Out.pdf`;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    return link;
+  };
+
+  const triggerDownloads = (downloadLinks) => {
+    console.log(`Triggering ${downloadLinks.length} downloads...`);
+    
+    // Download pertama langsung
+    downloadLinks[0].click();
+    
+    // Download kedua dengan requestAnimationFrame
+    if (downloadLinks.length > 1) {
+      requestAnimationFrame(() => {
+        downloadLinks[1].click();
+      });
+    }
+    
+    // Cleanup setelah delay
+    setTimeout(() => {
+      downloadLinks.forEach(link => {
+        if (document.body.contains(link)) {
+          link.remove();
+        }
+      });
+    }, 1000);
+    
+    Toast.success(`${downloadLinks.length} file SK berhasil didownload`);
+  };
+
+  const handleDownloadSK = async (id) => {
+    try {
+      console.log("=== DEBUG DOWNLOAD SK ===");
+      console.log("Download ID:", id);
+      
+      // Ambil JWT token dari cookie
+      const jwtToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('jwtToken='))
+        ?.split('=')[1];
+      
+      // Gunakan endpoint download-all-sk sesuai dengan backend
+      const response = await fetch(`${API_LINK}DropOut/download-all-sk?id=${encodeURIComponent(id)}`, {
+        method: 'GET',
+        headers: {
+          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` }),
+          'Accept': 'application/json'
+        }
+      });
+      
+      console.log("Response status:", response.status);
+      console.log("Response ok:", response.ok);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Response data:", data);
+      
+      if (data.files && Array.isArray(data.files)) {
+        const skFile = data.files.find(file => file.type === "SK");
+        const skpbFile = data.files.find(file => file.type === "SKPB");
+        
+        console.log("SK File found:", skFile);
+        console.log("SKPB File found:", skpbFile);
+        
+        // Buat semua link download sekaligus dalam satu user gesture
+        const downloadLinks = [];
+        
+        if (skFile) {
+          downloadLinks.push(createDownloadLink(skFile, "SK"));
+        }
+        
+        if (skpbFile) {
+          downloadLinks.push(createDownloadLink(skpbFile, "SKPB"));
+        }
+        
+        // Trigger semua download dalam satu event loop
+        if (downloadLinks.length > 0) {
+          triggerDownloads(downloadLinks);
+        } else {
+          Toast.error("File SK tidak ditemukan");
+        }
+      } else {
+        Toast.error("Format response tidak sesuai");
+      }
+      
+      console.log("=== END DEBUG DOWNLOAD SK ===");
+    } catch (err) {
+      console.error("Download error:", err);
+      Toast.error("Gagal membuka SK. Silakan coba lagi.");
+    }
+  };
+  
   const createHeaderStyle = () => ({
     font: { bold: true, color: { rgb: "FFFFFF" } },
     fill: { fgColor: { rgb: "4472C4" } },
@@ -1029,21 +1226,8 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
       Toast.success("File Excel berhasil diunduh!");
     } catch (err) {
       console.error("Error exporting Excel:", err);
-      Toast.error("Gagal membuat file Excel: " + (err?.message || "Unknown error"));
+      Toast.error("Gagal membuat file Excel. Silakan coba lagi.");
     }
-  };
-
-  const handlePageSizeChange = (newPageSize) => {
-    setPageSize(newPageSize);
-    setCurrentPage(1);
-    setCurrentPageRiwayat(1);
-  };
-
-  const handleRefresh = () => {
-    setCurrentPage(1);
-    setCurrentPageRiwayat(1);
-    loadData(1, sortBy, search);
-    Toast.info("Data sedang dimuat ulang...");
   };
 
   /* ================= INIT ================= */
@@ -1063,37 +1247,156 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
       return;
     }
     
-    loadData(1, sortBy, "");
+    // Initialize data
+    const initializeData = async () => {
+      try {
+        console.log("=== INITIALIZING DATA ===");
+        
+        // Jalankan semua API call secara parallel untuk mempercepat loading
+        const [, konsentrasiValue] = await Promise.all([
+          // 1. Load prodi list untuk dropdown
+          loadProdiList(),
+          // 2. Check user prodi access dan ambil konsentrasi value
+          checkUserProdiAccess()
+        ]);
+        
+        setUserProdiRestriction(konsentrasiValue);
+        
+        // 3. Set filter prodi jika ada pembatasan
+        if (konsentrasiValue && !filterProdi) {
+          console.log("Setting filterProdi to konsentrasi value:", konsentrasiValue);
+          setFilterProdi(konsentrasiValue);
+          
+          // 4. Load data dengan konsentrasi value sebagai parameter
+          console.log("Loading data with konsentrasi value as filter:", konsentrasiValue);
+          loadData(1, sortBy, "", konsentrasiValue);
+        } else {
+          // 4. Load data langsung jika tidak ada pembatasan
+          console.log("Loading data without prodi restriction");
+          loadData(1, sortBy, "");
+        }
+        
+        console.log("=== END INITIALIZATION ===");
+      } catch (err) {
+        console.error("Error initializing data:", err);
+        // Fallback: load data tanpa pembatasan
+        loadProdiList();
+        loadData(1, sortBy, "");
+      }
+    };
+    
+    initializeData();
   }, []);
+  
+  // Load data prodi untuk filter
+  const loadProdiList = async () => {
+    try {
+      const response = await fetchData(API_LINK + "DropOut/prodi/list", {}, "GET");
+      
+      if (response && !response.error) {
+        const data = Array.isArray(response) ? response : (response.data || []);
+        const prodiOptions = [
+          { Value: "", Text: "Semua Prodi" },
+          ...data.map(item => ({
+            Value: item.value || item.text || item.nama,
+            Text: item.text || item.nama || item.value
+          }))
+        ];
+        setProdiList(prodiOptions);
+      }
+    } catch (err) {
+      console.error("Error loading prodi:", err);
+      setProdiList([{ Value: "", Text: "Semua Prodi" }]);
+    }
+  };
 
-  // Re-load data when isAdmin changes
+  // Check user prodi access dan ambil konsentrasi value untuk filtering
+  const checkUserProdiAccess = async () => {
+    try {
+      console.log("=== CHECKING USER PRODI ACCESS ===");
+      
+      // Step 1: Ambil prodi user
+      const prodiResponse = await fetchData(API_LINK + "DropOut/prodi", {}, "GET");
+      console.log("Raw response from /DropOut/prodi:", prodiResponse);
+      
+      if (!prodiResponse || prodiResponse.error) {
+        console.log("No prodi restrictions - user can access all prodi");
+        return null;
+      }
+      
+      // Handle berbagai format response
+      let prodiData = prodiResponse;
+      if (prodiResponse.data) {
+        prodiData = prodiResponse.data;
+      }
+      
+      if (!Array.isArray(prodiData) || prodiData.length === 0) {
+        console.log("No prodi restrictions - user can access all prodi");
+        return null;
+      }
+      
+      // Step 2: Ambil prodi value untuk query konsentrasi
+      const userProdi = prodiData[0];
+      const prodiValue = userProdi.value || userProdi.id;
+      
+      console.log("User prodi data:", userProdi);
+      console.log("Prodi value:", prodiValue);
+      
+      if (!prodiValue) {
+        console.log("No prodi value found - user can access all prodi");
+        return null;
+      }
+      
+      // Step 3: Ambil konsentrasi berdasarkan prodi value
+      console.log("Fetching konsentrasi for prodi value:", prodiValue);
+      const konsentrasiResponse = await fetchData(
+        API_LINK + `DropOut/konsentrasi?prodiId=${prodiValue}`, 
+        {}, 
+        "GET"
+      );
+      
+      console.log("Konsentrasi response:", konsentrasiResponse);
+      
+      if (!konsentrasiResponse || konsentrasiResponse.error) {
+        console.log("No konsentrasi found for prodi value:", prodiValue);
+        return null;
+      }
+      
+      // Handle berbagai format response konsentrasi
+      let konsentrasiData = konsentrasiResponse;
+      if (konsentrasiResponse.data) {
+        konsentrasiData = konsentrasiResponse.data;
+      }
+      
+      if (!Array.isArray(konsentrasiData) || konsentrasiData.length === 0) {
+        console.log("No konsentrasi data found");
+        return null;
+      }
+      
+      // Step 4: Ambil konsentrasi value untuk filtering
+      const konsentrasi = konsentrasiData[0];
+      const konsentrasiValue = konsentrasi.value || konsentrasi.id;
+      
+      console.log("Konsentrasi data:", konsentrasi);
+      console.log("Final konsentrasi value for filtering:", konsentrasiValue);
+      console.log("=== END PRODI ACCESS CHECK ===");
+      
+      return konsentrasiValue;
+      
+    } catch (err) {
+      console.error("Error checking user prodi access:", err);
+      return null;
+    }
+  };
+
+  // Re-load data when userData changes
   useEffect(() => {
-    if (isClient && isAdmin !== undefined) {
+    if (isClient && userData) {
       loadData(1, sortBy, "");
     }
-  }, [isAdmin]);
+  }, [userData, isClient]);
 
   /* ================= FILTER UI ================= */
-
-  // Filter dataRiwayat berdasarkan search keyword
-  const filteredDataRiwayat = useMemo(() => {
-    if (!search || search.trim() === "") {
-      return dataRiwayat;
-    }
-    
-    const lowerKeyword = search.toLowerCase();
-    return dataRiwayat.filter(item => {
-      const noPengajuan = (item["No. Pengajuan DO"] || "").toLowerCase();
-      const namaMhs = (item["Nama Mahasiswa"] || "").toLowerCase();
-      const prodi = (item["Prodi"] || "").toLowerCase();
-      const status = (item["Status"] || "").toLowerCase();
-      
-      return noPengajuan.includes(lowerKeyword) || 
-             namaMhs.includes(lowerKeyword) || 
-             prodi.includes(lowerKeyword) ||
-             status.includes(lowerKeyword);
-    });
-  }, [dataRiwayat, search]);
 
   const filterContent = (
     <>
@@ -1109,12 +1412,16 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
         label="Status"
         defaultValue={sortStatus}
       />
-      <DropDown
-        arrData={pageSizeOptions}
-        label="Tampilkan"
-        value={pageSize}
-        onChange={(e) => handlePageSizeChange(Number.parseInt(e.target.value, 10))}
-      />
+      {/* Dropdown Prodi - hanya untuk user selain mahasiswa dan prodi */}
+      {prodiList.length > 0 && !userProdiRestriction && (
+        <DropDown
+          ref={prodiRef}
+          arrData={prodiList}
+          label="Prodi"
+          defaultValue={filterProdi}
+          disabled={false}
+        />
+      )}
     </>
   );
 
@@ -1131,267 +1438,161 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
         { label: "Drop Out" }
       ]}
     >
+      {/* Loading overlay saat fetch data */}
+      <Loading loading={loading} message="Memuat data..." />
+      
       {/* Check view permission */}
       {!hasViewPermission && userData?.permission && userData.permission.length > 0 && (
         <div className="alert alert-warning" role="alert">
-          <i className="bi bi-exclamation-triangle me-2"></i>
+          <i className="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>
+          {' '}
           Anda tidak memiliki akses untuk melihat halaman ini. Silakan hubungi administrator untuk mendapatkan permission <strong>drop_out.view</strong>.
         </div>
       )}
 
       {/* Show content only if has view permission or permission is empty (fallback to role) */}
-      {(hasViewPermission || !userData?.permission || userData.permission.length === 0) && (
+      {(hasViewPermission || !userData?.permission?.length) && (
         <>
-      {/* Tabel untuk Mahasiswa - Hanya menampilkan Daftar Pengajuan */}
-      {isMahasiswa && (
-        <div className="mb-4">
-          <Formsearch
-            onSearch={handleSearch}
-            onRefresh={handleRefresh}
-            showAddButton={false}
-            showRefreshButton={true}
-            showFilterButton={false}
-            showExportButton={false}
-            searchPlaceholder="Cari No. Pengajuan / Nama Mahasiswa"
-          />
-          
-          <div className="d-flex justify-content-between align-items-center mb-3 mt-3">
-            <h5 className="mb-0">Daftar Pengajuan</h5>
-          </div>
-          
-          <Table
-            data={dataDraft.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
-            onDetail={handleDetail}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onAjukan={handleAjukan}
-          />
-          
-          {dataDraft.length > pageSize && (
-            <Paging
-              pageSize={pageSize}
-              pageCurrent={currentPage}
-              totalData={dataDraft.length}
-              navigation={(p) => setCurrentPage(p)}
-            />
-          )}
-        </div>
-      )}
-
-      {/* Tabel untuk Admin - Menampilkan Daftar Pengajuan dan Riwayat */}
-      {isAdmin && !isMahasiswa && (
-        <>
-          <div className="mb-4">
-            {/* Tombol Tambah untuk Admin - tampilkan jika punya create atau approve_reject */}
-            {(hasCreatePermission || hasApproveRejectPermission) && (
-              <div className="mb-3">
-                <button 
-                  className="btn btn-primary px-4"
-                  onClick={() => router.push("/pages/administrasi-akademik/drop-out/add")}
-                >
-                  <i className="bi bi-plus-lg me-1"></i>Tambah
-                </button>
-              </div>
-            )}
+          {/* Tombol Tambah - di atas Daftar Pengajuan */}
+          {(() => {
+            if (!hasCreatePermission) return null;
             
+            // Cek apakah user adalah mahasiswa
+            const nim = userData?.nim || userData?.username || "";
+            const isMahasiswa = nim && nim.length > 0 && /^\d+$/.test(nim);
+            
+            // Jika bukan mahasiswa (prodi/admin), selalu tampilkan tombol
+            if (!isMahasiswa) {
+              return (
+                <div className="mb-3">
+                  <button 
+                    className="btn btn-primary px-4"
+                    onClick={handleAddClick}
+                    type="button"
+                  >
+                    <i className="bi bi-plus-lg me-1" aria-hidden="true"></i>
+                    {' '}
+                    Tambah
+                  </button>
+                </div>
+              );
+            }
+            
+            // Jika mahasiswa, hanya tampilkan jika belum ada pengajuan aktif dan bebas tanggungan
+            if (!hasActivePengajuan && isBebasTanggungan) {
+              return (
+                <div className="mb-3">
+                  <button 
+                    className="btn btn-primary px-4"
+                    onClick={handleAddClick}
+                    type="button"
+                  >
+                    <i className="bi bi-plus-lg me-1" aria-hidden="true"></i>
+                    {' '}
+                    Tambah
+                  </button>
+                </div>
+              );
+            }
+            
+            return null;
+          })()}
+
+          {/* Tabel Pengajuan - Universal untuk semua user */}
+          <div className="mb-4">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h5 className="mb-0">Daftar Pengajuan</h5>
             </div>
             
             <Table
-              data={dataDraft.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
+              data={dataDraft}
               onDetail={handleDetail}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onApprove={handleApprove}
               onReject={handleReject}
+              onSent={handleAjukan}
               onAjukan={handleAjukan}
-              onUnggahBerkas={handleUploadSK}
+              onUpload={handleUploadSK}
               onUnduhBerkas={handleUnduhBerkas}
+              onDownloadSK={handleDownloadSK}
+              onCetakSK={handleCetakSK}
             />
             
-            {dataDraft.length > pageSize && (
+            {totalDraft > pageSize && (
               <Paging
                 pageSize={pageSize}
                 pageCurrent={currentPage}
-                totalData={dataDraft.length}
-                navigation={(p) => setCurrentPage(p)}
+                totalData={totalDraft}
+                navigation={(p) => {
+                  setCurrentPage(p);
+                  loadData(p, sortBy, search);
+                }}
               />
             )}
           </div>
 
+          {/* Tabel Riwayat - Universal untuk semua user */}
           <div className="mb-4">
             <div className="d-flex justify-content-between align-items-center mb-3">
-              <h5 className="mb-0">Riwayat Pengajuan</h5>
+              <h5 className="mb-0">Daftar Riwayat</h5>
             </div>
             
             <Formsearch
               onSearch={handleSearch}
               onFilter={handleFilterApply}
-              onRefresh={handleRefresh}
-              onExport={canExport ? handleExportExcel : undefined}
               showAddButton={false}
-              showRefreshButton={true}
-              showExportButton={canExport}
+              showRefreshButton={false}
               searchPlaceholder="Cari No. Pengajuan / Nama Mahasiswa"
               filterContent={filterContent}
             />
             
             <Table
-              data={filteredDataRiwayat.slice((currentPageRiwayat - 1) * pageSize, currentPageRiwayat * pageSize)}
+              data={dataRiwayat}
               onDetail={handleDetail}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onApprove={handleApprove}
-              onReject={handleReject}
-              onAjukan={handleAjukan}
-              onUnggahBerkas={handleUploadSK}
-              onUnduhBerkas={handleUnduhBerkas}
+              onDownloadSK={handleDownloadSK}
             />
             
-            {filteredDataRiwayat.length > pageSize && (
+            {totalRiwayat > pageSize && (
               <Paging
                 pageSize={pageSize}
                 pageCurrent={currentPageRiwayat}
-                totalData={filteredDataRiwayat.length}
-                navigation={(p) => setCurrentPageRiwayat(p)}
+                totalData={totalRiwayat}
+                navigation={(p) => {
+                  setCurrentPageRiwayat(p);
+                  loadRiwayatOnly(p);
+                }}
               />
             )}
           </div>
         </>
       )}
-
-      {/* Tabel Draft Pengajuan - Untuk Prodi dan role lain (bukan Admin, bukan Mahasiswa) */}
-      {canSeeDraft && !isMahasiswa && !isAdmin && (
-        <div className="mb-4">
-          <div className="mb-3">
-            <button 
-              className="btn btn-primary px-4"
-              onClick={() => router.push("/pages/administrasi-akademik/drop-out/add")}
-            >
-              <i className="bi bi-plus-lg me-1"></i>Tambah
-            </button>
-          </div>
-          
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <h5 className="mb-0">Daftar Pengajuan</h5>
-          </div>
-          
-          <Table
-            data={dataDraft.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
-            onDetail={handleDetail}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onApprove={handleApprove}
-            onReject={handleReject}
-            onAjukan={handleAjukan}
-            onUnggahBerkas={handleUploadSK}
-            onUnduhBerkas={handleUnduhBerkas}
-          />
-          
-          {dataDraft.length > pageSize && (
-            <Paging
-              pageSize={pageSize}
-              pageCurrent={currentPage}
-              totalData={dataDraft.length}
-              navigation={(p) => setCurrentPage(p)}
-            />
-          )}
-        </div>
-      )}
-
-      {/* Tabel Pengajuan untuk Wadir - Menampilkan yang Belum Disetujui Wadir 1 */}
-      {isWadir1 && (
-        <div className="mb-4">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <h5 className="mb-0">Daftar Pengajuan (Belum Disetujui Wadir 1)</h5>
-          </div>
-          
-          <Table
-            data={dataDraft.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
-            onDetail={handleDetail}
-            onApprove={handleApprove}
-            onReject={handleReject}
-          />
-          
-          {dataDraft.length > pageSize && (
-            <Paging
-              pageSize={pageSize}
-              pageCurrent={currentPage}
-              totalData={dataDraft.length}
-              navigation={(p) => setCurrentPage(p)}
-            />
-          )}
-        </div>
-      )}
-
-
-      {/* Tabel Riwayat Pengajuan - Untuk Prodi dan role lain (bukan Admin, bukan Mahasiswa, bukan Wadir) */}
-      {canSeeDraft && !isMahasiswa && !isAdmin && !isWadir1 && (
-        <div className="mb-4">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <h5 className="mb-0">Riwayat Pengajuan</h5>
-          </div>
-          
-          <Formsearch
-            onSearch={handleSearch}
-            onFilter={handleFilterApply}
-            onRefresh={handleRefresh}
-            onExport={canExport ? handleExportExcel : undefined}
-            showAddButton={false}
-            showRefreshButton={true}
-            showExportButton={canExport}
-            searchPlaceholder="Cari No. Pengajuan / Nama Mahasiswa"
-            filterContent={filterContent}
-          />
-          
-          <Table
-            data={filteredDataRiwayat.slice((currentPageRiwayat - 1) * pageSize, currentPageRiwayat * pageSize)}
-            onDetail={handleDetail}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onApprove={handleApprove}
-            onReject={handleReject}
-            onAjukan={handleAjukan}
-            onUnggahBerkas={handleUploadSK}
-            onUnduhBerkas={handleUnduhBerkas}
-          />
-          
-          {filteredDataRiwayat.length > pageSize && (
-            <Paging
-              pageSize={pageSize}
-              pageCurrent={currentPageRiwayat}
-              totalData={filteredDataRiwayat.length}
-              navigation={(p) => setCurrentPageRiwayat(p)}
-            />
-          )}
-        </div>
-      )}
-
+      
       {/* Modal Upload SK */}
       {showUploadModal && (
         <>
           <div
             className="position-fixed top-0 start-0 w-100 h-100"
-            style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+            style={{ 
+              backgroundColor: 'rgba(0,0,0,0.5)', 
+              backdropFilter: 'blur(5px)',
+              WebkitBackdropFilter: 'blur(5px)',
+              zIndex: 1050 
+            }}
             onClick={handleCloseUploadModal}
-          />
+            onKeyDown={(e) => e.key === 'Escape' && handleCloseUploadModal()}
+            role="button"
+            tabIndex={0}
+            aria-label="Close modal"
+          ></div>
           <div 
             className="position-fixed top-50 start-50 translate-middle"
-            style={{ zIndex: 1051, width: '90%', maxWidth: '650px' }}
+            style={{ zIndex: 1051, width: '90%', maxWidth: '550px' }}
           >
-            <div className="bg-white rounded-4 shadow-lg overflow-hidden">
+            <div className="bg-white rounded shadow-lg">
               {/* Header */}
-              <div className="bg-primary text-white p-4 d-flex justify-content-between align-items-center">
-                <div className="d-flex align-items-center gap-3">
-                  <div className="bg-white bg-opacity-25 rounded-circle p-2">
-                    <i className="bi bi-cloud-upload fs-4"></i>
-                  </div>
-                  <div>
-                    <h5 className="mb-0 fw-bold">Unggah Berkas SK Drop Out</h5>
-                    <small className="opacity-75">Lengkapi dokumen yang diperlukan</small>
-                  </div>
-                </div>
+              <div className="bg-primary text-white p-3 d-flex justify-content-between align-items-center">
+                <h6 className="mb-0">Unggah Berkas SK Drop Out</h6>
                 <button 
                   type="button" 
                   className="btn-close btn-close-white"
@@ -1401,110 +1602,70 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
               </div>
 
               {/* Body */}
-              <div className="p-4">
+              <div className="p-3">
                 {/* File SK Drop Out */}
-                <div className="mb-4">
-                  <label htmlFor="fileSK" className="form-label fw-semibold d-flex align-items-center gap-2 mb-3">
-                    <i className="bi bi-file-earmark-pdf text-danger"></i>
-                    Berkas SK Drop Out
-                    <span className="text-danger">*</span>
+                <div className="mb-3">
+                  <label htmlFor="fileSK" className="form-label">
+                    Berkas SK Drop Out <span className="text-danger">*</span>
                   </label>
-                  <div className="position-relative">
-                    <input
-                      id="fileSK"
-                      type="file"
-                      className="form-control form-control-lg"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => setFileSK(e.target.files[0])}
-                      style={{ 
-                        paddingLeft: '3rem',
-                        border: '2px dashed #dee2e6',
-                        backgroundColor: '#f8f9fa'
-                      }}
-                    />
-                    <i 
-                      className="bi bi-paperclip position-absolute text-muted" 
-                      style={{ left: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '1.25rem' }}
-                    ></i>
-                  </div>
+                  <input
+                    id="fileSK"
+                    type="file"
+                    className="form-control"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => setFileSK(e.target.files[0])}
+                  />
                   {fileSK && (
-                    <div className="alert alert-success mt-2 py-2 px-3 d-flex align-items-center gap-2">
-                      <i className="bi bi-check-circle-fill"></i>
-                      <small className="mb-0">{fileSK.name}</small>
-                    </div>
+                    <small className="text-success d-block mt-1">
+                      <i className="bi bi-check-circle me-1" aria-hidden="true"></i>
+                      {fileSK.name}
+                    </small>
                   )}
-                  <div className="d-flex align-items-center gap-2 mt-2">
-                    <i className="bi bi-info-circle text-primary"></i>
-                    <small className="text-muted">Format: PDF, JPG, PNG • Maksimal: 5MB</small>
-                  </div>
+                  <small className="text-muted d-block mt-1">Format: PDF, JPG, PNG • Maksimal: 5MB</small>
                 </div>
 
                 {/* File Surat Keterangan */}
-                <div className="mb-4">
-                  <label htmlFor="fileSuratKeterangan" className="form-label fw-semibold d-flex align-items-center gap-2 mb-3">
-                    <i className="bi bi-file-earmark-text text-info"></i>
-                    Berkas Surat Keterangan Pernah Berkuliah
-                    <span className="text-danger">*</span>
+                <div className="mb-3">
+                  <label htmlFor="fileSuratKeterangan" className="form-label">
+                    Berkas Surat Keterangan Pernah Berkuliah <span className="text-danger">*</span>
                   </label>
-                  <div className="position-relative">
-                    <input
-                      id="fileSuratKeterangan"
-                      type="file"
-                      className="form-control form-control-lg"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => setFileSuratKeterangan(e.target.files[0])}
-                      style={{ 
-                        paddingLeft: '3rem',
-                        border: '2px dashed #dee2e6',
-                        backgroundColor: '#f8f9fa'
-                      }}
-                    />
-                    <i 
-                      className="bi bi-paperclip position-absolute text-muted" 
-                      style={{ left: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '1.25rem' }}
-                    ></i>
-                  </div>
+                  <input
+                    id="fileSuratKeterangan"
+                    type="file"
+                    className="form-control"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => setFileSuratKeterangan(e.target.files[0])}
+                  />
                   {fileSuratKeterangan && (
-                    <div className="alert alert-success mt-2 py-2 px-3 d-flex align-items-center gap-2">
-                      <i className="bi bi-check-circle-fill"></i>
-                      <small className="mb-0">{fileSuratKeterangan.name}</small>
-                    </div>
+                    <small className="text-success d-block mt-1">
+                      <i className="bi bi-check-circle me-1" aria-hidden="true"></i>
+                      {fileSuratKeterangan.name}
+                    </small>
                   )}
-                  <div className="d-flex align-items-center gap-2 mt-2">
-                    <i className="bi bi-info-circle text-primary"></i>
-                    <small className="text-muted">Format: PDF, JPG, PNG • Maksimal: 5MB</small>
-                  </div>
+                  <small className="text-muted d-block mt-1">Format: PDF, JPG, PNG • Maksimal: 5MB</small>
                 </div>
 
                 {/* Info Box */}
-                <div className="alert alert-light border-start border-4 border-primary py-3 px-4">
-                  <div className="d-flex gap-3">
-                    <i className="bi bi-exclamation-circle text-primary fs-5"></i>
-                    <div>
-                      <strong className="d-block mb-1">Perhatian:</strong>
-                      <small className="text-muted">
-                        Pastikan semua berkas yang diunggah sudah benar dan sesuai. 
-                        Berkas yang sudah diunggah tidak dapat diubah kembali.
-                      </small>
-                    </div>
-                  </div>
+                <div className="alert alert-info py-2 px-3 mb-0">
+                  <small>
+                    Pastikan semua berkas yang diunggah sudah benar dan sesuai. Berkas yang sudah diunggah tidak dapat diubah kembali.
+                  </small>
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="bg-light p-4 d-flex justify-content-end gap-3">
+              <div className="p-3 border-top d-flex justify-content-end gap-2">
                 <button 
                   type="button" 
-                  className="btn btn-light border px-4 py-2"
+                  className="btn btn-secondary"
                   onClick={handleCloseUploadModal}
                   disabled={uploading}
                 >
-                  <i className="bi bi-x-lg me-2"></i>
                   Batal
                 </button>
                 <button 
                   type="button" 
-                  className="btn btn-primary px-4 py-2 shadow-sm"
+                  className="btn btn-primary"
                   onClick={handleSubmitUpload}
                   disabled={uploading || !fileSK || !fileSuratKeterangan}
                 >
@@ -1514,10 +1675,7 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
                       Mengunggah...
                     </>
                   ) : (
-                    <>
-                      <i className="bi bi-cloud-upload me-2"></i>
-                      Unggah Berkas
-                    </>
+                    'Unggah Berkas'
                   )}
                 </button>
               </div>
@@ -1537,7 +1695,8 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
               <div className="modal-header bg-primary text-white">
                 <h5 className="modal-title">
                   <i className="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>
-                  {' Tolak Pengajuan'}
+                  {' '}
+                  Tolak Pengajuan
                 </h5>
                 <button 
                   type="button" 
@@ -1577,14 +1736,13 @@ export default function Page_Administrasi_Pengajuan_Drop_Out() {
                   onClick={handleRejectSubmit}
                 >
                   <i className="bi bi-x-circle me-1" aria-hidden="true"></i>
-                  {' Tolak'}
+                  {' '}
+                  Tolak
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}
-      </>
       )}
     </MainContent>
   );

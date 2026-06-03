@@ -118,13 +118,11 @@ const SsoPage = () => {
         const userData = {
           permission: data.listPermission,
           nama: ssoData.nama,
-          username: ssoData.username, // ⬅️ TAMBAHKAN INI UNTUK NDA-PRODI
           role: selectedRole.namaRole,
           aplikasi: selectedRole.namaAplikasi,
           appId: selectedRole.appId,
           roleId: selectedRole.roleId,
         };
-        
         Cookies.set("userData", encryptId(JSON.stringify(userData)));
         Cookies.set("permissionData", JSON.stringify(data.listPermission));
         Toast.success(

@@ -9,6 +9,7 @@ import Toast from "@/components/common/Toast";
 import SweetAlert from "@/components/common/SweetAlert";
 import { API_LINK } from "@/lib/constant";
 import { getSSOData } from "@/context/user";
+import { decryptIdUrl } from "@/lib/encryptor";
 
 export default function EditPengunduranDiri() {
   const router = useRouter();
@@ -36,7 +37,14 @@ export default function EditPengunduranDiri() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const id = decodeURIComponent(params.id);
+      const encryptedId = decodeURIComponent(params.id);
+      const id = decryptIdUrl(encryptedId);
+      
+      if (!id) {
+        Toast.error("ID tidak valid");
+        router.push("/pages/administrasi-akademik/pengunduran-diri");
+        return;
+      }
       
       // Get JWT token
       const jwtToken = document.cookie
@@ -290,7 +298,7 @@ export default function EditPengunduranDiri() {
         {/* Action Buttons */}
         <div className="d-flex justify-content-start gap-2 pt-3 border-top">
           <Button
-            classType="warning"
+            classType="secondary"
             label="Kembali"
             onClick={() => router.back()}
           />

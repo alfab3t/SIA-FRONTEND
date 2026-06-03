@@ -7,17 +7,10 @@ export default function Badge({
   className = "",
 }) {
   const defaultStyleMap = {
-    Draft: "bg-secondary-subtle text-secondary",
     Diproses: "bg-warning-subtle text-warning",
-    "Belum Disetujui Wadir 1": "bg-warning-subtle text-warning",
-    "Belum Disetujui Direktur": "bg-warning-subtle text-warning",
-    "Belum Disetujui Finance": "bg-warning-subtle text-warning",
-    "Menunggu Persetujuan Wadir 1": "bg-warning-subtle text-warning",
-    "Menunggu Persetujuan Direktur": "bg-warning-subtle text-warning",
-    "Menunggu Persetujuan Finance": "bg-warning-subtle text-warning",
-    "Menunggu Upload SK": "bg-warning-subtle text-warning",
     Disetujui: "bg-success-subtle text-success",
     Ditolak: "bg-danger-subtle text-danger",
+    Draft: "bg-info-subtle text-info",
     Aktif: "bg-success-subtle text-success",
     "Tidak Aktif": "bg-secondary-subtle text-secondary",
     Selesai: "bg-primary-subtle text-primary",
@@ -26,7 +19,6 @@ export default function Badge({
 
   const styleMap = { ...defaultStyleMap, ...customMap };
   const badgeClass = styleMap[status] || "bg-secondary-subtle text-secondary";
-
   const sizeClasses = {
     xs: "px-1 py-0",
     sm: "px-2 py-1",
